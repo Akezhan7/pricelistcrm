@@ -1,0 +1,125 @@
+﻿const express = require('express');
+const router = express.Router();
+const { body, param, query, validationResult } = require('express-validator');
+const { auth } = require('../middleware/auth');
+const checkRole = require('../middleware/checkRole');
+const orderController = require('../controllers/orderController');
+
+const handleValidationErrors = (req, res, next) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Ошибка валидации',
+      errors: errors.array().map(err => ({
+        field: err.param,
+        message: err.msg,
+        value: err.value
+      }))
+    });
+  }
+  next();
+};
+
+router.get('/',
+  auth,
+  query('page').optional().isInt({ min: 1 }),
+  query('limit').optional().isInt({ min: 1, max: 100 }),
+  query('status').optional().isIn(['В работе', 'На точке', 'В пути', 'На складе']),
+  query('paymentStatus').optional().isIn(['Не оплачено', 'Частично оплачено', 'Оплачено']),
+  query('supplierId').optional().isInt(),
+  query('dateFrom').optional().isISO8601(),
+  query('dateTo').optional().isISO8601(),
+  handleValidationErrors,
+  orderController.getOrders
+);
+
+router.post('/',
+  auth,
+  checkRole(['admin', 'purchase_manager']),
+  body('supplierId').notEmpty().isInt(),
+  body('expectedDeliveryDate').optional({ nullable: true }).isISO8601(),
+  body('deliveryLocation').optional().isString().trim().isLength({ max: 200 }),
+  body('notes').optional({ nullable: true }).isString().trim(),
+  body('items').notEmpty().isArray({ min: 1 }),
+  body('items.*.productId').notEmpty().isInt(),
+  body('items.*.quantity').notEmpty().isInt({ min: 1 }),
+  body('items.*.priceAtPurchase').notEmpty().isFloat({ min: 0 }),
+  body('items.*.notes').optional({ nullable: true }).isString().trim(),
+  handleValidationErrors,
+  orderController.createOrder
+);
+
+router.patch('/:id/status',
+  auth,
+  param('id').isInt(),
+  body('status').notEmpty().isIn(['В работе', 'На точке', 'В пути', 'На складе']),
+  body('comment').optional({ nullable: true }).isString().trim().isLength({ max: 500 }),
+  handleValidationErrors,
+  orderController.changeOrderStatus
+);
+
+router.patch('/:id/payment',
+  auth,
+  checkRole(['admin', 'purchase_manager', 'accountant']),
+  param('id').isInt(),
+  body('amount').notEmpty().isFloat({ min: 0.01 }).withMessage('Сумма должна быть больше нуля'),
+  body('comment').optional({ nullable: true }).isString().trim().isLength({ max: 500 }),
+  handleValidationErrors,
+  orderController.updatePayment
+);
+
+router.get('/:id',
+  auth,
+  param('id').isInt(),
+  handleValidationErrors,
+  orderController.getOrderById
+);
+
+router.put('/:id',
+  auth,
+  checkRole(['admin', 'purchase_manager']),
+  param('id').isInt(),
+  body('expectedDeliveryDate').optional({ nullable: true }).isISO8601(),
+  body('deliveryLocation').optional().isString().trim().isLength({ max: 200 }),
+  body('notes').optional({ nullable: true }).isString().trim(),
+  body('items').optional().isArray({ min: 1 }),
+  body('items.*.productId').if(body('items').exists()).notEmpty().isInt(),
+  body('items.*.quantity').if(body('items').exists()).notEmpty().isInt({ min: 1 }),
+  body('items.*.priceAtPurchase').if(body('items').exists()).notEmpty().isFloat({ min: 0 }),
+  handleValidationErrors,
+  orderController.updateOrder
+);
+
+// DELETE /api/orders/:id - Удалить заявку (мягкое удаление)
+router.delete('/:id',
+  auth,
+  checkRole(['admin']),
+  param('id').isInt(),
+  handleValidationErrors,
+  orderController.deleteOrder
+);
+
+// GET /api/orders/:id/payments - Получить историю платежей по заказу
+router.get('/:id/payments',
+  auth,
+  param('id').isInt(),
+  handleValidationErrors,
+  orderController.getOrderPayments
+);
+
+// PATCH /api/orders/:id/update-prices - Обновить базовые цены товаров через заявку
+router.patch('/:id/update-prices',
+  auth,
+  checkRole(['admin', 'purchase_manager']),
+  param('id').isInt(),
+  body('priceUpdates').notEmpty().isArray({ min: 1 }),
+  body('priceUpdates.*.productId').notEmpty().isInt(),
+  body('priceUpdates.*.newCostPrice').optional().isFloat({ min: 0 }),
+  body('priceUpdates.*.newSellingPrice').optional().isFloat({ min: 0 }),
+  body('priceUpdates.*.reason').optional().isString().trim().isLength({ max: 200 }),
+  handleValidationErrors,
+  orderController.updateProductPricesFromOrder
+);
+
+module.exports = router;
