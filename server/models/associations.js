@@ -136,6 +136,19 @@ Product.hasMany(OrderItem, {
   as: 'orderItems',
 });
 
+// Связь с вариацией товара (опциональная)
+OrderItem.belongsTo(ProductVariation, {
+  foreignKey: 'productVariationId',
+  as: 'variation',
+  onDelete: 'RESTRICT',
+  onUpdate: 'CASCADE',
+});
+
+ProductVariation.hasMany(OrderItem, {
+  foreignKey: 'productVariationId',
+  as: 'orderItems',
+});
+
 // Связи для истории статусов заявок
 Order.hasMany(OrderStatusHistory, {
   foreignKey: 'orderId',

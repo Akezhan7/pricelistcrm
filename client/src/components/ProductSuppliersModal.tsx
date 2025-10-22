@@ -3,6 +3,15 @@ import { X, Plus, Trash2, Edit, Check, AlertCircle, UserPlus, Users, Upload } fr
 import { Product, Supplier, SupplierWithPrice } from '../types';
 import api from '../utils/api';
 
+type Sector = {
+  id: number;
+  name: string;
+  code: string;
+  productType: string;
+  color?: string;
+  icon?: string;
+};
+
 type ProductSuppliersModalProps = {
   isOpen: boolean;
   onClose: () => void;
@@ -49,6 +58,18 @@ export const ProductSuppliersModal: React.FC<ProductSuppliersModalProps> = ({
   const [showAddForm, setShowAddForm] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [actionType, setActionType] = useState<'existing' | 'create' | null>(null);
+  
+  // Состояния для работы с секторами
+  const [sectors, setSectors] = useState<Sector[]>([]);
+  const [loadingSectors, setLoadingSectors] = useState(false);
+  const [showAddSector, setShowAddSector] = useState(false);
+  const [newSector, setNewSector] = useState({
+    name: '',
+    code: '',
+    productType: '',
+    color: '#6b7280',
+  });
+  const [addingSector, setAddingSector] = useState(false);
   const [newSupplierData, setNewSupplierData] = useState<NewSupplierData>({
     supplierId: '',
     supplierPrice: '',
@@ -86,6 +107,7 @@ export const ProductSuppliersModal: React.FC<ProductSuppliersModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       loadAvailableSuppliers();
+      loadSectors();
     }
   }, [isOpen]);
 
@@ -95,6 +117,58 @@ export const ProductSuppliersModal: React.FC<ProductSuppliersModalProps> = ({
       setAvailableSuppliers(response.data.data.suppliers || []);
     } catch (error) {
       console.error('Ошибка загрузки поставщиков:', error);
+    }
+  };
+
+  const loadSectors = async () => {
+    try {
+      setLoadingSectors(true);
+      const response = await api.get('/sectors');
+      setSectors(response.data.data || []);
+    } catch (err) {
+      console.error('Ошибка загрузки секторов:', err);
+    } finally {
+      setLoadingSectors(false);
+    }
+  };
+
+  const handleAddSector = async () => {
+    if (!newSector.name.trim() || !newSector.code.trim() || !newSector.productType.trim()) {
+      setError('Заполните все поля нового сектора');
+      return;
+    }
+
+    try {
+      setAddingSector(true);
+      setError('');
+      
+      const response = await api.post('/sectors', {
+        name: newSector.name,
+        code: newSector.code,
+        productType: newSector.productType,
+        color: newSector.color,
+      });
+
+      const createdSector = response.data.data;
+      
+      // Обновляем список секторов
+      setSectors([...sectors, createdSector]);
+      
+      // Автоматически выбираем новый сектор
+      setCreateSupplierData({ ...createSupplierData, sector: createdSector.name });
+      
+      // Сбрасываем форму добавления сектора
+      setNewSector({
+        name: '',
+        code: '',
+        productType: '',
+        color: '#6b7280',
+      });
+      setShowAddSector(false);
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Ошибка создания сектора');
+    } finally {
+      setAddingSector(false);
     }
   };
 
@@ -656,24 +730,131 @@ export const ProductSuppliersModal: React.FC<ProductSuppliersModalProps> = ({
                       <label className="block text-sm font-medium text-gray-700 mb-1">
                         Сектор
                       </label>
-                      <select
-                        className="input-field"
-                        value={createSupplierData.sector}
-                        onChange={(e) => setCreateSupplierData({ ...createSupplierData, sector: e.target.value })}
-                      >
-                        <option value="">Выберите сектор</option>
-                        <option value="Игрушки">Игрушки</option>
-                        <option value="Стройматериалы">Стройматериалы</option>
-                        <option value="Посуда">Посуда</option>
-                        <option value="Текстиль">Текстиль</option>
-                        <option value="Электроника">Электроника</option>
-                        <option value="Косметика">Косметика</option>
-                        <option value="Автотовары">Автотовары</option>
-                        <option value="Продукты">Продукты</option>
-                        <option value="Бытовая химия">Бытовая химия</option>
-                        <option value="Спорт">Спорт</option>
-                        <option value="Другое">Другое</option>
-                      </select>
+                      <div className="flex gap-2">
+                        <select
+                          className="input-field flex-1"
+                          value={createSupplierData.sector}
+                          onChange={(e) => setCreateSupplierData({ ...createSupplierData, sector: e.target.value })}
+                          disabled={loadingSectors}
+                        >
+                          <option value="">
+                            {loadingSectors ? 'Загрузка секторов...' : 'Выберите сектор'}
+                          </option>
+                          {sectors.map((sector) => (
+                            <option key={sector.id} value={sector.name}>
+                              {sector.name} ({sector.productType})
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          type="button"
+                          onClick={() => setShowAddSector(!showAddSector)}
+                          className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1"
+                          title="Добавить новый сектор"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </button>
+                      </div>
+                      
+                      {/* Форма быстрого добавления сектора */}
+                      {showAddSector && (
+                        <div className="mt-3 p-3 bg-white border border-gray-300 rounded-lg space-y-3 shadow-sm">
+                          <h4 className="text-sm font-medium text-gray-900">Добавить новый сектор</h4>
+                          
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Название сектора *
+                            </label>
+                            <input
+                              type="text"
+                              className="input-field text-sm"
+                              placeholder="Например: Игрушки"
+                              value={newSector.name}
+                              onChange={(e) => setNewSector({ ...newSector, name: e.target.value })}
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Код сектора *
+                            </label>
+                            <input
+                              type="text"
+                              className="input-field text-sm"
+                              placeholder="Например: TOY"
+                              value={newSector.code}
+                              onChange={(e) => setNewSector({ ...newSector, code: e.target.value.toUpperCase() })}
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Тип продукции *
+                            </label>
+                            <input
+                              type="text"
+                              className="input-field text-sm"
+                              placeholder="Например: Детские товары"
+                              value={newSector.productType}
+                              onChange={(e) => setNewSector({ ...newSector, productType: e.target.value })}
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Цвет (опционально)
+                            </label>
+                            <div className="flex gap-2 items-center">
+                              <input
+                                type="color"
+                                className="h-10 w-16 rounded border border-gray-300 cursor-pointer"
+                                value={newSector.color}
+                                onChange={(e) => setNewSector({ ...newSector, color: e.target.value })}
+                              />
+                              <span className="text-xs text-gray-500">
+                                Цвет для отображения на карте
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="flex justify-end gap-2 pt-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setShowAddSector(false);
+                                setNewSector({
+                                  name: '',
+                                  code: '',
+                                  productType: '',
+                                  color: '#6b7280',
+                                });
+                              }}
+                              className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+                              disabled={addingSector}
+                            >
+                              Отмена
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleAddSector}
+                              className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-1"
+                              disabled={addingSector}
+                            >
+                              {addingSector ? (
+                                <>
+                                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
+                                  Добавление...
+                                </>
+                              ) : (
+                                <>
+                                  <Plus className="h-3 w-3" />
+                                  Добавить сектор
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

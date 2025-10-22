@@ -43,16 +43,33 @@ export const ProductList: React.FC<ProductListProps> = ({
   const [productForVariations, setProductForVariations] = useState<Product | null>(null);
   // Состояние для истории цен
   const [productForPriceHistory, setProductForPriceHistory] = useState<Product | null>(null);
+  // Локальный поиск по товарам
+  const [localSearchQuery, setLocalSearchQuery] = useState('');
 
-  // Фильтрация товаров по поисковому запросу
+  // Фильтрация товаров по поисковому запросу (глобальный + локальный)
   const filteredProducts = useMemo(() => {
-    if (!searchQuery.trim()) return products;
-    const query = searchQuery.toLowerCase();
-    return products.filter(product =>
-      product.name.toLowerCase().includes(query) ||
-      product.article.toLowerCase().includes(query)
-    );
-  }, [products, searchQuery]);
+    let filtered = products;
+    
+    // Сначала применяем глобальный поиск из Header
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(product =>
+        product.name.toLowerCase().includes(query) ||
+        product.article.toLowerCase().includes(query)
+      );
+    }
+    
+    // Затем применяем локальный поиск
+    if (localSearchQuery.trim()) {
+      const query = localSearchQuery.toLowerCase();
+      filtered = filtered.filter(product =>
+        product.name.toLowerCase().includes(query) ||
+        product.article.toLowerCase().includes(query)
+      );
+    }
+    
+    return filtered;
+  }, [products, searchQuery, localSearchQuery]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('ru-RU').format(price);
@@ -95,13 +112,41 @@ export const ProductList: React.FC<ProductListProps> = ({
         </div>
       )}
 
+      {/* Поле поиска по товарам */}
+      <div className="px-4 py-3 border-b border-gray-200 bg-white">
+        <div className="relative">
+          <input
+            type="text"
+            placeholder="Поиск по названию или артикулу..."
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+            value={localSearchQuery}
+            onChange={(e) => setLocalSearchQuery(e.target.value)}
+          />
+          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          {localSearchQuery && (
+            <button
+              onClick={() => setLocalSearchQuery('')}
+              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Список товаров */}
       <div className="flex-1 overflow-y-auto">
         {filteredProducts.length === 0 ? (
           <div className="p-4 text-center text-gray-500">
             <div className="text-4xl mb-2">📦</div>
             <p>
-              {searchQuery ? 'Товары не найдены' : 'Товары не добавлены'}
+              {(searchQuery || localSearchQuery) ? 'Товары не найдены' : 'Товары не добавлены'}
             </p>
           </div>
         ) : (

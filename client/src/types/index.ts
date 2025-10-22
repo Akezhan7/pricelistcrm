@@ -189,6 +189,7 @@ export interface OrderItem {
   id: number;
   orderId: number;
   productId: number;
+  productVariationId?: number | null;
   product?: {
     id: number;
     name: string;
@@ -196,6 +197,13 @@ export interface OrderItem {
     image?: string;
     costPrice?: number | string;
     sellingPrice?: number | string;
+  };
+  variation?: {
+    id: number;
+    name: string;
+    value: string;
+    price: number | string;
+    sku?: string;
   };
   quantity: number;
   priceAtPurchase: string | number;
@@ -226,6 +234,7 @@ export interface CreateOrderDto {
   notes?: string;
   items: Array<{
     productId: number;
+    productVariationId?: number;
     quantity: number;
     priceAtPurchase: number;
     notes?: string;
@@ -238,6 +247,7 @@ export interface UpdateOrderDto {
   notes?: string;
   items?: Array<{
     productId: number;
+    productVariationId?: number;
     quantity: number;
     priceAtPurchase: number;
     notes?: string;

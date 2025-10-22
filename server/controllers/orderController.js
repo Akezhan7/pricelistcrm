@@ -1,6 +1,6 @@
 const { Op } = require('sequelize');
 const sequelize = require('../config/database');
-const { Order, OrderItem, OrderStatusHistory, Product, Supplier, User, Payment } = require('../models');
+const { Order, OrderItem, OrderStatusHistory, Product, Supplier, User, Payment, ProductVariation } = require('../models');
 const { recalculateSupplierDebt } = require('./paymentController');
 const { createPriceHistoryRecord } = require('./priceHistoryController');
 
@@ -199,6 +199,11 @@ exports.getOrderById = async (req, res) => {
               model: Product,
               as: 'product',
               attributes: ['id', 'name', 'article', 'image', 'costPrice', 'sellingPrice']
+            },
+            {
+              model: ProductVariation,
+              as: 'variation',
+              attributes: ['id', 'name', 'value', 'price', 'costPrice', 'sku']
             }
           ]
         },
@@ -271,7 +276,7 @@ exports.createOrder = async (req, res) => {
       });
     }
 
-    // Проверка существования всех товаров и расчет общей суммы
+    // Проверка существования всех товаров и вариаций, расчет общей суммы
     let totalAmount = 0;
     for (const item of items) {
       const product = await Product.findByPk(item.productId);
@@ -283,6 +288,27 @@ exports.createOrder = async (req, res) => {
           errors: [{ field: 'items', message: `Товар с ID ${item.productId} не найден` }]
         });
       }
+
+      // Если указана вариация, проверить её существование
+      if (item.productVariationId) {
+        const variation = await ProductVariation.findOne({
+          where: {
+            id: item.productVariationId,
+            productId: item.productId,
+            isActive: true
+          }
+        });
+        
+        if (!variation) {
+          await transaction.rollback();
+          return res.status(400).json({
+            success: false,
+            message: `Вариация товара с ID ${item.productVariationId} не найдена`,
+            errors: [{ field: 'items', message: `Вариация товара с ID ${item.productVariationId} не найдена` }]
+          });
+        }
+      }
+
       totalAmount += parseFloat(item.priceAtPurchase) * parseInt(item.quantity);
     }
 
@@ -308,6 +334,7 @@ exports.createOrder = async (req, res) => {
     const orderItemsData = items.map(item => ({
       orderId: order.id,
       productId: item.productId,
+      productVariationId: item.productVariationId || null,
       quantity: item.quantity,
       priceAtPurchase: item.priceAtPurchase,
       totalPrice: (parseFloat(item.priceAtPurchase) * parseInt(item.quantity)).toFixed(2),
@@ -347,6 +374,11 @@ exports.createOrder = async (req, res) => {
               model: Product,
               as: 'product',
               attributes: ['id', 'name', 'article']
+            },
+            {
+              model: ProductVariation,
+              as: 'variation',
+              attributes: ['id', 'name', 'value', 'price', 'sku']
             }
           ]
         }
@@ -418,7 +450,7 @@ exports.updateOrder = async (req, res) => {
         transaction
       });
 
-      // Проверка существования товаров и расчет новой суммы
+      // Проверка существования товаров и вариаций, расчет новой суммы
       let totalAmount = 0;
       for (const item of items) {
         const product = await Product.findByPk(item.productId);
@@ -429,6 +461,26 @@ exports.updateOrder = async (req, res) => {
             message: `Товар с ID ${item.productId} не найден`
           });
         }
+
+        // Если указана вариация, проверить её существование
+        if (item.productVariationId) {
+          const variation = await ProductVariation.findOne({
+            where: {
+              id: item.productVariationId,
+              productId: item.productId,
+              isActive: true
+            }
+          });
+          
+          if (!variation) {
+            await transaction.rollback();
+            return res.status(400).json({
+              success: false,
+              message: `Вариация товара с ID ${item.productVariationId} не найдена`
+            });
+          }
+        }
+
         totalAmount += parseFloat(item.priceAtPurchase) * parseInt(item.quantity);
       }
 
@@ -436,6 +488,7 @@ exports.updateOrder = async (req, res) => {
       const orderItemsData = items.map(item => ({
         orderId: order.id,
         productId: item.productId,
+        productVariationId: item.productVariationId || null,
         quantity: item.quantity,
         priceAtPurchase: item.priceAtPurchase,
         totalPrice: (parseFloat(item.priceAtPurchase) * parseInt(item.quantity)).toFixed(2),
@@ -470,6 +523,11 @@ exports.updateOrder = async (req, res) => {
               model: Product,
               as: 'product',
               attributes: ['id', 'name', 'article']
+            },
+            {
+              model: ProductVariation,
+              as: 'variation',
+              attributes: ['id', 'name', 'value', 'price', 'sku']
             }
           ]
         }

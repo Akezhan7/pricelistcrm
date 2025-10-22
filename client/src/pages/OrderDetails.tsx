@@ -17,13 +17,17 @@ import {
   FileText,
   CreditCard,
   DollarSign,
-  TrendingUp
+  TrendingUp,
+  Download,
+  Printer
 } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import ordersApi from '../services/ordersApi';
 import ChangeOrderStatusModal from '../components/ChangeOrderStatusModal';
 import PaymentModal from '../components/PaymentModal';
 import { UpdatePricesFromOrderModal } from '../components/UpdatePricesFromOrderModal';
+import EditOrderModal from '../components/EditOrderModal';
+import { generateOrderPDF } from '../utils/pdfGenerator';
 import type { Order, OrderStatus } from '../types';
 
 const OrderDetails: React.FC = () => {
@@ -36,6 +40,7 @@ const OrderDetails: React.FC = () => {
   const [showChangeStatusModal, setShowChangeStatusModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showUpdatePricesModal, setShowUpdatePricesModal] = useState(false);
+  const [showEditOrderModal, setShowEditOrderModal] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [payments, setPayments] = useState<any[]>([]);
 
@@ -137,6 +142,18 @@ const OrderDetails: React.FC = () => {
       alert(error.message || 'Ошибка при регистрации оплаты');
     } finally {
       setPaymentLoading(false);
+    }
+  };
+
+  // Обработчик скачивания PDF
+  const handleDownloadPDF = async () => {
+    if (!order) return;
+    
+    try {
+      await generateOrderPDF(order);
+    } catch (error: any) {
+      console.error('Ошибка генерации PDF:', error);
+      alert('Ошибка при создании PDF документа');
     }
   };
 
@@ -244,7 +261,7 @@ const OrderDetails: React.FC = () => {
               {order.status === 'В работе' && (
                 <>
                   <button
-                    onClick={() => alert('Функция редактирования в разработке')}
+                    onClick={() => setShowEditOrderModal(true)}
                     className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                   >
                     <Edit className="w-4 h-4" />
@@ -339,7 +356,17 @@ const OrderDetails: React.FC = () => {
 
           {/* Товары в заявке */}
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Товары</h2>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Товары</h2>
+              <button
+                onClick={handleDownloadPDF}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-sm"
+                title="Скачать заявку в PDF"
+              >
+                <Download className="w-4 h-4" />
+                Скачать PDF
+              </button>
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
@@ -360,21 +387,34 @@ const OrderDetails: React.FC = () => {
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {order.items?.map((item) => (
-                    <tr key={item.id}>
+                    <tr key={item.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3">
-                        <div className="font-medium text-gray-900">{item.product?.name}</div>
-                        <div className="text-sm text-gray-500">{item.product?.article}</div>
-                        {item.notes && (
-                          <div className="text-sm text-gray-600 mt-1">{item.notes}</div>
-                        )}
+                        <div className="flex items-start gap-2">
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">{item.product?.name}</div>
+                            <div className="text-sm text-gray-500">{item.product?.article}</div>
+                            {item.variation && (
+                              <div className="mt-1 inline-flex items-center px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">
+                                <span className="mr-1">🔹</span>
+                                {item.variation.name}: <span className="font-semibold ml-1">{item.variation.value}</span>
+                                {item.variation.sku && (
+                                  <span className="text-blue-600 ml-2 opacity-75">({item.variation.sku})</span>
+                                )}
+                              </div>
+                            )}
+                            {item.notes && (
+                              <div className="text-sm text-gray-600 mt-1 italic">📝 {item.notes}</div>
+                            )}
+                          </div>
+                        </div>
                       </td>
-                      <td className="px-4 py-3 text-right text-gray-900">
+                      <td className="px-4 py-3 text-right text-gray-900 font-medium">
                         {item.quantity}
                       </td>
                       <td className="px-4 py-3 text-right text-gray-900">
                         {Number(item.priceAtPurchase).toLocaleString('ru-RU')} ₸
                       </td>
-                      <td className="px-4 py-3 text-right font-medium text-gray-900">
+                      <td className="px-4 py-3 text-right font-semibold text-gray-900">
                         {Number(item.totalPrice).toLocaleString('ru-RU')} ₸
                       </td>
                     </tr>
@@ -564,16 +604,28 @@ const OrderDetails: React.FC = () => {
 
         {/* Модальное окно обновления цен товаров */}
         {order && (
-          <UpdatePricesFromOrderModal
-            isOpen={showUpdatePricesModal}
-            onClose={() => setShowUpdatePricesModal(false)}
-            onSuccess={() => {
-              setShowUpdatePricesModal(false);
-              // Можно добавить toast-уведомление
-              alert('Цены товаров успешно обновлены!');
-            }}
-            order={order}
-          />
+          <>
+            <UpdatePricesFromOrderModal
+              isOpen={showUpdatePricesModal}
+              onClose={() => setShowUpdatePricesModal(false)}
+              onSuccess={() => {
+                setShowUpdatePricesModal(false);
+                alert('Цены товаров успешно обновлены!');
+              }}
+              order={order}
+            />
+
+            {/* Модальное окно редактирования заявки */}
+            <EditOrderModal
+              isOpen={showEditOrderModal}
+              onClose={() => setShowEditOrderModal(false)}
+              onSuccess={() => {
+                loadOrder();
+                alert('Заявка успешно обновлена!');
+              }}
+              order={order}
+            />
+          </>
         )}
       </div>
     </Layout>

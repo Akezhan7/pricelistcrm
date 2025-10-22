@@ -17,6 +17,11 @@ const OrderItem = sequelize.define('OrderItem', {
     allowNull: false,
     comment: 'ID товара',
   },
+  productVariationId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: 'ID вариации товара (если выбрана конкретная вариация)',
+  },
   quantity: {
     type: DataTypes.INTEGER,
     allowNull: false,
@@ -57,6 +62,10 @@ const OrderItem = sequelize.define('OrderItem', {
     {
       fields: ['product_id'],
       name: 'order_items_product_id_idx',
+    },
+    {
+      fields: ['product_variation_id'],
+      name: 'order_items_product_variation_id_idx',
     },
     {
       fields: ['order_id', 'product_id'],

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Search, Loader2, AlertCircle, Package } from 'lucide-react';
+import { X, Plus, Trash2, Search, Loader2, AlertCircle, Package, PlusCircle } from 'lucide-react';
 import ordersApi from '../services/ordersApi';
 import suppliersApi from '../services/suppliersApi';
 import productsApi from '../services/productsApi';
-import type { Supplier, Product, CreateOrderDto } from '../types';
+import api from '../utils/api';
+import type { Supplier, Product, CreateOrderDto, ProductVariation } from '../types';
 
 interface CreateOrderModalProps {
   isOpen: boolean;
@@ -14,9 +15,12 @@ interface CreateOrderModalProps {
 interface OrderItemForm {
   productId: number;
   product?: Product;
+  productVariationId?: number | null;
+  selectedVariation?: ProductVariation | null;
   quantity: number;
   priceAtPurchase: number;
   notes?: string;
+  uniqueKey?: string; // Для различения одного товара с разными вариациями
 }
 
 const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ isOpen, onClose, onSuccess }) => {
@@ -89,24 +93,42 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ isOpen, onClose, on
   }, [productSearch, products]);
 
   // Добавление товара в список
-  const handleAddProduct = (product: Product) => {
-    // Проверка, не добавлен ли уже этот товар
-    if (items.some(item => item.productId === product.id)) {
-      alert('Этот товар уже добавлен в заявку');
-      return;
+  const handleAddProduct = async (product: Product) => {
+    // Загрузить вариации товара
+    let variations: ProductVariation[] = [];
+    try {
+      const response = await api.get(`/products/${product.id}/variations`);
+      variations = response.data.data.variations || [];
+    } catch (error) {
+      console.error('Ошибка загрузки вариаций:', error);
     }
 
-    const newItem: OrderItemForm = {
+    // Создать основную запись товара БЕЗ вариации
+    const mainItem: OrderItemForm = {
       productId: product.id,
-      product,
+      product: { ...product, variations },
+      productVariationId: null,
+      selectedVariation: null,
       quantity: 1,
       priceAtPurchase: Number(product.costPrice) || 0,
-      notes: ''
+      notes: '',
+      uniqueKey: `product-${product.id}-main-${Date.now()}`
     };
 
-    setItems([...items, newItem]);
-    setProductSearch('');
-    setShowProductDropdown(false);
+    // Если есть активные вариации, предложить их для добавления
+    const activeVariations = variations.filter(v => v.isActive);
+    
+    if (activeVariations.length > 0) {
+      // Показать модальное окно выбора вариаций
+      setItems([...items, mainItem]);
+      setProductSearch('');
+      setShowProductDropdown(false);
+    } else {
+      // Нет вариаций, просто добавить основной товар
+      setItems([...items, mainItem]);
+      setProductSearch('');
+      setShowProductDropdown(false);
+    }
   };
 
   // Удаление товара из списка
@@ -133,6 +155,60 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ isOpen, onClose, on
     const newItems = [...items];
     newItems[index].notes = notes;
     setItems(newItems);
+  };
+
+  // Выбор вариации товара
+  const handleSelectVariation = (index: number, variationId: number | null) => {
+    const newItems = [...items];
+    const item = newItems[index];
+    
+    if (variationId === null) {
+      // Выбран основной товар (без вариации)
+      item.productVariationId = null;
+      item.selectedVariation = null;
+      item.priceAtPurchase = Number(item.product?.costPrice) || 0;
+    } else {
+      // Выбрана конкретная вариация
+      const variation = item.product?.variations?.find(v => v.id === variationId);
+      if (variation) {
+        item.productVariationId = variationId;
+        item.selectedVariation = variation;
+        item.priceAtPurchase = Number(variation.price) || 0;
+      }
+    }
+    
+    setItems(newItems);
+  };
+
+  // Добавить вариацию как отдельную позицию
+  const handleAddVariationAsNewItem = (productIndex: number, variationId: number) => {
+    const sourceItem = items[productIndex];
+    const variation = sourceItem.product?.variations?.find(v => v.id === variationId);
+    
+    if (!variation) return;
+
+    // Проверить, не добавлена ли уже эта вариация
+    const alreadyExists = items.some(
+      item => item.productId === sourceItem.productId && item.productVariationId === variationId
+    );
+
+    if (alreadyExists) {
+      alert('Эта вариация уже добавлена в заявку');
+      return;
+    }
+
+    const newItem: OrderItemForm = {
+      productId: sourceItem.productId,
+      product: sourceItem.product,
+      productVariationId: variationId,
+      selectedVariation: variation,
+      quantity: 1,
+      priceAtPurchase: Number(variation.price) || 0,
+      notes: '',
+      uniqueKey: `product-${sourceItem.productId}-var-${variationId}-${Date.now()}`
+    };
+
+    setItems([...items, newItem]);
   };
 
   // Расчет общей суммы
@@ -174,6 +250,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ isOpen, onClose, on
         notes: notes || undefined,
         items: items.map(item => ({
           productId: item.productId,
+          productVariationId: item.productVariationId || undefined,
           quantity: item.quantity,
           priceAtPurchase: item.priceAtPurchase,
           notes: item.notes || undefined
@@ -328,21 +405,78 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ isOpen, onClose, on
                 {items.length > 0 ? (
                   <div className="space-y-3">
                     {items.map((item, index) => (
-                      <div key={index} className="bg-gray-50 p-4 rounded-lg">
+                      <div key={item.uniqueKey || index} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
                         <div className="flex items-start gap-4">
                           <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-3">
                             {/* Название товара */}
-                            <div className="md:col-span-2">
+                            <div className="md:col-span-4">
                               <label className="block text-xs font-medium text-gray-700 mb-1">
                                 Товар
                               </label>
-                              <div className="text-sm font-medium text-gray-900">
-                                {item.product?.name}
-                              </div>
-                              <div className="text-xs text-gray-500">
-                                {item.product?.article}
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <div className="text-sm font-medium text-gray-900">
+                                    {item.product?.name}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    {item.product?.article}
+                                  </div>
+                                </div>
+                                {/* Кнопка добавления вариаций */}
+                                {item.product?.variations && item.product.variations.length > 0 && (
+                                  <div className="relative group">
+                                    <button
+                                      type="button"
+                                      className="px-3 py-1 text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1"
+                                      onClick={() => {
+                                        const dropdown = document.getElementById(`variations-dropdown-${index}`);
+                                        if (dropdown) {
+                                          dropdown.classList.toggle('hidden');
+                                        }
+                                      }}
+                                    >
+                                      <PlusCircle className="w-3 h-3" />
+                                      Добавить вариацию
+                                    </button>
+                                    {/* Выпадающий список вариаций */}
+                                    <div
+                                      id={`variations-dropdown-${index}`}
+                                      className="hidden absolute right-0 mt-1 w-64 bg-white border border-gray-300 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto"
+                                    >
+                                      {item.product.variations.filter(v => v.isActive).map(variation => (
+                                        <button
+                                          key={variation.id}
+                                          type="button"
+                                          onClick={() => {
+                                            handleAddVariationAsNewItem(index, variation.id);
+                                            document.getElementById(`variations-dropdown-${index}`)?.classList.add('hidden');
+                                          }}
+                                          className="w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
+                                        >
+                                          <div className="text-sm font-medium text-gray-900">
+                                            {variation.name}: {variation.value}
+                                          </div>
+                                          <div className="text-xs text-gray-600">
+                                            {Number(variation.price).toLocaleString('ru-RU')} ₸
+                                            {variation.sku && <span className="text-gray-400 ml-1">({variation.sku})</span>}
+                                          </div>
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             </div>
+
+                            {/* Вариация (если выбрана) */}
+                            {item.selectedVariation && (
+                              <div className="md:col-span-4 bg-blue-50 p-2 rounded-lg">
+                                <div className="text-xs font-medium text-blue-900">
+                                  🔹 Вариация: {item.selectedVariation.name} - {item.selectedVariation.value}
+                                  {item.selectedVariation.sku && <span className="text-blue-700 ml-1">({item.selectedVariation.sku})</span>}
+                                </div>
+                              </div>
+                            )}
 
                             {/* Количество */}
                             <div>
@@ -374,7 +508,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ isOpen, onClose, on
                             </div>
 
                             {/* Заметки */}
-                            <div className="md:col-span-4">
+                            <div className="md:col-span-2">
                               <label className="block text-xs font-medium text-gray-700 mb-1">
                                 Заметки
                               </label>
@@ -382,7 +516,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ isOpen, onClose, on
                                 type="text"
                                 value={item.notes || ''}
                                 onChange={(e) => handleUpdateNotes(index, e.target.value)}
-                                placeholder="Размер, цвет, и т.д."
+                                placeholder="Дополнительная информация..."
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                               />
                             </div>

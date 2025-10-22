@@ -15,7 +15,6 @@ export const Dashboard: React.FC = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [supplierSearchQuery, setSupplierSearchQuery] = useState('');
   const [showMap, setShowMap] = useState(false);
 
   // Загрузка данных
@@ -61,21 +60,6 @@ export const Dashboard: React.FC = () => {
         return priceA - priceB;
       })
     : suppliers;
-
-  // Фильтрация поставщиков по поисковому запросу
-  const searchFilteredSuppliers = filteredSuppliers.filter(supplier => {
-    if (!supplierSearchQuery) return true;
-    
-    const query = supplierSearchQuery.toLowerCase();
-    return (
-      supplier.name.toLowerCase().includes(query) ||
-      supplier.phone?.toLowerCase().includes(query) ||
-      supplier.address?.toLowerCase().includes(query) ||
-      supplier.sector?.toLowerCase().includes(query) ||
-      supplier.row?.toString().toLowerCase().includes(query) ||
-      supplier.container?.toString().toLowerCase().includes(query)
-    );
-  });
 
   if (loading) {
     return (
@@ -162,46 +146,20 @@ export const Dashboard: React.FC = () => {
         {/* Правая часть - Поставщики */}
         <div className="flex-1 border border-gray-200 bg-white rounded-lg overflow-hidden flex flex-col shadow-sm">
           <div className="p-4 border-b border-gray-200 bg-gray-50">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-gray-900">
                 {selectedProduct ? (
                   <>
                     Поставщики товара: <span className="text-blue-600">{selectedProduct.name}</span>
-                    <span className="text-sm text-gray-500 ml-2">({searchFilteredSuppliers.length})</span>
                   </>
                 ) : (
-                  <>Все поставщики ({searchFilteredSuppliers.length})</>
+                  <>Все поставщики</>
                 )}
               </h2>
             </div>
-            {/* Поиск по поставщикам */}
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="Поиск по названию, телефону, адресу, сектору..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                value={supplierSearchQuery}
-                onChange={(e) => setSupplierSearchQuery(e.target.value)}
-              />
-              <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400">
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-              </div>
-              {supplierSearchQuery && (
-                <button
-                  onClick={() => setSupplierSearchQuery('')}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              )}
-            </div>
           </div>
           <SupplierCards
-            suppliers={searchFilteredSuppliers}
+            suppliers={filteredSuppliers}
             selectedProduct={selectedProduct}
             onRefresh={refreshData}
             canEdit={user?.role === 'admin'}
