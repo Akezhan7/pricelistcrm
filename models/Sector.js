@@ -50,11 +50,6 @@ const Sector = sequelize.define('Sector', {
     allowNull: true,
     comment: 'Иконка сектора (emoji или название иконки)',
   },
-  description: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-    comment: 'Описание сектора',
-  },
   position: {
     type: DataTypes.JSONB,
     allowNull: true,
