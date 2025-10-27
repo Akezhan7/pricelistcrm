@@ -6,7 +6,7 @@ const rateLimit = require('express-rate-limit');
 const compression = require('compression');
 const path = require('path');
 const { sequelize } = require('./models');
-const initializeDatabase = require('./scripts/initDb');
+const { runMigrations } = require('./scripts/runMigrations');
 
 // Импорт маршрутов
 const authRoutes = require('./routes/auth');
@@ -246,11 +246,22 @@ async function startServer() {
 
     // Проверка подключения к базе данных
     await sequelize.authenticate();
-    console.log('✓ Подключение к базе данных установлено');
+    console.log('✅ Подключение к базе данных установлено');
     
-    // Синхронизация моделей без alter (избегаем спама)
-    await sequelize.sync({ force: false, alter: false });
-    console.log('✓ Модели синхронизированы');
+    // ВАЖНО: Автоматические миграции при старте (в production)
+    if (process.env.AUTO_MIGRATE === 'true' || isProduction) {
+      console.log('\n📊 Запуск автоматических миграций...');
+      await runMigrations();
+    } else {
+      console.log('ℹ️  Автоматические миграции отключены (установите AUTO_MIGRATE=true)');
+    }
+    
+    // ВАЖНО: НЕ используем sync в production! Только миграции!
+    if (!isProduction) {
+      // В разработке можем использовать sync для удобства
+      await sequelize.sync({ force: false, alter: false });
+      console.log('✅ Модели синхронизированы (dev mode)');
+    }
     
     // Запуск сервера
     const server = app.listen(PORT, () => {

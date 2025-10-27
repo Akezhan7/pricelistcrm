@@ -10,9 +10,17 @@
     "build": "cd ../client && npm run build",
     "build:full": "npm install && cd ../client && npm install && npm run build",
     "install-deps": "npm install && cd ../client && npm install",
-    "setup": "npm run install-deps && npm run init-db",
+    "setup": "npm run install-deps && npm run db:migrate && npm run init-db",
     "init-db": "node scripts/initDb.js",
     "test-connection": "node scripts/testConnection.js",
+    "db:migrate": "node scripts/runMigrations.js up",
+    "db:migrate:undo": "node scripts/runMigrations.js down",
+    "db:migrate:status": "node scripts/runMigrations.js status",
+    "db:migrate:reset": "node scripts/runMigrations.js down:all && node scripts/runMigrations.js up",
+    "backup:create": "node scripts/backup.js create",
+    "backup:restore": "node scripts/backup.js restore",
+    "backup:list": "node scripts/backup.js list",
+    "backup:clean": "node scripts/backup.js clean",
     "migrate": "node scripts/migrateToPostgres.js",
     "migrate-orders": "node scripts/migrateOrders.js",
     "docker:up": "docker-compose up -d",
@@ -40,7 +48,9 @@
   },
   "devDependencies": {
     "concurrently": "^8.2.0",
-    "nodemon": "^3.0.1"
+    "nodemon": "^3.0.1",
+    "sequelize-cli": "^6.6.3",
+    "umzug": "^3.8.2"
   },
   "keywords": [
     "crm",

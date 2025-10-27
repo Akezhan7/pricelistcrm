@@ -1,6 +1,7 @@
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
-const { sequelize, User, Sector, Row, Supplier } = require('../models');
+const { sequelize, User, Sector, Row } = require('../models');
+const { runMigrations } = require('./runMigrations');
 
 // Начальные данные для секторов
 const DEFAULT_SECTORS = [
@@ -48,37 +49,37 @@ const DEFAULT_SECTORS = [
 
 async function initializeDatabase() {
   try {
-    console.log('Подключение к базе данных...');
+    console.log('🔌 Подключение к базе данных...');
     await sequelize.authenticate();
-    console.log('✓ Успешное подключение к базе данных');
+    console.log('✅ Успешное подключение к базе данных');
 
-    console.log('Полная пересоздания базы данных...');
-    console.log('⚠️  Это удалит все существующие данные!');
-    
-    // Полное пересоздание базы для новых моделей
-    await sequelize.sync({ force: true });
-    console.log('✓ База данных пересоздана');
+    // ВАЖНО: Используем миграции вместо sync({ force: true })
+    console.log('\n📊 Запуск миграций для создания/обновления структуры БД...');
+    await runMigrations();
+    console.log('✅ Структура БД актуальна');
 
-    // Создание администратора по умолчанию
-    const adminExists = await User.findOne({ where: { role: 'admin' } });
+    // Создание администратора по умолчанию (если не существует)
+    console.log('\n👤 Проверка наличия администратора...');
+    const adminEmail = process.env.DEFAULT_ADMIN_EMAIL || 'admin@example.com';
+    const adminExists = await User.findOne({ where: { email: adminEmail } });
     
     if (!adminExists) {
       console.log('Создание администратора по умолчанию...');
       await User.create({
         name: process.env.DEFAULT_ADMIN_NAME || 'Администратор',
-        email: process.env.DEFAULT_ADMIN_EMAIL || 'admin@example.com',
+        email: adminEmail,
         password: process.env.DEFAULT_ADMIN_PASSWORD || 'admin123',
         role: 'admin',
       });
-      console.log('✓ Администратор создан');
-      console.log(`   Email: ${process.env.DEFAULT_ADMIN_EMAIL || 'admin@example.com'}`);
-      console.log(`   Password: ${process.env.DEFAULT_ADMIN_PASSWORD || 'admin123'}`);
+      console.log('✅ Администратор создан');
+      console.log(`   📧 Email: ${adminEmail}`);
+      console.log(`   🔑 Password: ${process.env.DEFAULT_ADMIN_PASSWORD || 'admin123'}`);
     } else {
-      console.log('✓ Администратор уже существует');
+      console.log('✅ Администратор уже существует');
     }
 
-    // Создание начальных секторов
-    console.log('Проверка наличия секторов...');
+    // Создание начальных секторов (если нужно)
+    console.log('\n🗺️  Проверка наличия секторов...');
     const existingSectors = await Sector.count();
     
     if (existingSectors === 0) {
@@ -113,7 +114,7 @@ async function initializeDatabase() {
         console.log(`  ✓ Создано ${rowCount} рядов для сектора ${sector.name}`);
       }
     } else {
-      console.log('✓ Сектора уже существуют');
+      console.log('✅ Сектора уже существуют');
     }
 
     console.log('\n🎉 База данных успешно инициализирована!');
