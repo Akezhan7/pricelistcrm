@@ -63,12 +63,6 @@ const Row = sequelize.define('Row', {
     defaultValue: true,
     comment: 'Активен ли ряд',
   },
-  sortOrder: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    defaultValue: 0,
-    comment: 'Порядок сортировки внутри сектора',
-  },
 }, {
   indexes: [
     {

@@ -69,12 +69,6 @@ const Sector = sequelize.define('Sector', {
     defaultValue: true,
     comment: 'Активен ли сектор',
   },
-  sortOrder: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    defaultValue: 0,
-    comment: 'Порядок сортировки',
-  },
 }, {
   indexes: [
     {
