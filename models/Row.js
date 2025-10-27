@@ -53,11 +53,6 @@ const Row = sequelize.define('Row', {
     allowNull: true,
     comment: 'Позиция ряда относительно сектора {x: number, y: number, width: number, height: number}',
   },
-  notes: {
-    type: DataTypes.TEXT,
-    allowNull: true,
-    comment: 'Дополнительные заметки о ряде',
-  },
   isActive: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,

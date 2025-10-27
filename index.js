@@ -23,6 +23,9 @@ const PORT = process.env.PORT || 5000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const isProduction = NODE_ENV === 'production';
 
+// Trust proxy для Railway/Heroku
+app.set('trust proxy', 1);
+
 // Настройка CORS origins
 const allowedOrigins = [process.env.CLIENT_URL];
 if (!isProduction) {
