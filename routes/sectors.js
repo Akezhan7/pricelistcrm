@@ -22,7 +22,7 @@ router.get('/', async (req, res) => {
         }
       ],
       where: { isActive: true },
-      order: [['sortOrder', 'ASC'], ['name', 'ASC']],
+      order: [['name', 'ASC']],
     });
 
     res.json({
@@ -87,7 +87,7 @@ router.get('/:id', async (req, res) => {
 // POST /api/sectors - Создать новый сектор
 router.post('/', async (req, res) => {
   try {
-    const { name, code, productType, color, icon, description, position, sortOrder } = req.body;
+    const { name, code, productType, color, icon, position } = req.body;
 
     // Валидация обязательных полей
     if (!name || !code || !productType) {
@@ -118,9 +118,7 @@ router.post('/', async (req, res) => {
       productType,
       color: color || '#6b7280',
       icon,
-      description,
       position,
-      sortOrder: sortOrder || 0,
     });
 
     res.status(201).json({
@@ -142,7 +140,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, code, productType, color, icon, description, position, sortOrder, isActive } = req.body;
+    const { name, code, productType, color, icon, position, isActive } = req.body;
 
     const sector = await Sector.findByPk(id);
     if (!sector) {
@@ -175,9 +173,7 @@ router.put('/:id', async (req, res) => {
       productType: productType || sector.productType,
       color: color || sector.color,
       icon: icon !== undefined ? icon : sector.icon,
-      description: description !== undefined ? description : sector.description,
       position: position !== undefined ? position : sector.position,
-      sortOrder: sortOrder !== undefined ? sortOrder : sector.sortOrder,
       isActive: isActive !== undefined ? isActive : sector.isActive,
     });
 

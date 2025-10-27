@@ -28,7 +28,7 @@ router.get('/', async (req, res) => {
         }
       ],
       where: whereClause,
-      order: [['sortOrder', 'ASC'], ['name', 'ASC']],
+      order: [['name', 'ASC']],
     });
 
     res.json({
@@ -89,7 +89,7 @@ router.get('/:id', async (req, res) => {
 // POST /api/rows - Создать новый ряд
 router.post('/', async (req, res) => {
   try {
-    const { sectorId, name, code, totalSpaces, position, notes, sortOrder } = req.body;
+    const { sectorId, name, code, totalSpaces, position } = req.body;
 
     // Валидация обязательных полей
     if (!sectorId || !name || !code) {
@@ -136,8 +136,6 @@ router.post('/', async (req, res) => {
       totalSpaces: totalSpaces || 0,
       occupiedSpaces: 0,
       position,
-      notes,
-      sortOrder: sortOrder || 0,
     });
 
     // Обновляем количество рядов в секторе
@@ -174,7 +172,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, code, totalSpaces, occupiedSpaces, position, notes, sortOrder, isActive } = req.body;
+    const { name, code, totalSpaces, occupiedSpaces, position, isActive } = req.body;
 
     const row = await Row.findByPk(id);
     if (!row) {
@@ -208,8 +206,6 @@ router.put('/:id', async (req, res) => {
       totalSpaces: totalSpaces !== undefined ? totalSpaces : row.totalSpaces,
       occupiedSpaces: occupiedSpaces !== undefined ? occupiedSpaces : row.occupiedSpaces,
       position: position !== undefined ? position : row.position,
-      notes: notes !== undefined ? notes : row.notes,
-      sortOrder: sortOrder !== undefined ? sortOrder : row.sortOrder,
       isActive: isActive !== undefined ? isActive : row.isActive,
     });
 
