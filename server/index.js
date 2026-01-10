@@ -17,6 +17,10 @@ const rowRoutes = require('./routes/rows');
 const orderRoutes = require('./routes/orders');
 const paymentRoutes = require('./routes/payments');
 const priceHistoryRoutes = require('./routes/priceHistory');
+const categoryRoutes = require('./routes/categories');
+const collectorRoutes = require('./routes/collector');
+const warehouseRoutes = require('./routes/warehouse');
+const exportRoutes = require('./routes/export');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -151,11 +155,15 @@ app.get('/health', async (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/suppliers', supplierRoutes);
+app.use('/api/categories', categoryRoutes);
+app.use('/api/collector', collectorRoutes);
 app.use('/api/sectors', sectorRoutes);
 app.use('/api/rows', rowRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/price-history', priceHistoryRoutes);
+app.use('/api/warehouse', warehouseRoutes);
+app.use('/api/export', exportRoutes);
 
 // Базовый маршрут
 app.get('/api', (req, res) => {

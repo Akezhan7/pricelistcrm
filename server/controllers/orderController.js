@@ -1,8 +1,9 @@
 const { Op } = require('sequelize');
 const sequelize = require('../config/database');
-const { Order, OrderItem, OrderStatusHistory, Product, Supplier, User, Payment, ProductVariation } = require('../models');
+const { Order, OrderItem, OrderStatusHistory, Product, Supplier, User, Payment, ProductVariation, OrderConfirmation, CollectorTask } = require('../models');
 const { recalculateSupplierDebt } = require('./paymentController');
 const { createPriceHistoryRecord } = require('./priceHistoryController');
+const { formatOrderMessage, generateWhatsAppLink } = require('../utils/whatsappFormatter');
 
 /**
  * Автоматический расчет статуса оплаты на основе сумм
@@ -1058,4 +1059,557 @@ exports.updateProductPricesFromOrder = async (req, res) => {
     });
   }
 };
+
+/**
+ * Сформировать сообщение WhatsApp для заявки
+ * GET /api/orders/:id/whatsapp-message
+ */
+exports.getWhatsAppMessage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { useInternalNames = 'true' } = req.query;
+
+    const order = await Order.findOne({
+      where: { id, isActive: true },
+      include: [
+        {
+          model: Supplier,
+          as: 'supplier',
+          attributes: ['id', 'name', 'whatsapp'],
+        },
+        {
+          model: OrderItem,
+          as: 'items',
+          include: [
+            {
+              model: Product,
+              as: 'product',
+              attributes: ['id', 'name', 'internalName', 'kaspiName', 'article', 'image'],
+            },
+          ],
+        },
+      ],
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Заявка не найдена',
+      });
+    }
+
+    if (!order.supplier?.whatsapp) {
+      return res.status(400).json({
+        success: false,
+        message: 'У поставщика не указан номер WhatsApp',
+      });
+    }
+
+    // Формируем сообщение
+    const message = formatOrderMessage(order, {
+      useInternalNames: useInternalNames === 'true',
+      includeHeader: true,
+      includeFooter: true,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        message,
+        supplier: {
+          name: order.supplier.name,
+          whatsapp: order.supplier.whatsapp,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Ошибка генерации WhatsApp сообщения:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка генерации WhatsApp сообщения',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Отправить заявку поставщику через WhatsApp (генерация deep link)
+ * POST /api/orders/:id/send-whatsapp
+ */
+exports.sendToWhatsApp = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { useInternalNames = true, customMessage } = req.body;
+
+    const order = await Order.findOne({
+      where: { id, isActive: true },
+      include: [
+        {
+          model: Supplier,
+          as: 'supplier',
+          attributes: ['id', 'name', 'whatsapp'],
+        },
+        {
+          model: OrderItem,
+          as: 'items',
+          include: [
+            {
+              model: Product,
+              as: 'product',
+              attributes: ['id', 'name', 'internalName', 'kaspiName', 'article', 'image'],
+            },
+          ],
+        },
+      ],
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Заявка не найдена',
+      });
+    }
+
+    if (!order.supplier?.whatsapp) {
+      return res.status(400).json({
+        success: false,
+        message: 'У поставщика не указан номер WhatsApp',
+      });
+    }
+
+    // Используем кастомное сообщение или формируем автоматически
+    const message = customMessage || formatOrderMessage(order, {
+      useInternalNames,
+      includeHeader: true,
+      includeFooter: true,
+    });
+
+    // Генерируем WhatsApp deep link
+    const whatsappLink = generateWhatsAppLink(order.supplier.whatsapp, message);
+
+    // Обновляем статус заявки на "Отправлена поставщику"
+    const transaction = await sequelize.transaction();
+    try {
+      const oldStatus = order.status;
+      await order.update(
+        { status: 'Отправлена поставщику' },
+        { transaction }
+      );
+
+      // Логируем изменение статуса
+      await OrderStatusHistory.create(
+        {
+          orderId: order.id,
+          oldStatus,
+          newStatus: 'Отправлена поставщику',
+          changedBy: req.user.id,
+          notes: 'Отправлено в WhatsApp',
+        },
+        { transaction }
+      );
+
+      await transaction.commit();
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+
+    res.json({
+      success: true,
+      data: {
+        whatsappLink,
+        message,
+        supplier: {
+          name: order.supplier.name,
+          whatsapp: order.supplier.whatsapp,
+        },
+      },
+      message: 'WhatsApp ссылка успешно создана. Статус заявки обновлён.',
+    });
+  } catch (error) {
+    console.error('Ошибка отправки в WhatsApp:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка отправки в WhatsApp',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Полное подтверждение заявки поставщиком
+ * POST /api/orders/:id/confirm
+ */
+exports.confirmOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+
+    const order = await Order.findOne({
+      where: { id, isActive: true },
+      include: [
+        {
+          model: OrderItem,
+          as: 'items',
+          include: [
+            {
+              model: Product,
+              as: 'product',
+            },
+          ],
+        },
+      ],
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Заявка не найдена',
+      });
+    }
+
+    const transaction = await sequelize.transaction();
+
+    try {
+      // Создаём записи подтверждения для всех товаров (полное подтверждение)
+      const confirmations = order.items.map(item => ({
+        orderId: order.id,
+        productId: item.productId,
+        requestedQuantity: item.quantity,
+        confirmedQuantity: item.quantity,
+        isAvailable: true,
+        supplierComment: notes || 'Подтверждено полностью',
+      }));
+
+      await OrderConfirmation.bulkCreate(confirmations, { transaction });
+
+      // Обновляем статус заявки
+      const oldStatus = order.status;
+      await order.update(
+        { status: 'Подтверждена' },
+        { transaction }
+      );
+
+      // Логируем изменение статуса
+      await OrderStatusHistory.create(
+        {
+          orderId: order.id,
+          oldStatus,
+          newStatus: 'Подтверждена',
+          changedBy: req.user.id,
+          notes: notes || 'Заявка полностью подтверждена поставщиком',
+        },
+        { transaction }
+      );
+
+      await transaction.commit();
+
+      res.json({
+        success: true,
+        message: 'Заявка успешно подтверждена',
+        data: { order },
+      });
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  } catch (error) {
+    console.error('Ошибка подтверждения заявки:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка подтверждения заявки',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Частичное подтверждение заявки поставщиком
+ * POST /api/orders/:id/partial-confirm
+ */
+exports.partialConfirmOrder = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { items, notes } = req.body;
+
+    // items: [{ productId, confirmedQuantity, isAvailable, supplierComment }]
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Необходимо указать товары для подтверждения',
+      });
+    }
+
+    const order = await Order.findOne({
+      where: { id, isActive: true },
+      include: [
+        {
+          model: OrderItem,
+          as: 'items',
+        },
+      ],
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Заявка не найдена',
+      });
+    }
+
+    const transaction = await sequelize.transaction();
+
+    try {
+      // Создаём записи подтверждения
+      const confirmations = items.map(item => {
+        const orderItem = order.items.find(oi => oi.productId === item.productId);
+        if (!orderItem) {
+          throw new Error(`Товар с ID ${item.productId} не найден в заявке`);
+        }
+
+        return {
+          orderId: order.id,
+          productId: item.productId,
+          requestedQuantity: orderItem.quantity,
+          confirmedQuantity: item.confirmedQuantity || 0,
+          isAvailable: item.isAvailable !== false,
+          supplierComment: item.supplierComment || '',
+        };
+      });
+
+      await OrderConfirmation.bulkCreate(confirmations, { transaction });
+
+      // Определяем новый статус
+      const allConfirmed = confirmations.every(
+        c => c.confirmedQuantity === c.requestedQuantity && c.isAvailable
+      );
+
+      const newStatus = allConfirmed ? 'Подтверждена' : 'Частично подтверждена';
+
+      // Обновляем статус заявки
+      const oldStatus = order.status;
+      await order.update({ status: newStatus }, { transaction });
+
+      // Логируем изменение статуса
+      await OrderStatusHistory.create(
+        {
+          orderId: order.id,
+          oldStatus,
+          newStatus,
+          changedBy: req.user.id,
+          notes: notes || 'Заявка частично подтверждена поставщиком',
+        },
+        { transaction }
+      );
+
+      await transaction.commit();
+
+      res.json({
+        success: true,
+        message: 'Заявка успешно обработана',
+        data: {
+          order,
+          confirmations,
+          status: newStatus,
+        },
+      });
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  } catch (error) {
+    console.error('Ошибка частичного подтверждения заявки:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка частичного подтверждения заявки',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Назначить сборщика на заявку
+ * POST /api/orders/:id/assign-collector
+ */
+exports.assignCollector = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { collectorId, notes } = req.body;
+
+    if (!collectorId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Необходимо указать ID сборщика',
+      });
+    }
+
+    const order = await Order.findOne({
+      where: { id, isActive: true },
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Заявка не найдена',
+      });
+    }
+
+    // Проверяем, существует ли пользователь и является ли он сборщиком
+    const collector = await User.findByPk(collectorId);
+    if (!collector) {
+      return res.status(404).json({
+        success: false,
+        message: 'Сборщик не найден',
+      });
+    }
+
+    if (collector.role !== 'collector' && collector.role !== 'admin') {
+      return res.status(400).json({
+        success: false,
+        message: 'Указанный пользователь не является сборщиком',
+      });
+    }
+
+    const transaction = await sequelize.transaction();
+
+    try {
+      // Создаём задание для сборщика
+      const task = await CollectorTask.create(
+        {
+          orderId: order.id,
+          assignedTo: collectorId,
+          status: 'pending',
+          notes: notes || '',
+        },
+        { transaction }
+      );
+
+      // Обновляем статус заявки
+      const oldStatus = order.status;
+      await order.update({ status: 'В сборе' }, { transaction });
+
+      // Логируем изменение статуса
+      await OrderStatusHistory.create(
+        {
+          orderId: order.id,
+          oldStatus,
+          newStatus: 'В сборе',
+          changedBy: req.user.id,
+          notes: `Назначен сборщик: ${collector.name}`,
+        },
+        { transaction }
+      );
+
+      await transaction.commit();
+
+      // Получаем полную информацию о задании
+      const createdTask = await CollectorTask.findByPk(task.id, {
+        include: [
+          {
+            model: User,
+            as: 'collector',
+            attributes: ['id', 'name', 'email'],
+          },
+          {
+            model: Order,
+            as: 'order',
+            attributes: ['id', 'orderNumber', 'deliveryLocation'],
+          },
+        ],
+      });
+
+      res.json({
+        success: true,
+        message: 'Сборщик успешно назначен',
+        data: { task: createdTask },
+      });
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  } catch (error) {
+    console.error('Ошибка назначения сборщика:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка назначения сборщика',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Отметить товар как собранный
+ * PUT /api/orders/:id/collect
+ */
+exports.markAsCollected = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { notes } = req.body;
+
+    const order = await Order.findOne({
+      where: { id, isActive: true },
+    });
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Заявка не найдена',
+      });
+    }
+
+    const transaction = await sequelize.transaction();
+
+    try {
+      // Обновляем статус заявки
+      const oldStatus = order.status;
+      await order.update({ status: 'Забрана' }, { transaction });
+
+      // Логируем изменение статуса
+      await OrderStatusHistory.create(
+        {
+          orderId: order.id,
+          oldStatus,
+          newStatus: 'Забрана',
+          changedBy: req.user.id,
+          notes: notes || 'Товар забран у поставщика',
+        },
+        { transaction }
+      );
+
+      // Обновляем задание сборщика (если есть)
+      await CollectorTask.update(
+        {
+          status: 'completed',
+          isCollected: true,
+          collectedAt: new Date(),
+          notes: notes || '',
+        },
+        {
+          where: { orderId: order.id },
+          transaction,
+        }
+      );
+
+      await transaction.commit();
+
+      res.json({
+        success: true,
+        message: 'Товар отмечен как забранный',
+        data: { order },
+      });
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  } catch (error) {
+    console.error('Ошибка отметки товара как собранного:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка отметки товара как собранного',
+      error: error.message,
+    });
+  }
+};
+
 

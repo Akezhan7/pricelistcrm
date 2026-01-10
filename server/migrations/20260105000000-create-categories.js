@@ -1,7 +1,21 @@
 const { DataTypes } = require('sequelize');
 
+/**
+ * Идемпотентная миграция - создание таблицы categories
+ */
 module.exports = {
   async up(queryInterface, Sequelize) {
+    // Проверяем существование таблицы
+    const [tables] = await queryInterface.sequelize.query(`
+      SELECT table_name FROM information_schema.tables 
+      WHERE table_schema = 'public' AND table_name = 'categories'
+    `);
+
+    if (tables.length > 0) {
+      console.log('⏭️  Таблица categories уже существует, пропускаем');
+      return;
+    }
+
     await queryInterface.createTable('categories', {
       id: {
         type: DataTypes.INTEGER,

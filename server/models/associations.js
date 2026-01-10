@@ -11,6 +11,11 @@ const OrderItem = require('./OrderItem');
 const OrderStatusHistory = require('./OrderStatusHistory');
 const Payment = require('./Payment');
 const PriceHistory = require('./PriceHistory');
+const Category = require('./Category');
+const OrderConfirmation = require('./OrderConfirmation');
+const CollectorTask = require('./CollectorTask');
+const WarehouseReceipt = require('./WarehouseReceipt');
+const WarehouseReceiptItem = require('./WarehouseReceiptItem');
 
 // Связи между секторами и рядами
 Sector.hasMany(Row, {
@@ -249,6 +254,131 @@ ProductVariation.belongsTo(Product, {
   as: 'product',
 });
 
+// Связи для категорий (с поддержкой вложенности)
+Category.hasMany(Product, {
+  foreignKey: 'categoryId',
+  as: 'products',
+  onDelete: 'SET NULL',
+  onUpdate: 'CASCADE',
+});
+
+Product.belongsTo(Category, {
+  foreignKey: 'categoryId',
+  as: 'category',
+});
+
+Category.hasMany(Category, {
+  foreignKey: 'parentId',
+  as: 'subcategories',
+  onDelete: 'SET NULL',
+  onUpdate: 'CASCADE',
+});
+
+Category.belongsTo(Category, {
+  foreignKey: 'parentId',
+  as: 'parent',
+});
+
+// Связи для подтверждений заявок от поставщиков
+Order.hasMany(OrderConfirmation, {
+  foreignKey: 'orderId',
+  as: 'confirmations',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE',
+});
+
+OrderConfirmation.belongsTo(Order, {
+  foreignKey: 'orderId',
+  as: 'order',
+});
+
+OrderConfirmation.belongsTo(Product, {
+  foreignKey: 'productId',
+  as: 'product',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE',
+});
+
+Product.hasMany(OrderConfirmation, {
+  foreignKey: 'productId',
+  as: 'confirmations',
+});
+
+// Связи для заданий сборщикам
+Order.hasMany(CollectorTask, {
+  foreignKey: 'orderId',
+  as: 'collectorTasks',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE',
+});
+
+CollectorTask.belongsTo(Order, {
+  foreignKey: 'orderId',
+  as: 'order',
+});
+
+CollectorTask.belongsTo(User, {
+  foreignKey: 'assignedTo',
+  as: 'collector',
+  onDelete: 'RESTRICT',
+  onUpdate: 'CASCADE',
+});
+
+User.hasMany(CollectorTask, {
+  foreignKey: 'assignedTo',
+  as: 'collectorTasks',
+});
+
+// Связи для приёмки на складе
+Order.hasMany(WarehouseReceipt, {
+  foreignKey: 'orderId',
+  as: 'warehouseReceipts',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE',
+});
+
+WarehouseReceipt.belongsTo(Order, {
+  foreignKey: 'orderId',
+  as: 'order',
+});
+
+WarehouseReceipt.belongsTo(User, {
+  foreignKey: 'receivedBy',
+  as: 'receiver',
+  onDelete: 'RESTRICT',
+  onUpdate: 'CASCADE',
+});
+
+User.hasMany(WarehouseReceipt, {
+  foreignKey: 'receivedBy',
+  as: 'receivedWarehouseReceipts',
+});
+
+// Связи для позиций приёмки
+WarehouseReceipt.hasMany(WarehouseReceiptItem, {
+  foreignKey: 'receiptId',
+  as: 'items',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE',
+});
+
+WarehouseReceiptItem.belongsTo(WarehouseReceipt, {
+  foreignKey: 'receiptId',
+  as: 'receipt',
+});
+
+WarehouseReceiptItem.belongsTo(Product, {
+  foreignKey: 'productId',
+  as: 'product',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE',
+});
+
+Product.hasMany(WarehouseReceiptItem, {
+  foreignKey: 'productId',
+  as: 'receiptItems',
+});
+
 module.exports = {
   Sector,
   Row,
@@ -262,4 +392,9 @@ module.exports = {
   OrderStatusHistory,
   Payment,
   PriceHistory,
+  Category,
+  OrderConfirmation,
+  CollectorTask,
+  WarehouseReceipt,
+  WarehouseReceiptItem,
 };

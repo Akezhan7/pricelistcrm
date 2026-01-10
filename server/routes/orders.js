@@ -25,7 +25,7 @@ router.get('/',
   auth,
   query('page').optional().isInt({ min: 1 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
-  query('status').optional().isIn(['В работе', 'На точке', 'В пути', 'На складе']),
+  query('status').optional().isIn(['Создана', 'Отправлена поставщику', 'Частично подтверждена', 'Подтверждена', 'В сборе', 'Забрана', 'Принята на складе', 'Закрыта']),
   query('paymentStatus').optional().isIn(['Не оплачено', 'Частично оплачено', 'Оплачено']),
   query('supplierId').optional().isInt(),
   query('dateFrom').optional().isISO8601(),
@@ -53,7 +53,7 @@ router.post('/',
 router.patch('/:id/status',
   auth,
   param('id').isInt(),
-  body('status').notEmpty().isIn(['В работе', 'На точке', 'В пути', 'На складе']),
+  body('status').notEmpty().isIn(['Создана', 'Отправлена поставщику', 'Частично подтверждена', 'Подтверждена', 'В сборе', 'Забрана', 'Принята на складе', 'Закрыта']),
   body('comment').optional({ nullable: true }).isString().trim().isLength({ max: 500 }),
   handleValidationErrors,
   orderController.changeOrderStatus
@@ -120,6 +120,72 @@ router.patch('/:id/update-prices',
   body('priceUpdates.*.reason').optional().isString().trim().isLength({ max: 200 }),
   handleValidationErrors,
   orderController.updateProductPricesFromOrder
+);
+
+// GET /api/orders/:id/whatsapp-message - Получить текст сообщения для WhatsApp
+router.get('/:id/whatsapp-message',
+  auth,
+  param('id').isInt(),
+  query('useInternalNames').optional().isBoolean(),
+  handleValidationErrors,
+  orderController.getWhatsAppMessage
+);
+
+// POST /api/orders/:id/send-whatsapp - Отправить заявку в WhatsApp (генерация deep link)
+router.post('/:id/send-whatsapp',
+  auth,
+  checkRole(['admin', 'purchase_manager']),
+  param('id').isInt(),
+  body('useInternalNames').optional().isBoolean(),
+  body('customMessage').optional().isString().trim(),
+  handleValidationErrors,
+  orderController.sendToWhatsApp
+);
+
+// POST /api/orders/:id/confirm - Полное подтверждение заявки
+router.post('/:id/confirm',
+  auth,
+  checkRole(['admin', 'purchase_manager']),
+  param('id').isInt(),
+  body('notes').optional().isString().trim(),
+  handleValidationErrors,
+  orderController.confirmOrder
+);
+
+// POST /api/orders/:id/partial-confirm - Частичное подтверждение заявки
+router.post('/:id/partial-confirm',
+  auth,
+  checkRole(['admin', 'purchase_manager']),
+  param('id').isInt(),
+  body('items').notEmpty().isArray({ min: 1 }),
+  body('items.*.productId').notEmpty().isInt(),
+  body('items.*.confirmedQuantity').notEmpty().isInt({ min: 0 }),
+  body('items.*.isAvailable').optional().isBoolean(),
+  body('items.*.supplierComment').optional().isString().trim(),
+  body('notes').optional().isString().trim(),
+  handleValidationErrors,
+  orderController.partialConfirmOrder
+);
+
+// POST /api/orders/:id/assign-collector - Назначить сборщика
+router.post('/:id/assign-collector',
+  auth,
+  checkRole(['admin', 'purchase_manager', 'warehouse_operator']),
+  param('id').isInt(),
+  body('collectorId').notEmpty().isInt(),
+  body('notes').optional().isString().trim(),
+  handleValidationErrors,
+  orderController.assignCollector
+);
+
+// PUT /api/orders/:id/collect - Отметить товар как собранный
+router.put('/:id/collect',
+  auth,
+  checkRole(['admin', 'collector', 'warehouse_operator']),
+  param('id').isInt(),
+  body('notes').optional().isString().trim(),
+  handleValidationErrors,
+  orderController.markAsCollected
 );
 
 module.exports = router;

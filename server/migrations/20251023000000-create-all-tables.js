@@ -700,83 +700,87 @@ module.exports = {
     // Создание индексов для оптимизации производительности
     console.log('Создание индексов...');
 
-    // Users
-    await queryInterface.addIndex('users', ['email'], { unique: true, name: 'users_email_unique' });
-    await queryInterface.addIndex('users', ['role'], { name: 'users_role_idx' });
-    await queryInterface.addIndex('users', ['is_active'], { name: 'users_is_active_idx' });
+    // Вспомогательная функция для создания индексов с проверкой
+    const addIndexIfNotExists = async (table, fields, options) => {
+      try {
+        await queryInterface.addIndex(table, fields, options);
+      } catch (error) {
+        if (error.original?.code === '42P07') {
+          console.log(`⚠️  Индекс ${options.name} уже существует, пропускаем`);
+        } else {
+          throw error;
+        }
+      }
+    };
 
-    // Sectors
-    await queryInterface.addIndex('sectors', ['code'], { unique: true, name: 'sectors_code_unique' });
-    await queryInterface.addIndex('sectors', ['is_active'], { name: 'sectors_is_active_idx' });
+    // Users - email уже имеет UNIQUE constraint, не нужен отдельный индекс
+    await addIndexIfNotExists('users', ['role'], { name: 'users_role_idx' });
+    await addIndexIfNotExists('users', ['is_active'], { name: 'users_is_active_idx' });
+
+    // Sectors - code уже имеет UNIQUE constraint
+    await addIndexIfNotExists('sectors', ['is_active'], { name: 'sectors_is_active_idx' });
 
     // Rows
-    await queryInterface.addIndex('rows', ['sector_id'], { name: 'rows_sector_id_idx' });
-    await queryInterface.addIndex('rows', ['is_active'], { name: 'rows_is_active_idx' });
+    await addIndexIfNotExists('rows', ['sector_id'], { name: 'rows_sector_id_idx' });
+    await addIndexIfNotExists('rows', ['is_active'], { name: 'rows_is_active_idx' });
 
-    // Products
-    await queryInterface.addIndex('products', ['article'], { unique: true, name: 'products_article_unique' });
-    await queryInterface.addIndex('products', ['name'], { name: 'products_name_idx' });
-    await queryInterface.addIndex('products', ['is_active'], { name: 'products_is_active_idx' });
-    await queryInterface.addIndex('products', ['cost_price'], { name: 'products_cost_price_idx' });
-    await queryInterface.addIndex('products', ['selling_price'], { name: 'products_selling_price_idx' });
+    // Products - article уже имеет UNIQUE constraint
+    await addIndexIfNotExists('products', ['name'], { name: 'products_name_idx' });
+    await addIndexIfNotExists('products', ['is_active'], { name: 'products_is_active_idx' });
+    await addIndexIfNotExists('products', ['cost_price'], { name: 'products_cost_price_idx' });
+    await addIndexIfNotExists('products', ['selling_price'], { name: 'products_selling_price_idx' });
 
     // Suppliers
-    await queryInterface.addIndex('suppliers', ['name'], { name: 'suppliers_name_idx' });
-    await queryInterface.addIndex('suppliers', ['phone'], { name: 'suppliers_phone_idx' });
-    await queryInterface.addIndex('suppliers', ['sector_id'], { name: 'suppliers_sector_id_idx' });
-    await queryInterface.addIndex('suppliers', ['row_id'], { name: 'suppliers_row_id_idx' });
-    await queryInterface.addIndex('suppliers', ['is_active'], { name: 'suppliers_is_active_idx' });
-    await queryInterface.addIndex('suppliers', ['debt'], { name: 'suppliers_debt_idx' });
+    await addIndexIfNotExists('suppliers', ['name'], { name: 'suppliers_name_idx' });
+    await addIndexIfNotExists('suppliers', ['phone'], { name: 'suppliers_phone_idx' });
+    await addIndexIfNotExists('suppliers', ['sector_id'], { name: 'suppliers_sector_id_idx' });
+    await addIndexIfNotExists('suppliers', ['row_id'], { name: 'suppliers_row_id_idx' });
+    await addIndexIfNotExists('suppliers', ['is_active'], { name: 'suppliers_is_active_idx' });
+    await addIndexIfNotExists('suppliers', ['debt'], { name: 'suppliers_debt_idx' });
 
-    // ProductSupplier
-    await queryInterface.addIndex('product_suppliers', ['product_id', 'supplier_id'], { 
-      unique: true, 
-      name: 'product_suppliers_product_supplier_unique' 
-    });
-    await queryInterface.addIndex('product_suppliers', ['product_id'], { name: 'product_suppliers_product_id_idx' });
-    await queryInterface.addIndex('product_suppliers', ['supplier_id'], { name: 'product_suppliers_supplier_id_idx' });
+    // ProductSupplier - составной UNIQUE создаётся автоматически через constraint
+    await addIndexIfNotExists('product_suppliers', ['product_id'], { name: 'product_suppliers_product_id_idx' });
+    await addIndexIfNotExists('product_suppliers', ['supplier_id'], { name: 'product_suppliers_supplier_id_idx' });
 
-    // ProductVariations
-    await queryInterface.addIndex('product_variations', ['product_id'], { name: 'product_variations_product_id_idx' });
-    await queryInterface.addIndex('product_variations', ['sku'], { unique: true, name: 'product_variations_sku_unique' });
-    await queryInterface.addIndex('product_variations', ['is_active'], { name: 'product_variations_is_active_idx' });
+    // ProductVariations - sku уже имеет UNIQUE constraint
+    await addIndexIfNotExists('product_variations', ['product_id'], { name: 'product_variations_product_id_idx' });
+    await addIndexIfNotExists('product_variations', ['is_active'], { name: 'product_variations_is_active_idx' });
 
-    // Orders
-    await queryInterface.addIndex('orders', ['order_number'], { unique: true, name: 'orders_order_number_unique' });
-    await queryInterface.addIndex('orders', ['supplier_id'], { name: 'orders_supplier_id_idx' });
-    await queryInterface.addIndex('orders', ['status'], { name: 'orders_status_idx' });
-    await queryInterface.addIndex('orders', ['payment_status'], { name: 'orders_payment_status_idx' });
-    await queryInterface.addIndex('orders', ['created_by'], { name: 'orders_created_by_idx' });
-    await queryInterface.addIndex('orders', ['is_active'], { name: 'orders_is_active_idx' });
-    await queryInterface.addIndex('orders', ['expected_delivery_date'], { name: 'orders_expected_delivery_date_idx' });
-    await queryInterface.addIndex('orders', ['created_at'], { name: 'orders_created_at_idx' });
+    // Orders - order_number уже имеет UNIQUE constraint
+    await addIndexIfNotExists('orders', ['supplier_id'], { name: 'orders_supplier_id_idx' });
+    await addIndexIfNotExists('orders', ['status'], { name: 'orders_status_idx' });
+    await addIndexIfNotExists('orders', ['payment_status'], { name: 'orders_payment_status_idx' });
+    await addIndexIfNotExists('orders', ['created_by'], { name: 'orders_created_by_idx' });
+    await addIndexIfNotExists('orders', ['is_active'], { name: 'orders_is_active_idx' });
+    await addIndexIfNotExists('orders', ['expected_delivery_date'], { name: 'orders_expected_delivery_date_idx' });
+    await addIndexIfNotExists('orders', ['created_at'], { name: 'orders_created_at_idx' });
 
     // OrderItems
-    await queryInterface.addIndex('order_items', ['order_id'], { name: 'order_items_order_id_idx' });
-    await queryInterface.addIndex('order_items', ['product_id'], { name: 'order_items_product_id_idx' });
-    await queryInterface.addIndex('order_items', ['product_variation_id'], { name: 'order_items_product_variation_id_idx' });
-    await queryInterface.addIndex('order_items', ['order_id', 'product_id'], { name: 'order_items_order_product_idx' });
+    await addIndexIfNotExists('order_items', ['order_id'], { name: 'order_items_order_id_idx' });
+    await addIndexIfNotExists('order_items', ['product_id'], { name: 'order_items_product_id_idx' });
+    await addIndexIfNotExists('order_items', ['product_variation_id'], { name: 'order_items_product_variation_id_idx' });
+    await addIndexIfNotExists('order_items', ['order_id', 'product_id'], { name: 'order_items_order_product_idx' });
 
     // OrderStatusHistory
-    await queryInterface.addIndex('order_status_history', ['order_id'], { name: 'order_status_history_order_id_idx' });
-    await queryInterface.addIndex('order_status_history', ['changed_by'], { name: 'order_status_history_changed_by_idx' });
-    await queryInterface.addIndex('order_status_history', ['changed_at'], { name: 'order_status_history_changed_at_idx' });
-    await queryInterface.addIndex('order_status_history', ['order_id', 'changed_at'], { name: 'order_status_history_order_time_idx' });
+    await addIndexIfNotExists('order_status_history', ['order_id'], { name: 'order_status_history_order_id_idx' });
+    await addIndexIfNotExists('order_status_history', ['changed_by'], { name: 'order_status_history_changed_by_idx' });
+    await addIndexIfNotExists('order_status_history', ['changed_at'], { name: 'order_status_history_changed_at_idx' });
+    await addIndexIfNotExists('order_status_history', ['order_id', 'changed_at'], { name: 'order_status_history_order_time_idx' });
 
     // Payments
-    await queryInterface.addIndex('payments', ['supplier_id'], { name: 'payments_supplier_id_idx' });
-    await queryInterface.addIndex('payments', ['payment_date'], { name: 'payments_payment_date_idx' });
-    await queryInterface.addIndex('payments', ['created_by'], { name: 'payments_created_by_idx' });
-    await queryInterface.addIndex('payments', ['payment_method'], { name: 'payments_payment_method_idx' });
-    await queryInterface.addIndex('payments', ['supplier_id', 'payment_date'], { name: 'payments_supplier_date_idx' });
+    await addIndexIfNotExists('payments', ['supplier_id'], { name: 'payments_supplier_id_idx' });
+    await addIndexIfNotExists('payments', ['payment_date'], { name: 'payments_payment_date_idx' });
+    await addIndexIfNotExists('payments', ['created_by'], { name: 'payments_created_by_idx' });
+    await addIndexIfNotExists('payments', ['payment_method'], { name: 'payments_payment_method_idx' });
+    await addIndexIfNotExists('payments', ['supplier_id', 'payment_date'], { name: 'payments_supplier_date_idx' });
 
     // PriceHistory
-    await queryInterface.addIndex('price_history', ['product_id'], { name: 'price_history_product_id_idx' });
-    await queryInterface.addIndex('price_history', ['changed_by'], { name: 'price_history_changed_by_idx' });
-    await queryInterface.addIndex('price_history', ['changed_at'], { name: 'price_history_changed_at_idx' });
-    await queryInterface.addIndex('price_history', ['order_id'], { name: 'price_history_order_id_idx' });
-    await queryInterface.addIndex('price_history', ['product_id', 'changed_at'], { name: 'price_history_product_time_idx' });
-    await queryInterface.addIndex('price_history', ['price_type'], { name: 'price_history_price_type_idx' });
+    await addIndexIfNotExists('price_history', ['product_id'], { name: 'price_history_product_id_idx' });
+    await addIndexIfNotExists('price_history', ['changed_by'], { name: 'price_history_changed_by_idx' });
+    await addIndexIfNotExists('price_history', ['changed_at'], { name: 'price_history_changed_at_idx' });
+    await addIndexIfNotExists('price_history', ['order_id'], { name: 'price_history_order_id_idx' });
+    await addIndexIfNotExists('price_history', ['product_id', 'changed_at'], { name: 'price_history_product_time_idx' });
+    await addIndexIfNotExists('price_history', ['price_type'], { name: 'price_history_price_type_idx' });
 
     console.log('✅ Все таблицы и индексы успешно созданы');
   },

@@ -15,6 +15,9 @@ const {
   getProductVariations,
   updateProductVariation,
   deleteProductVariation,
+  getLowStockProducts,
+  getStockAnalytics,
+  updateProductStock,
 } = require('../controllers/productController');
 const { getProductPriceHistory } = require('../controllers/priceHistoryController');
 
@@ -44,6 +47,8 @@ const productValidation = [
 
 // Публичные маршруты (для всех авторизованных пользователей)
 router.get('/', auth, getAllProducts);
+router.get('/low-stock', auth, getLowStockProducts);
+router.get('/stock-analytics', auth, getStockAnalytics);
 router.get('/:id', auth, getProductById);
 
 // Маршруты для администраторов
@@ -70,6 +75,19 @@ router.delete('/:id',
   requireRole('admin'), 
   deleteProduct
 );
+
+// PUT /api/products/:id/stock - Обновление остатков товара
+router.put('/:id/stock',
+  auth,
+  requireRole('admin', 'warehouse_operator'),
+  [
+    body('currentStock').optional().isInt({ min: 0 }).withMessage('Текущий остаток должен быть неотрицательным целым числом'),
+    body('minStock').optional().isInt({ min: 0 }).withMessage('Минимальный остаток должен быть неотрицательным целым числом'),
+  ],
+  updateProductStock
+);
+
+// Маршрут
 
 // Маршруты для управления поставщиками товаров
 router.post('/:productId/suppliers', 

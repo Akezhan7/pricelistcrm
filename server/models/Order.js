@@ -48,9 +48,18 @@ const Order = sequelize.define('Order', {
     comment: 'Оплаченная сумма',
   },
   status: {
-    type: DataTypes.ENUM('В работе', 'На точке', 'В пути', 'На складе'),
+    type: DataTypes.ENUM(
+      'Создана',
+      'Отправлена поставщику',
+      'Частично подтверждена',
+      'Подтверждена',
+      'В сборе',
+      'Забрана',
+      'Принята на складе',
+      'Закрыта'
+    ),
     allowNull: false,
-    defaultValue: 'В работе',
+    defaultValue: 'Создана',
     comment: 'Статус выполнения заявки',
   },
   paymentStatus: {

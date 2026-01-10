@@ -32,10 +32,10 @@ const User = sequelize.define('User', {
     },
   },
   role: {
-    type: DataTypes.ENUM('admin', 'operator', 'accountant', 'purchase_manager', 'warehouse_operator', 'driver'),
+    type: DataTypes.ENUM('admin', 'operator', 'accountant', 'purchase_manager', 'warehouse_operator', 'driver', 'collector'),
     allowNull: false,
     defaultValue: 'operator',
-    comment: 'Роль: admin, operator, accountant (бухгалтер), purchase_manager (менеджер по закупкам), warehouse_operator (оператор склада), driver (водитель)',
+    comment: 'Роль: admin, operator, accountant (бухгалтер), purchase_manager (менеджер по закупкам), warehouse_operator (оператор склада), driver (водитель), collector (сборщик)',
   },
   isActive: {
     type: DataTypes.BOOLEAN,

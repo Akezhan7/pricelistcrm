@@ -12,6 +12,13 @@ const OrderStatusHistory = require('./OrderStatusHistory');
 const Payment = require('./Payment');
 const PriceHistory = require('./PriceHistory');
 
+// Новые модели для системы закупок и склада
+const Category = require('./Category');
+const OrderConfirmation = require('./OrderConfirmation');
+const CollectorTask = require('./CollectorTask');
+const WarehouseReceipt = require('./WarehouseReceipt');
+const WarehouseReceiptItem = require('./WarehouseReceiptItem');
+
 // Импортируем связи (все связи определены в associations.js)
 require('./associations');
 
@@ -29,4 +36,10 @@ module.exports = {
   OrderStatusHistory,
   Payment,
   PriceHistory,
+  // Новые модели
+  Category,
+  OrderConfirmation,
+  CollectorTask,
+  WarehouseReceipt,
+  WarehouseReceiptItem,
 };

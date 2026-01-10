@@ -1,6 +1,6 @@
 const { validationResult } = require('express-validator');
 const { Op } = require('sequelize');
-const { Product, Supplier, ProductSupplier, ProductVariation, PriceHistory } = require('../models');
+const { Product, Supplier, ProductSupplier, ProductVariation, PriceHistory, Category, sequelize } = require('../models');
 const path = require('path');
 const fs = require('fs').promises;
 const { createPriceHistoryRecord } = require('./priceHistoryController');
@@ -18,6 +18,9 @@ const getAllProducts = async (req, res) => {
       whereClause[Op.or] = [
         { name: { [Op.like]: `%${search}%` } },
         { article: { [Op.like]: `%${search}%` } },
+        { internalName: { [Op.like]: `%${search}%` } },
+        { kaspiName: { [Op.like]: `%${search}%` } },
+        { kaspiArticle: { [Op.like]: `%${search}%` } },
       ];
     }
 
@@ -32,6 +35,12 @@ const getAllProducts = async (req, res) => {
             attributes: ['supplierPrice', 'quantity', 'isAvailable', 'notes'],
           },
           where: { isActive: true },
+          required: false,
+        },
+        {
+          model: Category,
+          as: 'category',
+          attributes: ['id', 'name'],
           required: false,
         },
       ],
@@ -112,7 +121,7 @@ const createProduct = async (req, res) => {
       });
     }
 
-    const { name, article, costPrice, sellingPrice, description } = req.body;
+    const { name, article, costPrice, sellingPrice, description, internalName, kaspiName, kaspiArticle, currentStock, minStock, categoryId } = req.body;
     // suppliers may be sent as JSON string in multipart/form-data. Accept both array and JSON string.
     let suppliers = req.body.suppliers;
     if (suppliers && typeof suppliers === 'string') {
@@ -132,12 +141,29 @@ const createProduct = async (req, res) => {
       });
     }
 
+    // Проверяем существование категории
+    if (categoryId) {
+      const category = await Category.findByPk(categoryId);
+      if (!category) {
+        return res.status(404).json({
+          success: false,
+          message: 'Категория не найдена',
+        });
+      }
+    }
+
     const product = await Product.create({
       name,
       article,
       costPrice,
       sellingPrice,
       description,
+      internalName: internalName || null,
+      kaspiName: kaspiName || null,
+      kaspiArticle: kaspiArticle || null,
+      currentStock: currentStock !== undefined ? parseInt(currentStock) : 0,
+      minStock: minStock !== undefined ? parseInt(minStock) : 0,
+      categoryId: categoryId || null,
       image: req.file ? `/uploads/${req.file.filename}` : null,
     });
 
@@ -710,6 +736,266 @@ const deleteProductVariation = async (req, res) => {
   }
 };
 
+/**
+ * Вспомогательная функция для определения статуса остатков товара
+ * @param {number} currentStock - Текущий остаток
+ * @param {number} minStock - Минимальный остаток
+ * @returns {string} - Статус: critical, low, medium, good
+ */
+function getStockStatus(currentStock, minStock) {
+  if (currentStock === 0) return 'critical';
+  if (currentStock <= minStock) return 'low';
+  if (currentStock <= minStock * 2) return 'medium';
+  return 'good';
+}
+
+/**
+ * Получить товары с низким остатком
+ * GET /api/products/low-stock
+ */
+const getLowStockProducts = async (req, res) => {
+  try {
+    const { page = 1, limit = 50, categoryId } = req.query;
+
+    const whereClause = {
+      isActive: true,
+    };
+
+    if (categoryId) {
+      whereClause.categoryId = categoryId;
+    }
+
+    // Загружаем ВСЕ товары без пагинации, фильтрацию делаем после
+    const allProducts = await Product.findAll({
+      where: whereClause,
+      include: [
+        {
+          model: Category,
+          as: 'category',
+          attributes: ['id', 'name'],
+          required: false,
+        },
+      ],
+      order: [['name', 'ASC']],
+    });
+
+    // Фильтруем товары с низким остатком
+    const filteredProducts = allProducts.filter(product => {
+      return product.currentStock === 0 || product.currentStock <= product.minStock;
+    });
+
+    // Добавляем статус критичности
+    const productsWithStatus = filteredProducts.map(product => {
+      const productData = product.toJSON();
+      productData.stockStatus = getStockStatus(product.currentStock, product.minStock);
+      productData.deficit = Math.max(0, product.minStock - product.currentStock);
+      return productData;
+    });
+
+    // Сортируем по критичности: сначала нулевые остатки, потом по дефициту
+    productsWithStatus.sort((a, b) => {
+      if (a.currentStock === 0 && b.currentStock !== 0) return -1;
+      if (a.currentStock !== 0 && b.currentStock === 0) return 1;
+      return b.deficit - a.deficit; // По убыванию дефицита
+    });
+
+    // Применяем пагинацию после фильтрации и сортировки
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const offset = (pageNum - 1) * limitNum;
+    const paginatedProducts = productsWithStatus.slice(offset, offset + limitNum);
+
+    res.json({
+      success: true,
+      data: {
+        products: paginatedProducts,
+        pagination: {
+          total: productsWithStatus.length,
+          page: pageNum,
+          limit: limitNum,
+          totalPages: Math.ceil(productsWithStatus.length / limitNum),
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Ошибка получения товаров с низким остатком:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка сервера при получении товаров с низким остатком',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Получить аналитику по остаткам
+ * GET /api/products/stock-analytics
+ */
+const getStockAnalytics = async (req, res) => {
+  try {
+    const { categoryId } = req.query;
+
+    const whereClause = { isActive: true };
+    if (categoryId) {
+      whereClause.categoryId = categoryId;
+    }
+
+    // Получаем все товары с остатками
+    const products = await Product.findAll({
+      where: whereClause,
+      attributes: ['id', 'name', 'currentStock', 'minStock', 'categoryId'],
+      include: [
+        {
+          model: Category,
+          as: 'category',
+          attributes: ['id', 'name'],
+          required: false,
+        },
+      ],
+    });
+
+    // Рассчитываем статистику
+    const analytics = {
+      total: products.length,
+      critical: 0,    // currentStock = 0
+      low: 0,         // currentStock <= minStock
+      medium: 0,      // currentStock <= minStock * 2
+      good: 0,        // currentStock > minStock * 2
+      totalValue: 0,
+      lowStockValue: 0,
+    };
+
+    const criticalProducts = [];
+    const lowProducts = [];
+
+    products.forEach(product => {
+      const status = getStockStatus(product.currentStock, product.minStock);
+
+      switch (status) {
+        case 'critical':
+          analytics.critical++;
+          criticalProducts.push({
+            id: product.id,
+            name: product.name,
+            currentStock: product.currentStock,
+            minStock: product.minStock,
+            category: product.category?.name || 'Без категории',
+          });
+          break;
+        case 'low':
+          analytics.low++;
+          lowProducts.push({
+            id: product.id,
+            name: product.name,
+            currentStock: product.currentStock,
+            minStock: product.minStock,
+            deficit: product.minStock - product.currentStock,
+            category: product.category?.name || 'Без категории',
+          });
+          break;
+        case 'medium':
+          analytics.medium++;
+          break;
+        case 'good':
+          analytics.good++;
+          break;
+      }
+    });
+
+    // Сортируем критичные товары
+    criticalProducts.sort((a, b) => a.name.localeCompare(b.name));
+    lowProducts.sort((a, b) => b.deficit - a.deficit); // По убыванию дефицита
+
+    res.json({
+      success: true,
+      data: {
+        analytics,
+        criticalProducts: criticalProducts.slice(0, 20), // Топ-20 критичных
+        lowProducts: lowProducts.slice(0, 20), // Топ-20 с низким остатком
+      },
+    });
+  } catch (error) {
+    console.error('Ошибка получения аналитики остатков:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка сервера при получении аналитики остатков',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Обновить остаток товара вручную
+ * PUT /api/products/:id/stock
+ */
+const updateProductStock = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { currentStock, minStock, notes } = req.body;
+
+    const product = await Product.findByPk(id);
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Товар не найден',
+      });
+    }
+
+    // Валидация
+    if (currentStock !== undefined && (currentStock < 0 || !Number.isInteger(Number(currentStock)))) {
+      return res.status(400).json({
+        success: false,
+        message: 'Текущий остаток должен быть неотрицательным целым числом',
+      });
+    }
+
+    if (minStock !== undefined && (minStock < 0 || !Number.isInteger(Number(minStock)))) {
+      return res.status(400).json({
+        success: false,
+        message: 'Минимальный остаток должен быть неотрицательным целым числом',
+      });
+    }
+
+    const oldStock = product.currentStock;
+    const updateData = {};
+
+    if (currentStock !== undefined) {
+      updateData.currentStock = currentStock;
+    }
+
+    if (minStock !== undefined) {
+      updateData.minStock = minStock;
+    }
+
+    await product.update(updateData);
+
+    // Логируем изменение (можно добавить таблицу StockHistory)
+    console.log(`[STOCK UPDATE] Product #${id}: ${oldStock} -> ${product.currentStock} by User #${req.user.id}`);
+
+    res.json({
+      success: true,
+      message: 'Остаток успешно обновлён',
+      data: {
+        product: {
+          id: product.id,
+          name: product.name,
+          currentStock: product.currentStock,
+          minStock: product.minStock,
+          stockStatus: getStockStatus(product.currentStock, product.minStock),
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Ошибка обновления остатка:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка сервера при обновлении остатка',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getAllProducts,
   getProductById,
@@ -723,4 +1009,8 @@ module.exports = {
   getProductVariations,
   updateProductVariation,
   deleteProductVariation,
+  getLowStockProducts,
+  getStockAnalytics,
+  updateProductStock,
+  getStockStatus, // Экспортируем для использования в других контроллерах
 };

@@ -1,0 +1,469 @@
+{
+  "info": {
+    "name": "CRM API - Шаг 2",
+    "description": "Коллекция для тестирования новых endpoints Шага 2",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{authToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000/api",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "categoryId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "productId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "orderId",
+      "value": "1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.collectionVariables.set('authToken', jsonData.token);",
+                  "    pm.environment.set('authToken', jsonData.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"login\": \"admin\",\n  \"password\": \"admin\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Categories",
+      "item": [
+        {
+          "name": "Get All Categories",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["categories"]
+            }
+          }
+        },
+        {
+          "name": "Get Categories Tree",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/categories/tree",
+              "host": ["{{baseUrl}}"],
+              "path": ["categories", "tree"]
+            }
+          }
+        },
+        {
+          "name": "Create Category",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Маски\",\n  \"description\": \"Средства индивидуальной защиты\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/categories",
+              "host": ["{{baseUrl}}"],
+              "path": ["categories"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Products - Stock",
+      "item": [
+        {
+          "name": "Get Low Stock Products",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/products/low-stock",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "low-stock"]
+            }
+          }
+        },
+        {
+          "name": "Get Stock Analytics",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/products/stock-analytics",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "stock-analytics"]
+            }
+          }
+        },
+        {
+          "name": "Update Product Stock",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentStock\": 25,\n  \"notes\": \"Ручная корректировка\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/products/{{productId}}/stock",
+              "host": ["{{baseUrl}}"],
+              "path": ["products", "{{productId}}", "stock"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Orders - WhatsApp",
+      "item": [
+        {
+          "name": "Get WhatsApp Message",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}/whatsapp-message",
+              "host": ["{{baseUrl}}"],
+              "path": ["orders", "{{orderId}}", "whatsapp-message"]
+            }
+          }
+        },
+        {
+          "name": "Send to WhatsApp",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"includeImages\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}/send-whatsapp",
+              "host": ["{{baseUrl}}"],
+              "path": ["orders", "{{orderId}}", "send-whatsapp"]
+            }
+          }
+        },
+        {
+          "name": "Confirm Order",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}/confirm",
+              "host": ["{{baseUrl}}"],
+              "path": ["orders", "{{orderId}}", "confirm"]
+            }
+          }
+        },
+        {
+          "name": "Partial Confirm Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"confirmations\": [\n    {\n      \"productId\": 1,\n      \"confirmedQuantity\": 30,\n      \"isAvailable\": true,\n      \"supplierComment\": \"Есть только 30 шт\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}/partial-confirm",
+              "host": ["{{baseUrl}}"],
+              "path": ["orders", "{{orderId}}", "partial-confirm"]
+            }
+          }
+        },
+        {
+          "name": "Assign Collector",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"collectorId\": 2,\n  \"notes\": \"Забрать завтра до 12:00\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}/assign-collector",
+              "host": ["{{baseUrl}}"],
+              "path": ["orders", "{{orderId}}", "assign-collector"]
+            }
+          }
+        },
+        {
+          "name": "Mark as Collected",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"Товар забран, везу на склад\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/orders/{{orderId}}/collect",
+              "host": ["{{baseUrl}}"],
+              "path": ["orders", "{{orderId}}", "collect"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Collector",
+      "item": [
+        {
+          "name": "Get My Tasks",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/collector/tasks",
+              "host": ["{{baseUrl}}"],
+              "path": ["collector", "tasks"]
+            }
+          }
+        },
+        {
+          "name": "Start Task",
+          "request": {
+            "method": "PUT",
+            "url": {
+              "raw": "{{baseUrl}}/collector/tasks/1/start",
+              "host": ["{{baseUrl}}"],
+              "path": ["collector", "tasks", "1", "start"]
+            }
+          }
+        },
+        {
+          "name": "Complete Task",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"Товар собран и доставлен\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/collector/tasks/1/complete",
+              "host": ["{{baseUrl}}"],
+              "path": ["collector", "tasks", "1", "complete"]
+            }
+          }
+        },
+        {
+          "name": "Get Collector Stats",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/collector/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["collector", "stats"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Warehouse",
+      "item": [
+        {
+          "name": "Get Pending Receipts",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/pending-receipts",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "pending-receipts"]
+            }
+          }
+        },
+        {
+          "name": "Receive Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"items\": [\n    {\n      \"productId\": 1,\n      \"expectedQuantity\": 50,\n      \"receivedQuantity\": 50,\n      \"notes\": \"Всё в порядке\"\n    }\n  ],\n  \"notes\": \"Приёмка без замечаний\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/receive/{{orderId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "receive", "{{orderId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Stock Report",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/stock-report",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "stock-report"]
+            }
+          }
+        },
+        {
+          "name": "Get Receipt History",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/warehouse/receipts",
+              "host": ["{{baseUrl}}"],
+              "path": ["warehouse", "receipts"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Export",
+      "item": [
+        {
+          "name": "Get Export Status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/export/kaspi/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["export", "kaspi", "status"]
+            }
+          }
+        },
+        {
+          "name": "Export Kaspi JSON",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/export/kaspi/json",
+              "host": ["{{baseUrl}}"],
+              "path": ["export", "kaspi", "json"]
+            }
+          }
+        },
+        {
+          "name": "Export Kaspi CSV",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/export/kaspi/csv",
+              "host": ["{{baseUrl}}"],
+              "path": ["export", "kaspi", "csv"]
+            }
+          }
+        },
+        {
+          "name": "Export Price List",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/export/price-list?format=json",
+              "host": ["{{baseUrl}}"],
+              "path": ["export", "price-list"],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "json"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

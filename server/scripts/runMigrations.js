@@ -8,9 +8,13 @@ const path = require('path');
  * Обеспечивает безопасное обновление структуры БД без потери данных
  */
 
+// Путь к миграциям (с конвертацией слешей для Windows)
+const migrationsPath = path.join(__dirname, '..', 'migrations');
+const globPattern = path.join(migrationsPath, '*.js').replace(/\\/g, '/');
+
 const umzug = new Umzug({
   migrations: {
-    glob: path.join(__dirname, '../migrations/*.js'),
+    glob: globPattern,
     resolve: ({ name, path: migrationPath, context }) => {
       // Используем стандартный формат миграций Sequelize
       const migration = require(migrationPath);
