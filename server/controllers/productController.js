@@ -737,16 +737,63 @@ const deleteProductVariation = async (req, res) => {
 };
 
 /**
- * Вспомогательная функция для определения статуса остатков товара
+ * Вспомогательная функция для определения статуса остатков товара с детальной аналитикой
  * @param {number} currentStock - Текущий остаток
  * @param {number} minStock - Минимальный остаток
- * @returns {string} - Статус: critical, low, medium, good
+ * @returns {object} - Статус с деталями: status, color, fillPercentage, needsPurchase, recommendation
  */
 function getStockStatus(currentStock, minStock) {
-  if (currentStock === 0) return 'critical';
-  if (currentStock <= minStock) return 'low';
-  if (currentStock <= minStock * 2) return 'medium';
-  return 'good';
+  const status = {
+    status: 'good',
+    color: 'green',
+    fillPercentage: 100,
+    needsPurchase: false,
+    recommendation: 'Достаточный запас',
+    urgency: 'low', // low, medium, high, critical
+  };
+
+  // Критический уровень - товар закончился
+  if (currentStock === 0) {
+    status.status = 'critical';
+    status.color = 'red';
+    status.fillPercentage = 0;
+    status.needsPurchase = true;
+    status.recommendation = 'СРОЧНО! Товар закончился';
+    status.urgency = 'critical';
+    return status;
+  }
+
+  // Низкий уровень - ниже минимального порога
+  if (currentStock <= minStock) {
+    const percentage = minStock > 0 ? Math.round((currentStock / minStock) * 100) : 0;
+    status.status = 'low';
+    status.color = 'yellow';
+    status.fillPercentage = Math.min(percentage, 100);
+    status.needsPurchase = true;
+    status.recommendation = `Низкий остаток (${currentStock} шт). Необходима закупка`;
+    status.urgency = 'high';
+    return status;
+  }
+
+  // Средний уровень - между минимумом и удвоенным минимумом
+  if (currentStock <= minStock * 2) {
+    const percentage = minStock > 0 ? Math.round((currentStock / (minStock * 2)) * 100) : 100;
+    status.status = 'medium';
+    status.color = 'orange';
+    status.fillPercentage = Math.min(percentage, 100);
+    status.needsPurchase = false;
+    status.recommendation = `Средний остаток (${currentStock} шт). Планируйте закупку`;
+    status.urgency = 'medium';
+    return status;
+  }
+
+  // Хороший уровень - выше удвоенного минимума
+  const percentage = minStock > 0 ? Math.min(Math.round((currentStock / (minStock * 3)) * 100), 100) : 100;
+  status.fillPercentage = percentage;
+  status.recommendation = `Хороший запас (${currentStock} шт)`;
+  status.urgency = 'low';
+
+  return status;
 }
 
 /**
@@ -996,6 +1043,194 @@ const updateProductStock = async (req, res) => {
   }
 };
 
+/**
+ * Получить рекомендации для закупки (автоформирование списка закупа)
+ * GET /api/products/purchase-suggestions
+ */
+const getPurchaseSuggestions = async (req, res) => {
+  try {
+    const { groupBy = 'supplier', categoryId } = req.query;
+
+    const whereClause = {
+      isActive: true,
+    };
+
+    if (categoryId) {
+      whereClause.categoryId = categoryId;
+    }
+
+    // Получаем товары с низким остатком
+    const products = await Product.findAll({
+      where: whereClause,
+      include: [
+        {
+          model: Supplier,
+          as: 'suppliers',
+          through: {
+            model: ProductSupplier,
+            attributes: ['supplierPrice', 'isAvailable'],
+          },
+          where: { isActive: true },
+          required: false,
+        },
+        {
+          model: Category,
+          as: 'category',
+          attributes: ['id', 'name'],
+          required: false,
+        },
+      ],
+    });
+
+    // Фильтруем товары с низким остатком (currentStock <= minStock)
+    const lowStockProducts = products.filter(product => {
+      return product.currentStock === 0 || product.currentStock <= product.minStock;
+    });
+
+    // Добавляем аналитику по каждому товару
+    const productsWithDetails = lowStockProducts.map(product => {
+      const stockStatus = getStockStatus(product.currentStock, product.minStock);
+      const deficit = Math.max(0, product.minStock - product.currentStock);
+      const recommendedQuantity = Math.max(deficit, Math.ceil(product.minStock * 1.5));
+
+      return {
+        id: product.id,
+        name: product.name,
+        internalName: product.internalName,
+        article: product.article,
+        currentStock: product.currentStock,
+        minStock: product.minStock,
+        deficit,
+        recommendedQuantity,
+        stockStatus,
+        category: product.category,
+        suppliers: product.suppliers.map(supplier => ({
+          id: supplier.id,
+          name: supplier.name,
+          phone: supplier.phone,
+          whatsapp: supplier.whatsapp,
+          supplierPrice: supplier.ProductSupplier?.supplierPrice,
+          isAvailable: supplier.ProductSupplier?.isAvailable,
+        })),
+      };
+    });
+
+    // Сортируем по критичности (urgency)
+    productsWithDetails.sort((a, b) => {
+      const urgencyOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+      const aOrder = urgencyOrder[a.stockStatus.urgency] || 3;
+      const bOrder = urgencyOrder[b.stockStatus.urgency] || 3;
+      
+      if (aOrder !== bOrder) {
+        return aOrder - bOrder;
+      }
+      
+      // Если urgency одинаковый, сортируем по дефициту
+      return b.deficit - a.deficit;
+    });
+
+    // Группировка по поставщикам или категориям
+    let grouped = {};
+
+    if (groupBy === 'supplier') {
+      // Группировка по поставщикам
+      productsWithDetails.forEach(product => {
+        if (product.suppliers.length === 0) {
+          // Товары без поставщиков
+          if (!grouped['Без поставщика']) {
+            grouped['Без поставщика'] = {
+              supplier: null,
+              products: [],
+              totalItems: 0,
+              totalCost: 0,
+            };
+          }
+          grouped['Без поставщика'].products.push(product);
+          grouped['Без поставщика'].totalItems++;
+        } else {
+          // Добавляем товар к каждому его поставщику
+          product.suppliers.forEach(supplier => {
+            if (!grouped[supplier.name]) {
+              grouped[supplier.name] = {
+                supplier: {
+                  id: supplier.id,
+                  name: supplier.name,
+                  phone: supplier.phone,
+                  whatsapp: supplier.whatsapp,
+                },
+                products: [],
+                totalItems: 0,
+                totalCost: 0,
+              };
+            }
+
+            const productForSupplier = { ...product, selectedSupplier: supplier };
+            grouped[supplier.name].products.push(productForSupplier);
+            grouped[supplier.name].totalItems++;
+            
+            const cost = (supplier.supplierPrice || 0) * product.recommendedQuantity;
+            grouped[supplier.name].totalCost += cost;
+          });
+        }
+      });
+    } else if (groupBy === 'category') {
+      // Группировка по категориям
+      productsWithDetails.forEach(product => {
+        const categoryName = product.category?.name || 'Без категории';
+        
+        if (!grouped[categoryName]) {
+          grouped[categoryName] = {
+            category: product.category,
+            products: [],
+            totalItems: 0,
+          };
+        }
+        
+        grouped[categoryName].products.push(product);
+        grouped[categoryName].totalItems++;
+      });
+    } else {
+      // Без группировки
+      grouped['all'] = {
+        products: productsWithDetails,
+        totalItems: productsWithDetails.length,
+      };
+    }
+
+    // Конвертируем объект в массив и сортируем по важности
+    const groupedArray = Object.entries(grouped).map(([key, value]) => ({
+      groupName: key,
+      ...value,
+    }));
+
+    // Подсчитываем общую статистику
+    const totalCritical = productsWithDetails.filter(p => p.stockStatus.urgency === 'critical').length;
+    const totalHigh = productsWithDetails.filter(p => p.stockStatus.urgency === 'high').length;
+    const totalMedium = productsWithDetails.filter(p => p.stockStatus.urgency === 'medium').length;
+
+    res.json({
+      success: true,
+      data: {
+        summary: {
+          totalProducts: productsWithDetails.length,
+          critical: totalCritical,
+          high: totalHigh,
+          medium: totalMedium,
+          groupBy,
+        },
+        groups: groupedArray,
+      },
+    });
+  } catch (error) {
+    console.error('Ошибка получения рекомендаций для закупки:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка сервера при получении рекомендаций',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getAllProducts,
   getProductById,
@@ -1012,5 +1247,6 @@ module.exports = {
   getLowStockProducts,
   getStockAnalytics,
   updateProductStock,
+  getPurchaseSuggestions,
   getStockStatus, // Экспортируем для использования в других контроллерах
 };

@@ -136,6 +136,65 @@ const Product = sequelize.define('Product', {
       name: 'idx_products_category_id',
     },
   ],
+  hooks: {
+    /**
+     * Хук для автоматического логирования изменений остатков
+     * Срабатывает после обновления товара
+     */
+    afterUpdate: async (product, options) => {
+      // Проверяем, изменился ли currentStock
+      if (product.changed('currentStock')) {
+        const oldStock = product._previousDataValues.currentStock || 0;
+        const newStock = product.currentStock || 0;
+        const changeAmount = newStock - oldStock;
+
+        // Если нет изменений, не логируем
+        if (changeAmount === 0) return;
+
+        // Получаем StockHistory через require, чтобы избежать циклической зависимости
+        const StockHistory = require('./StockHistory');
+
+        // Определяем тип изменения
+        let changeType = 'manual_increase';
+        if (changeAmount < 0) {
+          changeType = 'manual_decrease';
+        }
+
+        // Получаем дополнительные данные из контекста транзакции
+        const userId = options.userId || null;
+        const orderId = options.orderId || null;
+        const reason = options.reason || (changeAmount > 0 ? 'Увеличение остатка' : 'Уменьшение остатка');
+        const notes = options.notes || null;
+        
+        // Если указан явный тип изменения в опциях, используем его
+        if (options.changeType) {
+          changeType = options.changeType;
+        }
+
+        try {
+          // Создаём запись в истории
+          await StockHistory.create({
+            productId: product.id,
+            oldStock,
+            newStock,
+            changeAmount,
+            changeType,
+            userId,
+            orderId,
+            reason,
+            notes,
+          }, {
+            transaction: options.transaction,
+          });
+
+          console.log(`[STOCK HISTORY] Logged stock change for product #${product.id}: ${oldStock} → ${newStock} (${changeAmount > 0 ? '+' : ''}${changeAmount})`);
+        } catch (error) {
+          console.error('[STOCK HISTORY ERROR] Failed to log stock change:', error);
+          // Не прерываем транзакцию, логирование не критично
+        }
+      }
+    },
+  },
 });
 
 module.exports = Product;

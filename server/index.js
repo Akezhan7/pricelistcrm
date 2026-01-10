@@ -21,6 +21,7 @@ const categoryRoutes = require('./routes/categories');
 const collectorRoutes = require('./routes/collector');
 const warehouseRoutes = require('./routes/warehouse');
 const exportRoutes = require('./routes/export');
+const analyticsRoutes = require('./routes/analytics');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -164,6 +165,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/price-history', priceHistoryRoutes);
 app.use('/api/warehouse', warehouseRoutes);
 app.use('/api/export', exportRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // Базовый маршрут
 app.get('/api', (req, res) => {

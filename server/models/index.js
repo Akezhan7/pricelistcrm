@@ -18,6 +18,7 @@ const OrderConfirmation = require('./OrderConfirmation');
 const CollectorTask = require('./CollectorTask');
 const WarehouseReceipt = require('./WarehouseReceipt');
 const WarehouseReceiptItem = require('./WarehouseReceiptItem');
+const StockHistory = require('./StockHistory');
 
 // Импортируем связи (все связи определены в associations.js)
 require('./associations');
@@ -42,4 +43,5 @@ module.exports = {
   CollectorTask,
   WarehouseReceipt,
   WarehouseReceiptItem,
+  StockHistory,
 };

@@ -18,6 +18,7 @@ const {
   getLowStockProducts,
   getStockAnalytics,
   updateProductStock,
+  getPurchaseSuggestions,
 } = require('../controllers/productController');
 const { getProductPriceHistory } = require('../controllers/priceHistoryController');
 
@@ -49,6 +50,7 @@ const productValidation = [
 router.get('/', auth, getAllProducts);
 router.get('/low-stock', auth, getLowStockProducts);
 router.get('/stock-analytics', auth, getStockAnalytics);
+router.get('/purchase-suggestions', auth, getPurchaseSuggestions);
 router.get('/:id', auth, getProductById);
 
 // Маршруты для администраторов

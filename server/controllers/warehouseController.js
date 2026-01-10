@@ -150,13 +150,21 @@ const receiveOrder = async (req, res) => {
           notes: item.notes || '',
         });
 
-        // Обновляем остаток товара
+        // Обновляем остаток товара с контекстом для логирования
         const product = orderItem.product;
         await product.update(
           {
             currentStock: product.currentStock + receivedQty,
           },
-          { transaction }
+          { 
+            transaction,
+            // Передаём контекст для хука StockHistory
+            userId: req.user.id,
+            orderId: order.id,
+            changeType: 'receipt',
+            reason: `Приёмка товара по заявке ${order.orderNumber}`,
+            notes: item.notes || `Принято ${receivedQty} шт${discrepancy !== 0 ? `, расхождение ${discrepancy} шт` : ''}`,
+          }
         );
 
         console.log(`[STOCK UPDATE] Product #${product.id} (${product.name}): ${product.currentStock - receivedQty} + ${receivedQty} = ${product.currentStock}`);

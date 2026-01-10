@@ -16,6 +16,7 @@ const OrderConfirmation = require('./OrderConfirmation');
 const CollectorTask = require('./CollectorTask');
 const WarehouseReceipt = require('./WarehouseReceipt');
 const WarehouseReceiptItem = require('./WarehouseReceiptItem');
+const StockHistory = require('./StockHistory');
 
 // Связи между секторами и рядами
 Sector.hasMany(Row, {
@@ -379,6 +380,43 @@ Product.hasMany(WarehouseReceiptItem, {
   as: 'receiptItems',
 });
 
+// Связи для истории остатков товаров
+Product.hasMany(StockHistory, {
+  foreignKey: 'productId',
+  as: 'stockHistory',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE',
+});
+
+StockHistory.belongsTo(Product, {
+  foreignKey: 'productId',
+  as: 'product',
+});
+
+StockHistory.belongsTo(User, {
+  foreignKey: 'userId',
+  as: 'user',
+  onDelete: 'SET NULL',
+  onUpdate: 'CASCADE',
+});
+
+User.hasMany(StockHistory, {
+  foreignKey: 'userId',
+  as: 'stockChanges',
+});
+
+StockHistory.belongsTo(Order, {
+  foreignKey: 'orderId',
+  as: 'order',
+  onDelete: 'SET NULL',
+  onUpdate: 'CASCADE',
+});
+
+Order.hasMany(StockHistory, {
+  foreignKey: 'orderId',
+  as: 'stockChanges',
+});
+
 module.exports = {
   Sector,
   Row,
@@ -397,4 +435,5 @@ module.exports = {
   CollectorTask,
   WarehouseReceipt,
   WarehouseReceiptItem,
+  StockHistory,
 };
