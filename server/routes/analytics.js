@@ -6,6 +6,9 @@ const {
   getProductStockHistory,
   getPurchaseForecast,
   getTopMovers,
+  getStockAnalytics,
+  getPurchaseSuggestions,
+  getLowStockProducts,
 } = require('../controllers/analyticsController');
 
 const router = express.Router();
@@ -13,6 +16,15 @@ const router = express.Router();
 /**
  * Все маршруты аналитики требуют авторизации
  */
+
+// Аналитика остатков (новый endpoint для фронтенда)
+router.get('/stock-analytics', auth, getStockAnalytics);
+
+// Рекомендации для закупки
+router.get('/purchase-suggestions', auth, getPurchaseSuggestions);
+
+// Товары с низким остатком
+router.get('/low-stock', auth, getLowStockProducts);
 
 // Общая аналитика по остаткам
 router.get('/stock-overview', auth, getStockOverview);

@@ -179,9 +179,109 @@ const updateProfile = async (req, res) => {
   }
 };
 
+/**
+ * Получить список пользователей по роли
+ * GET /api/auth/users?role=collector
+ */
+const getUsersByRole = async (req, res) => {
+  try {
+    const { role, isActive = 'true' } = req.query;
+
+    const whereClause = {};
+    
+    if (role) {
+      whereClause.role = role;
+    }
+    
+    if (isActive !== undefined) {
+      whereClause.isActive = isActive === 'true';
+    }
+
+    const users = await User.findAll({
+      where: whereClause,
+      attributes: ['id', 'name', 'email', 'role', 'isActive', 'createdAt'],
+      order: [['name', 'ASC']],
+    });
+
+    res.json({
+      success: true,
+      data: {
+        users,
+        total: users.length,
+      },
+    });
+  } catch (error) {
+    console.error('Ошибка получения пользователей:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка сервера при получении пользователей',
+    });
+  }
+};
+
+/**
+ * Создать нового пользователя (только для админов)
+ * POST /api/auth/users
+ */
+const createUser = async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ошибки валидации',
+        errors: errors.array(),
+      });
+    }
+
+    const { name, email, password, role } = req.body;
+
+    // Проверка, что пользователь с таким email не существует
+    const existingUser = await User.findOne({ where: { email } });
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'Пользователь с таким email уже существует',
+      });
+    }
+
+    // Создаем пользователя
+    const user = await User.create({
+      name,
+      email,
+      password,
+      role: role || 'operator',
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Пользователь успешно создан',
+      data: {
+        user: {
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          isActive: user.isActive,
+          createdAt: user.createdAt,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Ошибка создания пользователя:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка сервера при создании пользователя',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   register,
   login,
   getProfile,
   updateProfile,
+  getUsersByRole,
+  createUser,
 };

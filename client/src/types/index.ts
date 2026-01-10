@@ -2,13 +2,40 @@ export interface Product {
   id: number;
   name: string;
   article: string;
+  // Новые поля для Kaspi и внутреннего использования
+  internalName?: string; // Внутреннее название (маска для сотрудников)
+  kaspiName?: string; // Официальное название Kaspi
+  kaspiArticle?: string; // Артикул Kaspi
+  // Управление остатками
+  currentStock?: number; // Текущий остаток на складе
+  minStock?: number; // Минимальный порог остатков
+  categoryId?: number; // FK к категории
+  category?: Category; // Связь с категорией
+  // Основные поля
   costPrice: number;
   sellingPrice: number;
   image?: string;
   description?: string;
   isActive: boolean;
   suppliers?: SupplierWithPrice[];
-  variations?: ProductVariation[]; // Добавляем поддержку вариаций
+  variations?: ProductVariation[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ===============================
+// Категории товаров
+// ===============================
+
+export interface Category {
+  id: number;
+  name: string;
+  description?: string;
+  parentId?: number;
+  parent?: Category;
+  subcategories?: Category[];
+  isActive: boolean;
+  productsCount?: number; // Количество товаров в категории
   createdAt: string;
   updatedAt: string;
 }
@@ -151,7 +178,16 @@ export interface PaginatedResponse<T> {
 // Типы для модуля заявок (Orders)
 // ===============================
 
-export type OrderStatus = 'В работе' | 'На точке' | 'В пути' | 'На складе';
+export type OrderStatus = 
+  | 'Создана'
+  | 'Отправлена поставщику'
+  | 'Частично подтверждена'
+  | 'Подтверждена'
+  | 'В сборе'
+  | 'Забрана'
+  | 'Принята на складе'
+  | 'Закрыта';
+
 export type PaymentStatus = 'Не оплачено' | 'Частично оплачено' | 'Оплачено';
 
 export interface Order {
@@ -194,6 +230,9 @@ export interface OrderItem {
     id: number;
     name: string;
     article: string;
+    internalName?: string;
+    kaspiName?: string;
+    kaspiArticle?: string;
     image?: string;
     costPrice?: number | string;
     sellingPrice?: number | string;
@@ -271,13 +310,26 @@ export interface OrderFilters {
 }
 
 export interface OrderStats {
-  inProgress: number;
-  atLocation: number;
-  inTransit: number;
-  atWarehouse: number;
+  // Статистика по статусам
+  created: number;            // Создана
+  sentToSupplier: number;     // Отправлена поставщику
+  confirmed: number;          // Подтверждена + Частично подтверждена
+  inCollection: number;       // В сборе
+  collected: number;          // Забрана
+  received: number;           // Принята на складе
+  closed: number;             // Закрыта
+  // Агрегированные показатели
+  pending: number;            // Ожидают (созданы + отправлены)
+  inProgress: number;         // В работе (подтверждены + в сборе + забраны)
+  completed: number;          // Завершены (приняты + закрыты)
+  // Финансовые показатели
   totalAmount: string;
   totalPaid: string;
   totalDebt: string;
+  // Старые поля для обратной совместимости (удалить позже)
+  atLocation?: number;
+  inTransit?: number;
+  atWarehouse?: number;
 }
 
 export interface OrdersResponse {
@@ -402,4 +454,302 @@ export interface UpdatePricesResponse {
   }>;
 }
 
+// ===============================
+// История остатков (Stock History)
+// ===============================
 
+export type StockChangeType = 
+  | 'receipt'           // Приёмка
+  | 'sale'              // Продажа
+  | 'manual_increase'   // Ручное увеличение
+  | 'manual_decrease'   // Ручное уменьшение
+  | 'correction'        // Корректировка
+  | 'return'            // Возврат
+  | 'write_off';        // Списание
+
+export interface StockHistory {
+  id: number;
+  productId: number;
+  product?: {
+    id: number;
+    name: string;
+    internalName?: string;
+    article: string;
+  };
+  oldStock: number;
+  newStock: number;
+  changeAmount: number;
+  changeType: StockChangeType;
+  userId?: number;
+  user?: {
+    id: number;
+    name: string;
+  };
+  orderId?: number;
+  order?: {
+    id: number;
+    orderNumber: string;
+  };
+  reason?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface StockHistoryResponse {
+  product: {
+    id: number;
+    name: string;
+    internalName?: string;
+    article: string;
+    currentStock: number;
+    minStock: number;
+  };
+  history: StockHistory[];
+  pagination: {
+    total: number;
+    page: number;
+    pages: number;
+    limit: number;
+  };
+}
+
+// ===============================
+// Подтверждение заявок (Order Confirmation)
+// ===============================
+
+export interface OrderConfirmation {
+  id: number;
+  orderId: number;
+  productId: number;
+  product?: {
+    id: number;
+    name: string;
+    internalName?: string;
+    article: string;
+  };
+  requestedQuantity: number;
+  confirmedQuantity: number;
+  isAvailable: boolean;
+  supplierComment?: string;
+  createdAt: string;
+}
+
+export interface PartialConfirmationDto {
+  items: Array<{
+    productId: number;
+    confirmedQuantity: number;
+    isAvailable: boolean;
+    supplierComment?: string;
+  }>;
+}
+
+// ===============================
+// Задания сборщикам (Collector Tasks)
+// ===============================
+
+export type CollectorTaskStatus = 'pending' | 'in_progress' | 'completed';
+
+export interface CollectorTask {
+  id: number;
+  orderId: number;
+  order?: {
+    id: number;
+    orderNumber: string;
+    totalAmount: number;
+    supplier?: {
+      id: number;
+      name: string;
+      address: string;
+      phone: string;
+      sectorId?: number;
+      rowId?: number;
+    };
+    items?: OrderItem[];
+  };
+  assignedTo: number;
+  assignee?: {
+    id: number;
+    name: string;
+  };
+  status: CollectorTaskStatus;
+  isCollected: boolean;
+  collectedAt?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CollectorTasksResponse {
+  tasks: CollectorTask[];
+  stats: {
+    pending: number;
+    inProgress: number;
+    completed: number;
+  };
+}
+
+export interface AssignCollectorDto {
+  collectorId: number;
+  notes?: string;
+}
+
+export interface UpdateCollectorTaskDto {
+  status?: CollectorTaskStatus;
+  notes?: string;
+}
+
+// ===============================
+// Приёмка товара (Warehouse Receipt)
+// ===============================
+
+export type WarehouseReceiptType = 'full' | 'partial';
+
+export interface WarehouseReceiptItem {
+  id: number;
+  receiptId: number;
+  productId: number;
+  product?: {
+    id: number;
+    name: string;
+    internalName?: string;
+    article: string;
+  };
+  expectedQuantity: number;
+  receivedQuantity: number;
+  discrepancy: number; // expected - received
+  notes?: string;
+}
+
+export interface WarehouseReceipt {
+  id: number;
+  orderId: number;
+  order?: {
+    id: number;
+    orderNumber: string;
+    supplier?: {
+      id: number;
+      name: string;
+    };
+  };
+  receivedBy: number;
+  receiver?: {
+    id: number;
+    name: string;
+  };
+  receiptType: WarehouseReceiptType;
+  receivedAt: string;
+  notes?: string;
+  items?: WarehouseReceiptItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ReceiveOrderDto {
+  receiptType: 'full' | 'partial';
+  items: Array<{
+    productId: number;
+    expectedQuantity: number;
+    receivedQuantity: number;
+    notes?: string;
+  }>;
+  notes?: string;
+}
+
+export interface PendingReceiptOrder extends Order {
+  collectorTask?: CollectorTask;
+}
+
+// ===============================
+// Аналитика остатков
+// ===============================
+
+export type StockStatus = 'critical' | 'low' | 'medium' | 'good';
+
+export interface StockAnalyticsItem {
+  id: number;
+  name: string;
+  internalName?: string;
+  article: string;
+  categoryId?: number;
+  category?: {
+    id: number;
+    name: string;
+  };
+  currentStock: number;
+  minStock: number;
+  stockStatus: StockStatus;
+  stockPercentage: number; // currentStock / minStock * 100
+  image?: string;
+}
+
+export interface StockAnalytics {
+  critical: StockAnalyticsItem[];   // currentStock = 0
+  low: StockAnalyticsItem[];        // currentStock <= minStock
+  medium: StockAnalyticsItem[];     // currentStock <= minStock * 2
+  good: StockAnalyticsItem[];       // currentStock > minStock * 2
+  stats: {
+    totalProducts: number;
+    criticalCount: number;
+    lowCount: number;
+    mediumCount: number;
+    goodCount: number;
+  };
+}
+
+// ===============================
+// Автоформирование закупа
+// ===============================
+
+export interface PurchaseSuggestionItem {
+  productId: number;
+  product: {
+    id: number;
+    name: string;
+    internalName?: string;
+    article: string;
+    currentStock: number;
+    minStock: number;
+    categoryId?: number;
+    category?: {
+      id: number;
+      name: string;
+    };
+  };
+  suggestedQuantity: number; // Рекомендуемое количество для заказа
+  priority: 'critical' | 'high' | 'medium'; // Приоритет закупки
+}
+
+export interface PurchaseSuggestionBySupplier {
+  supplierId: number;
+  supplier: {
+    id: number;
+    name: string;
+    address: string;
+    phone: string;
+    whatsapp?: string;
+  };
+  items: PurchaseSuggestionItem[];
+  totalItems: number;
+  estimatedAmount: number; // Примерная сумма заказа
+}
+
+export interface PurchaseSuggestions {
+  suggestions: PurchaseSuggestionBySupplier[];
+  totalProducts: number;
+  totalSuppliers: number;
+}
+
+// ===============================
+// WhatsApp интеграция
+// ===============================
+
+export interface WhatsAppMessage {
+  phoneNumber: string;
+  message: string;
+  deepLink: string; // wa.me link
+}
+
+export interface SendPhotoToSupplierDto {
+  supplierId: number;
+  message?: string;
+}

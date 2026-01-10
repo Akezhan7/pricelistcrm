@@ -176,7 +176,7 @@ app.get('/api', (req, res) => {
   });
 });
 
-// Обработка ошибок 404
+// Обработка ошибок 404 для API
 app.use('/api/*', (req, res) => {
   res.status(404).json({
     success: false,
@@ -184,10 +184,20 @@ app.use('/api/*', (req, res) => {
   });
 });
 
-// В production отдаём index.html для всех остальных маршрутов (поддержка React Router)
+// Отдаём index.html для всех остальных маршрутов (поддержка React Router)
+// В production из папки build, в development проксируем на клиент
 if (isProduction) {
   app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, '../client/build/index.html'));
+  });
+} else {
+  // В development режиме отправляем инструкцию для настройки клиента
+  app.get('*', (req, res) => {
+    res.json({
+      success: false,
+      message: 'В режиме разработки клиент должен быть запущен отдельно на порту 3000',
+      hint: 'Запустите клиент командой: cd client && npm start'
+    });
   });
 }
 

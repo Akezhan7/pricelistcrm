@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Save, Upload } from 'lucide-react';
 import api from '../utils/api';
+import categoryApi from '../services/categoryApi';
+import type { Category } from '../types';
 
 type CreateProductModalProps = {
   isOpen: boolean;
@@ -17,12 +19,35 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
   const [formData, setFormData] = useState({
     name: '',
     article: '',
+    internalName: '',
+    kaspiName: '',
+    kaspiArticle: '',
     costPrice: '',
     sellingPrice: '',
+    currentStock: '0',
+    minStock: '0',
+    categoryId: '',
     description: '',
   });
   const [image, setImage] = useState<File | null>(null);
   const [error, setError] = useState('');
+  const [categories, setCategories] = useState<Category[]>([]);
+
+  // Загрузка категорий при открытии модального окна
+  useEffect(() => {
+    if (isOpen) {
+      loadCategories();
+    }
+  }, [isOpen]);
+
+  const loadCategories = async () => {
+    try {
+      const data = await categoryApi.getCategories({ isActive: true });
+      setCategories(data);
+    } catch (error) {
+      console.error('Ошибка загрузки категорий:', error);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,8 +58,16 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
       const data = new FormData();
       data.append('name', formData.name);
       data.append('article', formData.article);
+      data.append('internalName', formData.internalName);
+      data.append('kaspiName', formData.kaspiName);
+      data.append('kaspiArticle', formData.kaspiArticle);
       data.append('costPrice', formData.costPrice);
       data.append('sellingPrice', formData.sellingPrice);
+      data.append('currentStock', formData.currentStock);
+      data.append('minStock', formData.minStock);
+      if (formData.categoryId) {
+        data.append('categoryId', formData.categoryId);
+      }
       data.append('description', formData.description);
       
       if (image) {
@@ -51,8 +84,14 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
       setFormData({
         name: '',
         article: '',
+        internalName: '',
+        kaspiName: '',
+        kaspiArticle: '',
         costPrice: '',
         sellingPrice: '',
+        currentStock: '0',
+        minStock: '0',
+        categoryId: '',
         description: '',
       });
       setImage(null);
@@ -100,6 +139,114 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
               placeholder="Например: Конструктор LEGO"
             />
+          </div>
+
+          {/* Новые поля для Kaspi и внутреннего использования */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <h3 className="text-sm font-semibold text-blue-900 mb-3">Дополнительные названия</h3>
+            
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Внутреннее название
+                  <span className="text-xs text-gray-500 ml-1">(для сотрудников)</span>
+                </label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={formData.internalName}
+                  onChange={(e) => setFormData({ ...formData, internalName: e.target.value })}
+                  placeholder="Например: Маска сварная чёрная"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Название для Kaspi
+                  <span className="text-xs text-gray-500 ml-1">(НЕ менять после выгрузки!)</span>
+                </label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={formData.kaspiName}
+                  onChange={(e) => setFormData({ ...formData, kaspiName: e.target.value })}
+                  placeholder="Официальное название для Kaspi"
+                />
+              </div>
+
+              <div>
+          {/* Остатки на складе */}
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+            <h3 className="text-sm font-semibold text-green-900 mb-3">Управление остатками</h3>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Текущий остаток
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  className="input-field"
+                  value={formData.currentStock}
+                  onChange={(e) => setFormData({ ...formData, currentStock: e.target.value })}
+                  placeholder="0"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Минимальный порог
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  className="input-field"
+                  value={formData.minStock}
+                  onChange={(e) => setFormData({ ...formData, minStock: e.target.value })}
+                  placeholder="0"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  При достижении этого уровня товар попадёт в список закупа
+                </p>
+              </div>
+            </div>
+          </div>
+
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Артикул Kaspi
+                  <span className="text-xs text-gray-500 ml-1">(НЕ менять после выгрузки!)</span>
+                </label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={formData.kaspiArticle}
+                  onChange={(e) => setFormData({ ...formData, kaspiArticle: e.target.value })}
+                  placeholder="Артикул для Kaspi"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Категория */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Категория
+            </label>
+            <select
+              className="input-field"
+              value={formData.categoryId}
+              onChange={(e) => setFormData({ ...formData, categoryId: e.target.value })}
+            >
+              <option value="">Без категории</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>

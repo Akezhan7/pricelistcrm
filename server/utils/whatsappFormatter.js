@@ -45,17 +45,17 @@ function formatOrderMessage(order, options = {}) {
 
   // Заголовок
   if (includeHeader) {
-    message += `📋 *Заявка №${order.orderNumber}*\n\n`;
+    message += `*Заявка №${order.orderNumber}*\n\n`;
   }
 
   // Информация о доставке
   if (order.deliveryLocation) {
-    message += `📍 Место доставки: ${order.deliveryLocation}\n`;
+    message += `Место доставки: ${order.deliveryLocation}\n`;
   }
 
   if (order.expectedDeliveryDate) {
     const date = new Date(order.expectedDeliveryDate);
-    message += `📅 Ожидаемая дата: ${formatDate(date)}\n`;
+    message += `Ожидаемая дата: ${formatDate(date)}\n`;
   }
 
   message += '\n';
@@ -82,7 +82,7 @@ function formatOrderMessage(order, options = {}) {
         const imageUrl = item.product.image.startsWith('http')
           ? item.product.image
           : `${process.env.API_URL || 'http://localhost:5000'}${item.product.image}`;
-        message += `   🖼️ ${imageUrl}\n`;
+        message += `   Фото: ${imageUrl}\n`;
       }
 
       message += '\n';
@@ -91,13 +91,13 @@ function formatOrderMessage(order, options = {}) {
 
   // Итоговая сумма
   if (order.totalAmount) {
-    message += `💰 *Итого: ${formatCurrency(order.totalAmount)}*\n`;
+    message += `*Итого: ${formatCurrency(order.totalAmount)}*\n`;
   }
 
   // Футер
   if (includeFooter) {
     message += '\n';
-    message += '✅ Пожалуйста, подтвердите наличие и сроки.\n';
+    message += 'Пожалуйста, подтвердите наличие и сроки.\n';
     message += 'Спасибо!';
   }
 
@@ -142,7 +142,7 @@ function formatProductImageMessage(product, supplierName, options = {}) {
     message += `\n${additionalInfo}\n`;
   }
 
-  message += `\n🖼️ Фото: ${imageUrl}\n`;
+  message += `\nФото: ${imageUrl}\n`;
   message += '\nЕсть в наличии? Какая цена и сроки?';
 
   return message;

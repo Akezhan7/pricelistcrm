@@ -189,7 +189,7 @@ const getCategoriesTree = async (req, res) => {
           delete childData.products;
 
           // Рекурсивно получаем подкатегории
-          childData.children = await buildTree(child.id, level + 1);
+          childData.subcategories = await buildTree(child.id, level + 1);
           
           return childData;
         })
@@ -197,14 +197,14 @@ const getCategoriesTree = async (req, res) => {
     };
 
     // Строим дерево для каждой корневой категории
-    const tree = await Promise.all(
+    const categories = await Promise.all(
       rootCategories.map(async (root) => {
         const rootData = root.toJSON();
         rootData.productsCount = rootData.products?.length || 0;
         rootData.level = 0;
         delete rootData.products;
 
-        rootData.children = await buildTree(root.id, 1);
+        rootData.subcategories = await buildTree(root.id, 1);
         
         return rootData;
       })
@@ -212,7 +212,7 @@ const getCategoriesTree = async (req, res) => {
 
     res.json({
       success: true,
-      data: { tree },
+      data: { categories },
     });
   } catch (error) {
     console.error('Ошибка получения дерева категорий:', error);

@@ -19,15 +19,23 @@ const categoryValidation = [
     .isLength({ min: 1, max: 100 })
     .withMessage('Название категории должно содержать от 1 до 100 символов'),
   body('description')
-    .optional()
+    .optional({ nullable: true, checkFalsy: true })
     .isLength({ max: 1000 })
     .withMessage('Описание не должно превышать 1000 символов'),
   body('parentId')
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage('parentId должен быть положительным числом'),
+    .optional({ nullable: true, checkFalsy: true })
+    .custom((value) => {
+      if (value === null || value === undefined || value === '') {
+        return true; // Пустые значения разрешены для корневых категорий
+      }
+      const numValue = parseInt(value, 10);
+      if (isNaN(numValue) || numValue < 1) {
+        throw new Error('parentId должен быть положительным числом');
+      }
+      return true;
+    }),
   body('isActive')
-    .optional()
+    .optional({ nullable: true })
     .isBoolean()
     .withMessage('isActive должно быть булевым значением'),
 ];

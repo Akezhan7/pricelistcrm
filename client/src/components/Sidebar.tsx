@@ -13,7 +13,11 @@ import {
   ChevronLeft,
   ChevronRight,
   User,
-  Search
+  Search,
+  FolderTree,
+  Warehouse,
+  ClipboardList,
+  PackageCheck
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -50,6 +54,32 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
       label: 'Заявки',
       icon: <FileText className="w-5 h-5" />,
       path: '/orders',
+    },
+    {
+      id: 'stock',
+      label: 'Остатки на складе',
+      icon: <Warehouse className="w-5 h-5" />,
+      path: '/stock',
+    },
+    {
+      id: 'categories',
+      label: 'Категории',
+      icon: <FolderTree className="w-5 h-5" />,
+      path: '/categories',
+    },
+    {
+      id: 'collector-tasks',
+      label: 'Задания сборщиков',
+      icon: <ClipboardList className="w-5 h-5" />,
+      path: '/collector/tasks',
+      requiredRole: ['admin', 'collector', 'purchase_manager'],
+    },
+    {
+      id: 'warehouse-receipt',
+      label: 'Приёмка товара',
+      icon: <PackageCheck className="w-5 h-5" />,
+      path: '/warehouse/receipt',
+      requiredRole: ['admin', 'warehouse_operator', 'purchase_manager'],
     },
     {
       id: 'products',
@@ -104,6 +134,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
       purchase_manager: 'Менеджер по закупкам',
       accountant: 'Бухгалтер',
       warehouse_operator: 'Оператор склада',
+      collector: 'Сборщик',
       driver: 'Водитель',
     };
     return roles[role || ''] || 'Пользователь';

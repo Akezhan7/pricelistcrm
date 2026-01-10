@@ -14,7 +14,11 @@ import {
   MapPin,
   Warehouse,
   RefreshCw,
-  CreditCard
+  CreditCard,
+  Send,
+  CheckCircle,
+  AlertTriangle,
+  Archive
 } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import ordersApi from '../services/ordersApi';
@@ -127,11 +131,15 @@ const Orders: React.FC = () => {
 
   // Цветовые схемы для статусов
   const getStatusColor = (status: OrderStatus) => {
-    const colors = {
-      'В работе': 'bg-blue-100 text-blue-800',
-      'На точке': 'bg-yellow-100 text-yellow-800',
-      'В пути': 'bg-purple-100 text-purple-800',
-      'На складе': 'bg-green-100 text-green-800'
+    const colors: Record<OrderStatus, string> = {
+      'Создана': 'bg-gray-100 text-gray-800',
+      'Отправлена поставщику': 'bg-blue-100 text-blue-800',
+      'Частично подтверждена': 'bg-yellow-100 text-yellow-800',
+      'Подтверждена': 'bg-green-100 text-green-800',
+      'В сборе': 'bg-purple-100 text-purple-800',
+      'Забрана': 'bg-indigo-100 text-indigo-800',
+      'Принята на складе': 'bg-teal-100 text-teal-800',
+      'Закрыта': 'bg-gray-200 text-gray-600'
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
@@ -146,11 +154,15 @@ const Orders: React.FC = () => {
   };
 
   const getStatusIcon = (status: OrderStatus) => {
-    const icons = {
-      'В работе': <Package className="w-4 h-4" />,
-      'На точке': <MapPin className="w-4 h-4" />,
-      'В пути': <Truck className="w-4 h-4" />,
-      'На складе': <Warehouse className="w-4 h-4" />
+    const icons: Record<OrderStatus, React.ReactElement> = {
+      'Создана': <FileText className="w-4 h-4" />,
+      'Отправлена поставщику': <Send className="w-4 h-4" />,
+      'Частично подтверждена': <AlertTriangle className="w-4 h-4" />,
+      'Подтверждена': <CheckCircle className="w-4 h-4" />,
+      'В сборе': <Package className="w-4 h-4" />,
+      'Забрана': <Truck className="w-4 h-4" />,
+      'Принята на складе': <Warehouse className="w-4 h-4" />,
+      'Закрыта': <Archive className="w-4 h-4" />
     };
     return icons[status];
   };
@@ -212,56 +224,144 @@ const Orders: React.FC = () => {
 
       {/* Статистика */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
+          {/* Ожидают обработки */}
           <div 
-            className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => handleStatusFilter('В работе')}
+            className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-gray-400"
+            onClick={() => handleStatusFilter('Создана')}
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">В работе</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.inProgress}</p>
+                <p className="text-xs text-gray-500 uppercase">Созданы</p>
+                <p className="text-2xl font-bold text-gray-600">{stats.created || 0}</p>
               </div>
-              <Package className="w-8 h-8 text-blue-600" />
+              <FileText className="w-6 h-6 text-gray-400" />
             </div>
           </div>
           
+          {/* Отправлены */}
           <div 
-            className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => handleStatusFilter('На точке')}
+            className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-blue-400"
+            onClick={() => handleStatusFilter('Отправлена поставщику')}
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">На точке</p>
-                <p className="text-2xl font-bold text-yellow-600">{stats.atLocation}</p>
+                <p className="text-xs text-gray-500 uppercase">Отправлены</p>
+                <p className="text-2xl font-bold text-blue-600">{stats.sentToSupplier || 0}</p>
               </div>
-              <MapPin className="w-8 h-8 text-yellow-600" />
+              <Send className="w-6 h-6 text-blue-400" />
             </div>
           </div>
           
+          {/* Подтверждены */}
           <div 
-            className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => handleStatusFilter('В пути')}
+            className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-green-400"
+            onClick={() => handleStatusFilter('Подтверждена')}
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">В пути</p>
-                <p className="text-2xl font-bold text-purple-600">{stats.inTransit}</p>
+                <p className="text-xs text-gray-500 uppercase">Подтверждены</p>
+                <p className="text-2xl font-bold text-green-600">{stats.confirmed || 0}</p>
               </div>
-              <Truck className="w-8 h-8 text-purple-600" />
+              <CheckCircle className="w-6 h-6 text-green-400" />
             </div>
           </div>
           
+          {/* В сборе */}
           <div 
-            className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => handleStatusFilter('На складе')}
+            className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-purple-400"
+            onClick={() => handleStatusFilter('В сборе')}
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">На складе</p>
-                <p className="text-2xl font-bold text-green-600">{stats.atWarehouse}</p>
+                <p className="text-xs text-gray-500 uppercase">В сборе</p>
+                <p className="text-2xl font-bold text-purple-600">{stats.inCollection || 0}</p>
               </div>
-              <Warehouse className="w-8 h-8 text-green-600" />
+              <Package className="w-6 h-6 text-purple-400" />
+            </div>
+          </div>
+          
+          {/* Забраны */}
+          <div 
+            className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-indigo-400"
+            onClick={() => handleStatusFilter('Забрана')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 uppercase">Забраны</p>
+                <p className="text-2xl font-bold text-indigo-600">{stats.collected || 0}</p>
+              </div>
+              <Truck className="w-6 h-6 text-indigo-400" />
+            </div>
+          </div>
+          
+          {/* Приняты */}
+          <div 
+            className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-teal-400"
+            onClick={() => handleStatusFilter('Принята на складе')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 uppercase">Приняты</p>
+                <p className="text-2xl font-bold text-teal-600">{stats.received || 0}</p>
+              </div>
+              <Warehouse className="w-6 h-6 text-teal-400" />
+            </div>
+          </div>
+
+          {/* Закрыты */}
+          <div 
+            className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-gray-300"
+            onClick={() => handleStatusFilter('Закрыта')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 uppercase">Закрыты</p>
+                <p className="text-2xl font-bold text-gray-500">{stats.closed || 0}</p>
+              </div>
+              <Archive className="w-6 h-6 text-gray-400" />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Финансовая сводка */}
+      {stats && (
+        <div className="bg-white p-4 rounded-lg shadow mb-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-6">
+              <div>
+                <span className="text-sm text-gray-500">Общая сумма:</span>
+                <span className="ml-2 text-lg font-semibold text-gray-900">
+                  {parseFloat(stats.totalAmount).toLocaleString('ru-RU')} ₸
+                </span>
+              </div>
+              <div>
+                <span className="text-sm text-gray-500">Оплачено:</span>
+                <span className="ml-2 text-lg font-semibold text-green-600">
+                  {parseFloat(stats.totalPaid).toLocaleString('ru-RU')} ₸
+                </span>
+              </div>
+              <div>
+                <span className="text-sm text-gray-500">Задолженность:</span>
+                <span className={`ml-2 text-lg font-semibold ${parseFloat(stats.totalDebt) > 0 ? 'text-red-600' : 'text-gray-600'}`}>
+                  {parseFloat(stats.totalDebt).toLocaleString('ru-RU')} ₸
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-4 text-sm text-gray-500">
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-yellow-400"></span>
+                Ожидают: {stats.pending || 0}
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-blue-400"></span>
+                В работе: {stats.inProgress || 0}
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-green-400"></span>
+                Завершены: {stats.completed || 0}
+              </span>
             </div>
           </div>
         </div>

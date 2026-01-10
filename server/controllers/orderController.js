@@ -122,13 +122,25 @@ exports.getOrders = async (req, res) => {
     });
 
     // Статистика по всем заявкам (не только текущей страницы)
+    // Используем новые статусы системы закупок
     const stats = await Order.findAll({
       where: { isActive: true },
       attributes: [
-        [sequelize.fn('COUNT', sequelize.literal('CASE WHEN status = \'В работе\' THEN 1 END')), 'inProgress'],
-        [sequelize.fn('COUNT', sequelize.literal('CASE WHEN status = \'На точке\' THEN 1 END')), 'atLocation'],
-        [sequelize.fn('COUNT', sequelize.literal('CASE WHEN status = \'В пути\' THEN 1 END')), 'inTransit'],
-        [sequelize.fn('COUNT', sequelize.literal('CASE WHEN status = \'На складе\' THEN 1 END')), 'atWarehouse'],
+        // Новые заявки (ещё не отправлены поставщику)
+        [sequelize.fn('COUNT', sequelize.literal('CASE WHEN status = \'Создана\' THEN 1 END')), 'created'],
+        // Ожидают подтверждения от поставщика
+        [sequelize.fn('COUNT', sequelize.literal('CASE WHEN status = \'Отправлена поставщику\' THEN 1 END')), 'sentToSupplier'],
+        // Частично или полностью подтверждены
+        [sequelize.fn('COUNT', sequelize.literal('CASE WHEN status IN (\'Частично подтверждена\', \'Подтверждена\') THEN 1 END')), 'confirmed'],
+        // На сборе (назначен сборщик)
+        [sequelize.fn('COUNT', sequelize.literal('CASE WHEN status = \'В сборе\' THEN 1 END')), 'inCollection'],
+        // Товар забран у поставщика
+        [sequelize.fn('COUNT', sequelize.literal('CASE WHEN status = \'Забрана\' THEN 1 END')), 'collected'],
+        // Принято на складе
+        [sequelize.fn('COUNT', sequelize.literal('CASE WHEN status = \'Принята на складе\' THEN 1 END')), 'received'],
+        // Закрытые заявки
+        [sequelize.fn('COUNT', sequelize.literal('CASE WHEN status = \'Закрыта\' THEN 1 END')), 'closed'],
+        // Финансовые показатели
         [sequelize.fn('SUM', sequelize.col('total_amount')), 'totalAmount'],
         [sequelize.fn('SUM', sequelize.col('paid_amount')), 'totalPaid']
       ],
@@ -150,10 +162,19 @@ exports.getOrders = async (req, res) => {
           limit: parseInt(limit)
         },
         stats: {
-          inProgress: parseInt(statsResult.inProgress || 0),
-          atLocation: parseInt(statsResult.atLocation || 0),
-          inTransit: parseInt(statsResult.inTransit || 0),
-          atWarehouse: parseInt(statsResult.atWarehouse || 0),
+          // Количество заявок по статусам
+          created: parseInt(statsResult.created || 0),
+          sentToSupplier: parseInt(statsResult.sentToSupplier || 0),
+          confirmed: parseInt(statsResult.confirmed || 0),
+          inCollection: parseInt(statsResult.inCollection || 0),
+          collected: parseInt(statsResult.collected || 0),
+          received: parseInt(statsResult.received || 0),
+          closed: parseInt(statsResult.closed || 0),
+          // Агрегированные показатели для удобства
+          pending: parseInt(statsResult.created || 0) + parseInt(statsResult.sentToSupplier || 0),
+          inProgress: parseInt(statsResult.confirmed || 0) + parseInt(statsResult.inCollection || 0) + parseInt(statsResult.collected || 0),
+          completed: parseInt(statsResult.received || 0) + parseInt(statsResult.closed || 0),
+          // Финансовые показатели
           totalAmount: totalAmount.toFixed(2),
           totalPaid: totalPaid.toFixed(2),
           totalDebt: (totalAmount - totalPaid).toFixed(2)
@@ -324,7 +345,7 @@ exports.createOrder = async (req, res) => {
       deliveryLocation: deliveryLocation || 'Точка Байсад',
       totalAmount: totalAmount.toFixed(2),
       paidAmount: 0,
-      status: 'В работе',
+      status: 'Создана',
       paymentStatus: 'Не оплачено',
       notes,
       createdBy: req.user.id,
@@ -348,7 +369,7 @@ exports.createOrder = async (req, res) => {
     await OrderStatusHistory.create({
       orderId: order.id,
       oldStatus: null,
-      newStatus: 'В работе',
+      newStatus: 'Создана',
       changedBy: req.user.id,
       comment: 'Заявка создана',
       changedAt: new Date()
@@ -407,7 +428,7 @@ exports.createOrder = async (req, res) => {
  * Обновить заявку
  * PUT /api/orders/:id
  * Доступ: admin, purchase_manager
- * Ограничение: можно редактировать только если статус = "В работе"
+ * Ограничение: можно редактировать только если статус = "Создана" или "Отправлена поставщику" или "Частично подтверждена"
  */
 exports.updateOrder = async (req, res) => {
   const transaction = await sequelize.transaction();
@@ -429,12 +450,13 @@ exports.updateOrder = async (req, res) => {
       });
     }
 
-    // Проверка, что заявка в статусе "В работе"
-    if (order.status !== 'В работе') {
+    // Проверка, что заявку можно редактировать (статусы до подтверждения)
+    const editableStatuses = ['Создана', 'Отправлена поставщику', 'Частично подтверждена'];
+    if (!editableStatuses.includes(order.status)) {
       await transaction.rollback();
       return res.status(409).json({
         success: false,
-        message: `Невозможно редактировать заявку. Текущий статус: ${order.status}`
+        message: `Невозможно редактировать заявку. Текущий статус: ${order.status}. Редактировать можно только заявки в статусах: ${editableStatuses.join(', ')}`
       });
     }
 
@@ -555,10 +577,20 @@ exports.updateOrder = async (req, res) => {
 /**
  * Изменить статус заявки
  * PATCH /api/orders/:id/status
- * Правила смены статусов и доступа:
- * 1. "В работе" → "На точке" (admin, purchase_manager)
- * 2. "На точке" → "В пути" (admin, purchase_manager, driver)
- * 3. "В пути" → "На складе" (admin, warehouse_operator, driver)
+ * 
+ * Граф переходов статусов в системе закупок:
+ * 
+ * Создана → Отправлена поставщику (через /send-whatsapp или вручную)
+ * Отправлена поставщику → Подтверждена | Частично подтверждена (через /confirm или /partial-confirm)
+ * Частично подтверждена → Подтверждена (после редактирования) | В сборе (назначен сборщик)
+ * Подтверждена → В сборе (через /assign-collector)
+ * В сборе → Забрана (сборщик забрал товар)
+ * Забрана → Принята на складе (через /warehouse/receive)
+ * Принята на складе → Закрыта (архивирование)
+ * 
+ * Особые переходы (только для admin):
+ * - Любой статус → Закрыта (принудительное закрытие)
+ * - Любой статус → предыдущий (откат, кроме Закрыта)
  */
 exports.changeOrderStatus = async (req, res) => {
   const transaction = await sequelize.transaction();
@@ -567,8 +599,18 @@ exports.changeOrderStatus = async (req, res) => {
     const { id } = req.params;
     const { status, comment } = req.body;
 
-    // Валидация нового статуса
-    const validStatuses = ['В работе', 'На точке', 'В пути', 'На складе'];
+    // Все допустимые статусы в системе
+    const validStatuses = [
+      'Создана',
+      'Отправлена поставщику',
+      'Частично подтверждена',
+      'Подтверждена',
+      'В сборе',
+      'Забрана',
+      'Принята на складе',
+      'Закрыта'
+    ];
+
     if (!validStatuses.includes(status)) {
       await transaction.rollback();
       return res.status(400).json({
@@ -592,6 +634,7 @@ exports.changeOrderStatus = async (req, res) => {
     }
 
     const currentStatus = order.status;
+    const userRole = req.user.role;
 
     // Если статус не меняется
     if (currentStatus === status) {
@@ -603,38 +646,74 @@ exports.changeOrderStatus = async (req, res) => {
     }
 
     // Определение допустимых переходов статусов
+    // Ключ = текущий статус, значение = массив допустимых следующих статусов
     const statusFlow = {
-      'В работе': 'На точке',
-      'На точке': 'В пути',
-      'В пути': 'На складе'
+      'Создана': ['Отправлена поставщику', 'Закрыта'],
+      'Отправлена поставщику': ['Подтверждена', 'Частично подтверждена', 'Создана', 'Закрыта'],
+      'Частично подтверждена': ['Подтверждена', 'В сборе', 'Отправлена поставщику', 'Закрыта'],
+      'Подтверждена': ['В сборе', 'Частично подтверждена', 'Закрыта'],
+      'В сборе': ['Забрана', 'Подтверждена', 'Закрыта'],
+      'Забрана': ['Принята на складе', 'В сборе', 'Закрыта'],
+      'Принята на складе': ['Закрыта', 'Забрана'],
+      'Закрыта': [] // Из закрытой заявки нельзя перейти никуда
+    };
+
+    // Роли и их права на переходы статусов
+    const rolePermissions = {
+      'admin': '*', // Все переходы
+      'purchase_manager': [
+        'Создана → Отправлена поставщику',
+        'Отправлена поставщику → Подтверждена',
+        'Отправлена поставщику → Частично подтверждена',
+        'Отправлена поставщику → Создана',
+        'Частично подтверждена → Подтверждена',
+        'Частично подтверждена → В сборе',
+        'Частично подтверждена → Отправлена поставщику',
+        'Подтверждена → В сборе',
+        'Подтверждена → Частично подтверждена',
+      ],
+      'warehouse_operator': [
+        'Забрана → Принята на складе',
+        'Принята на складе → Закрыта',
+      ],
+      'collector': [
+        'В сборе → Забрана',
+      ],
+      'driver': [
+        'В сборе → Забрана',
+        'Забрана → Принята на складе',
+      ],
     };
 
     // Проверка допустимости перехода
-    if (statusFlow[currentStatus] !== status) {
+    const allowedNextStatuses = statusFlow[currentStatus] || [];
+    if (!allowedNextStatuses.includes(status)) {
       await transaction.rollback();
       return res.status(409).json({
         success: false,
-        message: `Невозможно изменить статус с "${currentStatus}" на "${status}". Допустимый следующий статус: "${statusFlow[currentStatus] || 'нет'}"`
+        message: `Невозможно изменить статус с "${currentStatus}" на "${status}"`,
+        allowedStatuses: allowedNextStatuses
       });
     }
 
-    // Проверка прав доступа на основе перехода
-    const userRole = req.user.role;
+    // Проверка прав доступа
+    const transitionKey = `${currentStatus} → ${status}`;
     let hasPermission = false;
 
-    if (currentStatus === 'В работе' && status === 'На точке') {
-      hasPermission = ['admin', 'purchase_manager'].includes(userRole);
-    } else if (currentStatus === 'На точке' && status === 'В пути') {
-      hasPermission = ['admin', 'purchase_manager', 'driver'].includes(userRole);
-    } else if (currentStatus === 'В пути' && status === 'На складе') {
-      hasPermission = ['admin', 'warehouse_operator', 'driver'].includes(userRole);
+    if (rolePermissions[userRole] === '*') {
+      // Админ может всё
+      hasPermission = true;
+    } else if (rolePermissions[userRole]) {
+      // Проверяем есть ли этот переход в списке разрешённых для роли
+      hasPermission = rolePermissions[userRole].includes(transitionKey);
     }
 
     if (!hasPermission) {
       await transaction.rollback();
       return res.status(403).json({
         success: false,
-        message: `Недостаточно прав для изменения статуса с "${currentStatus}" на "${status}"`
+        message: `Недостаточно прав для изменения статуса с "${currentStatus}" на "${status}"`,
+        yourRole: userRole
       });
     }
 
@@ -689,7 +768,7 @@ exports.changeOrderStatus = async (req, res) => {
  * Удалить заявку (мягкое удаление)
  * DELETE /api/orders/:id
  * Доступ: admin
- * Ограничение: можно удалить только если статус = "В работе" и paymentStatus = "Не оплачено"
+ * Ограничение: можно удалить только если статус = "Создана" и paymentStatus = "Не оплачено"
  */
 exports.deleteOrder = async (req, res) => {
   try {
@@ -708,10 +787,10 @@ exports.deleteOrder = async (req, res) => {
     }
 
     // Проверка возможности удаления
-    if (order.status !== 'В работе' || order.paymentStatus !== 'Не оплачено') {
+    if (order.status !== 'Создана' || order.paymentStatus !== 'Не оплачено') {
       return res.status(409).json({
         success: false,
-        message: 'Невозможно удалить заявку. Можно удалить только заявки в статусе "В работе" и "Не оплачено"',
+        message: 'Невозможно удалить заявку. Можно удалить только заявки в статусе "Создана" и "Не оплачено"',
         currentStatus: order.status,
         paymentStatus: order.paymentStatus
       });
@@ -1218,8 +1297,10 @@ exports.sendToWhatsApp = async (req, res) => {
       success: true,
       data: {
         whatsappLink,
+        deepLink: whatsappLink, // Для совместимости с фронтендом
         message,
         supplier: {
+          id: order.supplier.id,
           name: order.supplier.name,
           whatsapp: order.supplier.whatsapp,
         },

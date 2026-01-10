@@ -442,10 +442,221 @@ const getTopMovers = async (req, res) => {
   }
 };
 
+/**
+ * Аналитика остатков (для фронтенда StockDashboard)
+ * GET /api/analytics/stock-analytics
+ */
+const getStockAnalytics = async (req, res) => {
+  try {
+    const { categoryId, status } = req.query;
+
+    const whereClause = { isActive: true };
+    
+    if (categoryId) {
+      whereClause.categoryId = categoryId;
+    }
+
+    // Получаем товары
+    const products = await Product.findAll({
+      where: whereClause,
+      attributes: ['id', 'name', 'internalName', 'article', 'currentStock', 'minStock', 'categoryId', 'image'],
+      include: [
+        {
+          model: Category,
+          as: 'category',
+          attributes: ['id', 'name'],
+        },
+      ],
+    });
+
+    // Классифицируем по статусам
+    const analytics = {
+      critical: [],
+      low: [],
+      medium: [],
+      good: [],
+      statistics: {
+        total: products.length,
+        critical: 0,
+        low: 0,
+        medium: 0,
+        good: 0,
+      },
+    };
+
+    products.forEach(product => {
+      const stockStatus = getStockStatus(product.currentStock, product.minStock);
+      const productData = {
+        ...product.toJSON(),
+        stockStatus,
+      };
+
+      analytics[stockStatus.status].push(productData);
+      analytics.statistics[stockStatus.status]++;
+    });
+
+    // Фильтрация по статусу если запрошено
+    let result = analytics;
+    if (status && analytics[status]) {
+      result = {
+        products: analytics[status],
+        statistics: analytics.statistics,
+      };
+    }
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    console.error('Ошибка получения аналитики остатков:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка получения аналитики остатков',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Рекомендации для закупки
+ * GET /api/analytics/purchase-suggestions
+ */
+const getPurchaseSuggestions = async (req, res) => {
+  try {
+    // Получаем товары где остаток <= минимального
+    const products = await Product.findAll({
+      where: {
+        isActive: true,
+        currentStock: {
+          [Op.lte]: sequelize.col('Product.min_stock'),
+        },
+      },
+      attributes: ['id', 'name', 'internalName', 'article', 'currentStock', 'minStock', 'costPrice'],
+      include: [
+        {
+          model: Category,
+          as: 'category',
+          attributes: ['id', 'name'],
+        },
+        {
+          model: Supplier,
+          as: 'suppliers',
+          through: { attributes: [] },
+          attributes: ['id', 'name', 'phone', 'whatsapp'],
+        },
+      ],
+      order: [['currentStock', 'ASC']],
+    });
+
+    // Группируем по поставщикам
+    const bySupplier = {};
+    
+    products.forEach(product => {
+      const stockStatus = getStockStatus(product.currentStock, product.minStock);
+      const suggestedQuantity = Math.max(product.minStock * 2 - product.currentStock, 0);
+      
+      const productData = {
+        ...product.toJSON(),
+        stockStatus,
+        suggestedQuantity,
+        estimatedCost: suggestedQuantity * (product.costPrice || 0),
+      };
+
+      if (product.suppliers && product.suppliers.length > 0) {
+        product.suppliers.forEach(supplier => {
+          if (!bySupplier[supplier.id]) {
+            bySupplier[supplier.id] = {
+              supplier: {
+                id: supplier.id,
+                name: supplier.name,
+                phone: supplier.phone,
+                whatsapp: supplier.whatsapp,
+              },
+              products: [],
+              totalEstimatedCost: 0,
+            };
+          }
+          bySupplier[supplier.id].products.push(productData);
+          bySupplier[supplier.id].totalEstimatedCost += productData.estimatedCost;
+        });
+      }
+    });
+
+    res.json({
+      success: true,
+      data: {
+        products,
+        bySupplier: Object.values(bySupplier),
+        statistics: {
+          total: products.length,
+          criticalItems: products.filter(p => p.currentStock === 0).length,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Ошибка получения рекомендаций закупки:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка получения рекомендаций закупки',
+      error: error.message,
+    });
+  }
+};
+
+/**
+ * Товары с низким остатком
+ * GET /api/analytics/low-stock
+ */
+const getLowStockProducts = async (req, res) => {
+  try {
+    const products = await Product.findAll({
+      where: {
+        isActive: true,
+        currentStock: {
+          [Op.lte]: sequelize.col('minStock'),
+        },
+      },
+      attributes: ['id', 'name', 'internalName', 'article', 'currentStock', 'minStock', 'image'],
+      include: [
+        {
+          model: Category,
+          as: 'category',
+          attributes: ['id', 'name'],
+        },
+      ],
+      order: [['currentStock', 'ASC']],
+    });
+
+    const result = products.map(product => ({
+      ...product.toJSON(),
+      stockStatus: getStockStatus(product.currentStock, product.minStock),
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        products: result,
+        count: result.length,
+      },
+    });
+  } catch (error) {
+    console.error('Ошибка получения товаров с низким остатком:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка получения товаров с низким остатком',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getStockOverview,
   getStockByCategory,
   getProductStockHistory,
   getPurchaseForecast,
   getTopMovers,
+  getStockAnalytics,
+  getPurchaseSuggestions,
+  getLowStockProducts,
 };

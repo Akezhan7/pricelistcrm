@@ -25,17 +25,21 @@ const ChangeOrderStatusModal: React.FC<ChangeOrderStatusModalProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Определение допустимых переходов
+  // Определение допустимых переходов согласно новой системе
   const getAvailableStatuses = (): OrderStatus[] => {
-    const statusFlow: Record<OrderStatus, OrderStatus | null> = {
-      'В работе': 'На точке',
-      'На точке': 'В пути',
-      'В пути': 'На складе',
-      'На складе': null
+    // Граф переходов: текущий статус -> массив допустимых следующих статусов
+    const statusFlow: Record<OrderStatus, OrderStatus[]> = {
+      'Создана': ['Отправлена поставщику', 'Закрыта'],
+      'Отправлена поставщику': ['Подтверждена', 'Частично подтверждена', 'Создана', 'Закрыта'],
+      'Частично подтверждена': ['Подтверждена', 'В сборе', 'Отправлена поставщику', 'Закрыта'],
+      'Подтверждена': ['В сборе', 'Частично подтверждена', 'Закрыта'],
+      'В сборе': ['Забрана', 'Подтверждена', 'Закрыта'],
+      'Забрана': ['Принята на складе', 'В сборе', 'Закрыта'],
+      'Принята на складе': ['Закрыта', 'Забрана'],
+      'Закрыта': []
     };
 
-    const nextStatus = statusFlow[currentStatus];
-    return nextStatus ? [nextStatus] : [];
+    return statusFlow[currentStatus] || [];
   };
 
   const availableStatuses = getAvailableStatuses();

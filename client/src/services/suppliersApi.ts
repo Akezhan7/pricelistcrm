@@ -35,6 +35,16 @@ class SuppliersApi {
   }
 
   /**
+   * Получить ВСЕ поставщики без пагинации (alias для getSuppliers)
+   */
+  async getAllSuppliers(params?: {
+    search?: string;
+    isActive?: boolean;
+  }): Promise<Supplier[]> {
+    return this.getSuppliers(params);
+  }
+
+  /**
    * Получить поставщика по ID
    */
   async getSupplierById(id: number): Promise<Supplier> {
@@ -48,5 +58,4 @@ class SuppliersApi {
   }
 }
 
-// Экспортируем синглтон
 export default new SuppliersApi();

@@ -19,7 +19,11 @@ import {
   DollarSign,
   TrendingUp,
   Download,
-  Printer
+  Printer,
+  Send,
+  CheckCircle,
+  UserPlus,
+  ClipboardCheck
 } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import ordersApi from '../services/ordersApi';
@@ -43,6 +47,12 @@ const OrderDetails: React.FC = () => {
   const [showEditOrderModal, setShowEditOrderModal] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [payments, setPayments] = useState<any[]>([]);
+  const [whatsappLoading, setWhatsappLoading] = useState(false);
+  const [showConfirmationForm, setShowConfirmationForm] = useState(false);
+  const [confirmationItems, setConfirmationItems] = useState<{[key: number]: number}>({});
+  const [showCollectorAssign, setShowCollectorAssign] = useState(false);
+  const [collectors, setCollectors] = useState<any[]>([]);
+  const [selectedCollectorId, setSelectedCollectorId] = useState<number | null>(null);
 
   const loadOrder = useCallback(async () => {
     try {
@@ -73,7 +83,16 @@ const OrderDetails: React.FC = () => {
   }, [id, loadOrder]);
 
   const getStatusColor = (status: OrderStatus) => {
-    const colors = {
+    const colors: Record<string, string> = {
+      'Создана': 'bg-gray-100 text-gray-800 border-gray-200',
+      'Отправлена поставщику': 'bg-blue-100 text-blue-800 border-blue-200',
+      'Частично подтверждена': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+      'Подтверждена': 'bg-green-100 text-green-800 border-green-200',
+      'В сборе': 'bg-purple-100 text-purple-800 border-purple-200',
+      'Забрана': 'bg-indigo-100 text-indigo-800 border-indigo-200',
+      'Принята на складе': 'bg-teal-100 text-teal-800 border-teal-200',
+      'Закрыта': 'bg-gray-200 text-gray-600 border-gray-300',
+      // Старые статусы для обратной совместимости
       'В работе': 'bg-blue-100 text-blue-800 border-blue-200',
       'На точке': 'bg-yellow-100 text-yellow-800 border-yellow-200',
       'В пути': 'bg-purple-100 text-purple-800 border-purple-200',
@@ -83,13 +102,22 @@ const OrderDetails: React.FC = () => {
   };
 
   const getStatusIcon = (status: OrderStatus) => {
-    const icons = {
+    const icons: Record<string, React.ReactNode> = {
+      'Создана': <FileText className="w-5 h-5" />,
+      'Отправлена поставщику': <Send className="w-5 h-5" />,
+      'Частично подтверждена': <ClipboardCheck className="w-5 h-5" />,
+      'Подтверждена': <CheckCircle className="w-5 h-5" />,
+      'В сборе': <UserPlus className="w-5 h-5" />,
+      'Забрана': <Truck className="w-5 h-5" />,
+      'Принята на складе': <Warehouse className="w-5 h-5" />,
+      'Закрыта': <Package className="w-5 h-5" />,
+      // Старые статусы
       'В работе': <Package className="w-5 h-5" />,
       'На точке': <MapPin className="w-5 h-5" />,
       'В пути': <Truck className="w-5 h-5" />,
       'На складе': <Warehouse className="w-5 h-5" />
     };
-    return icons[status];
+    return icons[status] || <Package className="w-5 h-5" />;
   };
 
   const getPaymentStatusColor = (status: string) => {
@@ -156,6 +184,94 @@ const OrderDetails: React.FC = () => {
       alert('Ошибка при создании PDF документа');
     }
   };
+
+  // Обработчик отправки в WhatsApp
+  const handleSendToWhatsApp = async () => {
+    if (!order || !order.supplier?.whatsapp) {
+      alert('У поставщика не указан номер WhatsApp');
+      return;
+    }
+
+    try {
+      setWhatsappLoading(true);
+      const response = await ordersApi.sendToWhatsApp(order.id);
+      window.open(response.deepLink, '_blank');
+    } catch (error: any) {
+      console.error('Ошибка генерации WhatsApp сообщения:', error);
+      alert('Ошибка при создании WhatsApp сообщения');
+    } finally {
+      setWhatsappLoading(false);
+    }
+  };
+
+  // Обработчик подтверждения заявки поставщиком
+  const handleConfirmOrder = async (isPartial: boolean = false) => {
+    if (!order) return;
+
+    try {
+      if (isPartial) {
+        // Частичное подтверждение
+        const items = Object.entries(confirmationItems).map(([productId, quantity]) => ({
+          productId: parseInt(productId),
+          confirmedQuantity: quantity,
+          isAvailable: true
+        }));
+
+        await ordersApi.partialConfirm(order.id, { items });
+        alert('Заявка частично подтверждена поставщиком');
+      } else {
+        // Полное подтверждение
+        await ordersApi.confirmOrder(order.id);
+        alert('Заявка полностью подтверждена поставщиком');
+      }
+
+      setShowConfirmationForm(false);
+      setConfirmationItems({});
+      loadOrder();
+    } catch (error: any) {
+      console.error('Ошибка подтверждения заявки:', error);
+      alert('Ошибка при подтверждении заявки');
+    }
+  };
+
+  // Обработчик назначения сборщика
+  const handleAssignCollector = async () => {
+    if (!order || !selectedCollectorId) {
+      alert('Выберите сборщика');
+      return;
+    }
+
+    try {
+      await ordersApi.assignCollector(order.id, { collectorId: selectedCollectorId });
+      alert('Сборщик успешно назначен');
+      setShowCollectorAssign(false);
+      setSelectedCollectorId(null);
+      loadOrder();
+    } catch (error: any) {
+      console.error('Ошибка назначения сборщика:', error);
+      alert('Ошибка при назначении сборщика');
+    }
+  };
+
+  // Загрузка списка сборщиков
+  useEffect(() => {
+    const loadCollectors = async () => {
+      try {
+        // Динамически импортируем usersApi чтобы избежать циклических зависимостей
+        const usersApi = (await import('../services/usersApi')).default;
+        const users = await usersApi.getCollectors();
+        setCollectors(users);
+      } catch (error) {
+        console.error('Ошибка загрузки сборщиков:', error);
+        // Если API не работает, показываем пустой список
+        setCollectors([]);
+      }
+    };
+
+    if (showCollectorAssign) {
+      loadCollectors();
+    }
+  }, [showCollectorAssign]);
 
   if (loading) {
     return (
@@ -257,9 +373,20 @@ const OrderDetails: React.FC = () => {
             </div>
 
             {/* Кнопки действий */}
-            <div className="flex items-center gap-2">
-              {order.status === 'В работе' && (
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Основные действия по статусу */}
+              {order.status === 'Создана' && (
                 <>
+                  {order.supplier?.whatsapp && (
+                    <button
+                      onClick={handleSendToWhatsApp}
+                      disabled={whatsappLoading}
+                      className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      <Send className="w-4 h-4" />
+                      {whatsappLoading ? 'Загрузка...' : 'WhatsApp'}
+                    </button>
+                  )}
                   <button
                     onClick={() => setShowEditOrderModal(true)}
                     className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
@@ -276,28 +403,47 @@ const OrderDetails: React.FC = () => {
                   </button>
                 </>
               )}
-              
-              {/* Кнопка обновления цен */}
-              {order.items && order.items.length > 0 && (
+
+              {order.status === 'Отправлена поставщику' && (
+                <>
+                  <button
+                    onClick={() => handleConfirmOrder(false)}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                  >
+                    <CheckCircle className="w-4 h-4" />
+                    Подтверждено
+                  </button>
+                  <button
+                    onClick={() => setShowConfirmationForm(!showConfirmationForm)}
+                    className="flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors"
+                  >
+                    <ClipboardCheck className="w-4 h-4" />
+                    Частично
+                  </button>
+                </>
+              )}
+
+              {['Подтверждена', 'Частично подтверждена'].includes(order.status) && (
                 <button
-                  onClick={() => setShowUpdatePricesModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors"
-                  title="Обновить базовые цены товаров на основе этой заявки"
+                  onClick={() => setShowCollectorAssign(!showCollectorAssign)}
+                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
                 >
-                  <TrendingUp className="w-4 h-4" />
-                  Обновить цены товаров
+                  <UserPlus className="w-4 h-4" />
+                  Назначить сборщика
+                </button>
+              )}
+
+              {/* Общие кнопки */}
+              {!['Закрыта'].includes(order.status) && (
+                <button
+                  onClick={() => setShowChangeStatusModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+                >
+                  <Package className="w-4 h-4" />
+                  Изменить статус
                 </button>
               )}
               
-              <button
-                onClick={() => setShowChangeStatusModal(true)}
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-              >
-                <Package className="w-4 h-4" />
-                Изменить статус
-              </button>
-              
-              {/* Кнопка оплаты - показываем только если заявка не полностью оплачена */}
               {order.paymentStatus !== 'Оплачено' && (
                 <button
                   onClick={() => setShowPaymentModal(true)}
@@ -307,6 +453,14 @@ const OrderDetails: React.FC = () => {
                   Зарегистрировать оплату
                 </button>
               )}
+
+              <button
+                onClick={handleDownloadPDF}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+              >
+                <Download className="w-4 h-4" />
+                Скачать PDF
+              </button>
             </div>
           </div>
         </div>
@@ -433,6 +587,113 @@ const OrderDetails: React.FC = () => {
               </table>
             </div>
           </div>
+
+          {/* Форма частичного подтверждения */}
+          {showConfirmationForm && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg shadow p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">Частичное подтверждение</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Укажите фактическое количество по каждой позиции, которое подтвердил поставщик
+              </p>
+              
+              <div className="space-y-3">
+                {order.items?.map((item) => {
+                  if (!item.product) return null;
+                  const productId = item.product.id;
+                  const confirmedQty = confirmationItems[productId] ?? item.quantity;
+                  
+                  return (
+                    <div key={item.id} className="flex items-center justify-between p-3 bg-white rounded border">
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900">{item.product.internalName || item.product.name}</div>
+                        <div className="text-sm text-gray-500">Запрошено: {item.quantity} шт</div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <label className="text-sm text-gray-600">Подтверждено:</label>
+                        <input
+                          type="number"
+                          min="0"
+                          max={item.quantity}
+                          value={confirmedQty}
+                          onChange={(e) => setConfirmationItems(prev => ({
+                            ...prev,
+                            [productId]: parseInt(e.target.value) || 0
+                          }))}
+                          className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex justify-end gap-3 mt-4">
+                <button
+                  onClick={() => {
+                    setShowConfirmationForm(false);
+                    setConfirmationItems({});
+                  }}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={() => handleConfirmOrder(true)}
+                  className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors"
+                >
+                  Подтвердить частично
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Форма назначения сборщика */}
+          {showCollectorAssign && (
+            <div className="bg-indigo-50 border border-indigo-200 rounded-lg shadow p-6">
+              <h3 className="text-lg font-bold text-gray-900 mb-4">Назначить сборщика</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Выберите сотрудника, который будет забирать товар у поставщика
+              </p>
+
+              <div className="space-y-2 mb-4">
+                {collectors.map(collector => (
+                  <label
+                    key={collector.id}
+                    className="flex items-center p-3 bg-white border rounded-lg cursor-pointer hover:bg-indigo-50 transition-colors"
+                  >
+                    <input
+                      type="radio"
+                      name="collector"
+                      value={collector.id}
+                      checked={selectedCollectorId === collector.id}
+                      onChange={() => setSelectedCollectorId(collector.id)}
+                      className="w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                    />
+                    <span className="ml-3 text-gray-900 font-medium">{collector.name}</span>
+                  </label>
+                ))}
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowCollectorAssign(false);
+                    setSelectedCollectorId(null);
+                  }}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  Отмена
+                </button>
+                <button
+                  onClick={handleAssignCollector}
+                  disabled={!selectedCollectorId}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                >
+                  Назначить
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* История статусов */}
           <div className="bg-white rounded-lg shadow p-6">

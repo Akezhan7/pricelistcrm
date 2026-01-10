@@ -167,6 +167,139 @@ class OrdersApi {
       throw new Error(response.data.message || 'Ошибка удаления заявки');
     }
   }
+
+  /**
+   * Получить WhatsApp сообщение для отправки поставщику
+   */
+  async getWhatsAppMessage(id: number): Promise<{
+    message: string;
+    deepLink: string;
+    supplier: {
+      name: string;
+      whatsapp: string;
+    };
+  }> {
+    const response = await api.get<ApiResponse<{
+      message: string;
+      deepLink: string;
+      supplier: {
+        name: string;
+        whatsapp: string;
+      };
+    }>>(`${this.baseUrl}/${id}/whatsapp-message`);
+    
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.message || 'Ошибка генерации WhatsApp сообщения');
+    }
+    
+    return response.data.data;
+  }
+
+  /**
+   * Отправить заявку поставщику через WhatsApp (генерация deep link)
+   */
+  async sendToWhatsApp(id: number): Promise<{
+    deepLink: string;
+    message: string;
+    supplier: {
+      id: number;
+      name: string;
+      whatsapp: string;
+    };
+  }> {
+    const response = await api.post<ApiResponse<{
+      deepLink: string;
+      message: string;
+      supplier: {
+        id: number;
+        name: string;
+        whatsapp: string;
+      };
+    }>>(`${this.baseUrl}/${id}/send-whatsapp`);
+    
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.message || 'Ошибка отправки в WhatsApp');
+    }
+    
+    return response.data.data;
+  }
+
+  /**
+   * Полное подтверждение заявки поставщиком
+   */
+  async confirmOrder(id: number): Promise<Order> {
+    const response = await api.post<ApiResponse<Order>>(`${this.baseUrl}/${id}/confirm`);
+    
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.message || 'Ошибка подтверждения заявки');
+    }
+    
+    return response.data.data;
+  }
+
+  /**
+   * Частичное подтверждение заявки
+   */
+  async partialConfirm(id: number, data: {
+    items: Array<{
+      productId: number;
+      confirmedQuantity: number;
+      isAvailable: boolean;
+      supplierComment?: string;
+    }>;
+  }): Promise<{
+    order: Order;
+    confirmations: any[];
+  }> {
+    const response = await api.post<ApiResponse<{
+      order: Order;
+      confirmations: any[];
+    }>>(`${this.baseUrl}/${id}/partial-confirm`, data);
+    
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.message || 'Ошибка частичного подтверждения');
+    }
+    
+    return response.data.data;
+  }
+
+  /**
+   * Назначить сборщика на заявку
+   */
+  async assignCollector(id: number, data: {
+    collectorId: number;
+    notes?: string;
+  }): Promise<{
+    order: Order;
+    task: any;
+  }> {
+    const response = await api.post<ApiResponse<{
+      order: Order;
+      task: any;
+    }>>(`${this.baseUrl}/${id}/assign-collector`, data);
+    
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.message || 'Ошибка назначения сборщика');
+    }
+    
+    return response.data.data;
+  }
+
+  /**
+   * Отметить что товар собран
+   */
+  async markAsCollected(id: number, notes?: string): Promise<Order> {
+    const response = await api.put<ApiResponse<Order>>(
+      `${this.baseUrl}/${id}/collect`,
+      { notes }
+    );
+    
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.message || 'Ошибка отметки сбора');
+    }
+    
+    return response.data.data;
+  }
 }
 
 // Экспортируем синглтон

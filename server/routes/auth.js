@@ -1,11 +1,13 @@
 const express = require('express');
-const { body } = require('express-validator');
+const { body, query } = require('express-validator');
 const { auth, requireRole } = require('../middleware/auth');
 const {
   register,
   login,
   getProfile,
   updateProfile,
+  getUsersByRole,
+  createUser,
 } = require('../controllers/authController');
 
 const router = express.Router();
@@ -25,8 +27,8 @@ const registerValidation = [
     .withMessage('Пароль должен содержать минимум 6 символов'),
   body('role')
     .optional()
-    .isIn(['admin', 'operator'])
-    .withMessage('Роль должна быть admin или operator'),
+    .isIn(['admin', 'operator', 'accountant', 'purchase_manager', 'warehouse_operator', 'collector', 'driver'])
+    .withMessage('Недопустимая роль'),
 ];
 
 const loginValidation = [
@@ -56,13 +58,41 @@ const updateProfileValidation = [
     .withMessage('Пароль должен содержать минимум 6 символов'),
 ];
 
+const createUserValidation = [
+  body('name')
+    .trim()
+    .notEmpty()
+    .withMessage('Имя обязательно')
+    .isLength({ min: 2, max: 100 })
+    .withMessage('Имя должно содержать от 2 до 100 символов'),
+  body('email')
+    .notEmpty()
+    .withMessage('Email обязателен')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Введите корректный email'),
+  body('password')
+    .notEmpty()
+    .withMessage('Пароль обязателен')
+    .isLength({ min: 6 })
+    .withMessage('Пароль должен содержать минимум 6 символов'),
+  body('role')
+    .notEmpty()
+    .withMessage('Роль обязательна')
+    .isIn(['admin', 'operator', 'accountant', 'purchase_manager', 'warehouse_operator', 'collector', 'driver'])
+    .withMessage('Недопустимая роль'),
+];
+
 // Маршруты
 router.post('/register', registerValidation, register);
 router.post('/login', loginValidation, login);
 router.get('/profile', auth, getProfile);
 router.put('/profile', auth, updateProfileValidation, updateProfile);
 
+// Получить список пользователей по роли (для назначения сборщиков и т.д.)
+router.get('/users', auth, getUsersByRole);
+
 // Маршрут для создания новых пользователей (только для админов)
-router.post('/users', auth, requireRole('admin'), registerValidation, register);
+router.post('/users', auth, requireRole('admin'), createUserValidation, createUser);
 
 module.exports = router;
