@@ -1,11 +1,20 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import api from '../utils/api';
 
+export type UserRole = 
+  | 'admin' 
+  | 'operator' 
+  | 'accountant' 
+  | 'purchase_manager' 
+  | 'warehouse_operator' 
+  | 'driver' 
+  | 'collector';
+
 export type User = {
   id: number;
   name: string;
   email: string;
-  role: 'admin' | 'operator';
+  role: UserRole;
 };
 
 type AuthContextType = {

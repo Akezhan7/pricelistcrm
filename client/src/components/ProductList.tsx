@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { Product } from '../types';
-import { Plus, Edit, Trash2, Image as ImageIcon, Users, Settings, TrendingUp } from 'lucide-react';
+import { Plus, Edit, Trash2, Image as ImageIcon, Users, Settings, TrendingUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { CreateProductModal } from './CreateProductModal';
 import { EditProductModal } from './EditProductModal';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
@@ -45,6 +45,14 @@ export const ProductList: React.FC<ProductListProps> = ({
   const [productForPriceHistory, setProductForPriceHistory] = useState<Product | null>(null);
   // Локальный поиск по товарам
   const [localSearchQuery, setLocalSearchQuery] = useState('');
+  // Пагинация
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 30;
+
+  // Сброс страницы при изменении фильтров
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, localSearchQuery]);
 
   // Фильтрация товаров по поисковому запросу (глобальный + локальный)
   const filteredProducts = useMemo(() => {
@@ -70,6 +78,15 @@ export const ProductList: React.FC<ProductListProps> = ({
     
     return filtered;
   }, [products, searchQuery, localSearchQuery]);
+
+  // Пагинация товаров
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredProducts.slice(startIndex, endIndex);
+  }, [filteredProducts, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('ru-RU').format(price);
@@ -151,7 +168,7 @@ export const ProductList: React.FC<ProductListProps> = ({
           </div>
         ) : (
           <div className="divide-y divide-gray-100">
-            {filteredProducts.map((product) => (
+            {paginatedProducts.map((product) => (
               <div
                 key={product.id}
                 className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${
@@ -271,6 +288,36 @@ export const ProductList: React.FC<ProductListProps> = ({
           </div>
         )}
       </div>
+
+      {/* Пагинация */}
+      {totalPages > 1 && (
+        <div className="border-t border-gray-200 px-4 py-3 bg-gray-50">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-gray-600">
+              {filteredProducts.length} товаров
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="p-1 text-gray-600 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <span className="text-sm text-gray-700">
+                {currentPage} / {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="p-1 text-gray-600 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Модальное окно создания товара */}
       <CreateProductModal

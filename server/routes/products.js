@@ -53,10 +53,10 @@ router.get('/stock-analytics', auth, getStockAnalytics);
 router.get('/purchase-suggestions', auth, getPurchaseSuggestions);
 router.get('/:id', auth, getProductById);
 
-// Маршруты для администраторов
+// Маршруты для администраторов и менеджеров по закупкам
 router.post('/', 
   auth, 
-  requireRole('admin'), 
+  requireRole('admin', 'purchase_manager'), 
   upload.single('image'),
   productValidation,
   handleUploadError,
@@ -65,7 +65,7 @@ router.post('/',
 
 router.put('/:id', 
   auth, 
-  requireRole('admin'), 
+  requireRole('admin', 'purchase_manager'), 
   upload.single('image'),
   productValidation,
   handleUploadError,
@@ -94,7 +94,7 @@ router.put('/:id/stock',
 // Маршруты для управления поставщиками товаров
 router.post('/:productId/suppliers', 
   auth, 
-  requireRole('admin'), 
+  requireRole('admin', 'purchase_manager'), 
   [
     body('supplierId').isInt().withMessage('ID поставщика должен быть числом'),
     body('supplierPrice').isFloat({ min: 0 }).withMessage('Цена поставщика должна быть положительным числом'),
@@ -107,13 +107,13 @@ router.post('/:productId/suppliers',
 
 router.delete('/:productId/suppliers/:supplierId', 
   auth, 
-  requireRole('admin'), 
+  requireRole('admin', 'purchase_manager'), 
   removeSupplierFromProduct
 );
 
 router.put('/:productId/suppliers/:supplierId', 
   auth, 
-  requireRole('admin'), 
+  requireRole('admin', 'purchase_manager'), 
   [
     body('supplierPrice').optional().isFloat({ min: 0 }).withMessage('Цена поставщика должна быть положительным числом'),
     body('quantity').optional().isInt({ min: 0 }).withMessage('Количество должно быть неотрицательным числом'),
@@ -128,7 +128,7 @@ router.get('/:productId/variations', auth, getProductVariations);
 
 router.post('/:productId/variations', 
   auth, 
-  requireRole('admin'), 
+  requireRole('admin', 'purchase_manager'), 
   [
     body('name').trim().isLength({ min: 1, max: 200 }).withMessage('Название вариации должно содержать от 1 до 200 символов'),
     body('value').trim().isLength({ min: 1, max: 100 }).withMessage('Значение вариации должно содержать от 1 до 100 символов'),
@@ -142,7 +142,7 @@ router.post('/:productId/variations',
 
 router.put('/:productId/variations/:variationId', 
   auth, 
-  requireRole('admin'), 
+  requireRole('admin', 'purchase_manager'), 
   [
     body('name').optional().trim().isLength({ min: 1, max: 200 }).withMessage('Название вариации должно содержать от 1 до 200 символов'),
     body('value').optional().trim().isLength({ min: 1, max: 100 }).withMessage('Значение вариации должно содержать от 1 до 100 символов'),
@@ -156,7 +156,7 @@ router.put('/:productId/variations/:variationId',
 
 router.delete('/:productId/variations/:variationId', 
   auth, 
-  requireRole('admin'), 
+  requireRole('admin', 'purchase_manager'), 
   deleteProductVariation
 );
 

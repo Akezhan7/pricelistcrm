@@ -26,6 +26,7 @@ import {
   ClipboardCheck
 } from 'lucide-react';
 import { Layout } from '../components/Layout';
+import { useAuth } from '../context/AuthContext';
 import ordersApi from '../services/ordersApi';
 import ChangeOrderStatusModal from '../components/ChangeOrderStatusModal';
 import PaymentModal from '../components/PaymentModal';
@@ -37,6 +38,14 @@ import type { Order, OrderStatus } from '../types';
 const OrderDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+
+  // Проверка прав доступа
+  const canEditOrders = user?.role === 'admin' || user?.role === 'purchase_manager';
+  const canDeleteOrders = user?.role === 'admin';
+  const canManagePayments = user?.role === 'admin' || user?.role === 'accountant' || user?.role === 'purchase_manager';
+  const canConfirmOrders = user?.role === 'admin' || user?.role === 'purchase_manager';
+  const canAssignCollector = user?.role === 'admin' || user?.role === 'purchase_manager' || user?.role === 'warehouse_operator';
 
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -377,7 +386,7 @@ const OrderDetails: React.FC = () => {
               {/* Основные действия по статусу */}
               {order.status === 'Создана' && (
                 <>
-                  {order.supplier?.whatsapp && (
+                  {canEditOrders && order.supplier?.whatsapp && (
                     <button
                       onClick={handleSendToWhatsApp}
                       disabled={whatsappLoading}
@@ -387,24 +396,28 @@ const OrderDetails: React.FC = () => {
                       {whatsappLoading ? 'Загрузка...' : 'WhatsApp'}
                     </button>
                   )}
-                  <button
-                    onClick={() => setShowEditOrderModal(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                  >
-                    <Edit className="w-4 h-4" />
-                    Редактировать
-                  </button>
-                  <button
-                    onClick={handleDelete}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                    Удалить
-                  </button>
+                  {canEditOrders && (
+                    <button
+                      onClick={() => setShowEditOrderModal(true)}
+                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                    >
+                      <Edit className="w-4 h-4" />
+                      Редактировать
+                    </button>
+                  )}
+                  {canDeleteOrders && (
+                    <button
+                      onClick={handleDelete}
+                      className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Удалить
+                    </button>
+                  )}
                 </>
               )}
 
-              {order.status === 'Отправлена поставщику' && (
+              {canConfirmOrders && order.status === 'Отправлена поставщику' && (
                 <>
                   <button
                     onClick={() => handleConfirmOrder(false)}
@@ -423,7 +436,7 @@ const OrderDetails: React.FC = () => {
                 </>
               )}
 
-              {['Подтверждена', 'Частично подтверждена'].includes(order.status) && (
+              {canAssignCollector && ['Подтверждена', 'Частично подтверждена'].includes(order.status) && (
                 <button
                   onClick={() => setShowCollectorAssign(!showCollectorAssign)}
                   className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
@@ -434,7 +447,7 @@ const OrderDetails: React.FC = () => {
               )}
 
               {/* Общие кнопки */}
-              {!['Закрыта'].includes(order.status) && (
+              {canEditOrders && !['Закрыта'].includes(order.status) && (
                 <button
                   onClick={() => setShowChangeStatusModal(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
@@ -444,7 +457,7 @@ const OrderDetails: React.FC = () => {
                 </button>
               )}
               
-              {order.paymentStatus !== 'Оплачено' && (
+              {canManagePayments && order.paymentStatus !== 'Оплачено' && (
                 <button
                   onClick={() => setShowPaymentModal(true)}
                   className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors"

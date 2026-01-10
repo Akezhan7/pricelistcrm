@@ -139,7 +139,7 @@ export const Dashboard: React.FC = () => {
             selectedProduct={selectedProduct}
             onSelectProduct={setSelectedProduct}
             onRefresh={refreshData}
-            canEdit={user?.role === 'admin'}
+            canEdit={user?.role === 'admin' || user?.role === 'purchase_manager'}
           />
         </div>
 
@@ -162,7 +162,7 @@ export const Dashboard: React.FC = () => {
             suppliers={filteredSuppliers}
             selectedProduct={selectedProduct}
             onRefresh={refreshData}
-            canEdit={user?.role === 'admin'}
+            canEdit={user?.role === 'admin' || user?.role === 'purchase_manager'}
           />
         </div>
       </div>

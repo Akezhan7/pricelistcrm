@@ -188,7 +188,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
         {/* Основное меню */}
         <nav className="flex-1 overflow-y-auto py-4">
           <ul className="space-y-1 px-3">
-            {menuItems.map((item) => (
+            {menuItems
+              .filter(item => !item.requiredRole || item.requiredRole.includes(user?.role || ''))
+              .map((item) => (
               <li key={item.id}>
                 <button
                   onClick={() => handleNavigate(item.path)}

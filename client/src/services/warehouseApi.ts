@@ -17,16 +17,32 @@ class WarehouseApi {
   /**
    * Получить список заявок, ожидающих приёмки
    */
-  async getPendingReceipts(): Promise<PendingReceiptOrder[]> {
-    const response = await api.get<ApiResponse<{ orders: PendingReceiptOrder[] }>>(
-      `${this.baseUrl}/pending-receipts`
+  async getPendingReceipts(params?: {
+    page?: number;
+    limit?: number;
+  }): Promise<{ orders: PendingReceiptOrder[]; pagination: any }> {
+    const queryParams = new URLSearchParams();
+    
+    if (params?.page) {
+      queryParams.append('page', params.page.toString());
+    }
+    if (params?.limit) {
+      queryParams.append('limit', params.limit.toString());
+    }
+
+    const url = queryParams.toString() 
+      ? `${this.baseUrl}/pending-receipts?${queryParams}` 
+      : `${this.baseUrl}/pending-receipts`;
+    
+    const response = await api.get<ApiResponse<{ orders: PendingReceiptOrder[]; pagination: any }>>(
+      url
     );
     
     if (!response.data.success || !response.data.data) {
       throw new Error(response.data.message || 'Ошибка получения заявок на приёмку');
     }
     
-    return response.data.data.orders;
+    return response.data.data;
   }
 
   /**

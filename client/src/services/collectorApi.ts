@@ -10,11 +10,21 @@ class CollectorApi {
   /**
    * Получить список заданий для текущего сборщика
    */
-  async getMyTasks(status?: 'pending' | 'in_progress' | 'completed'): Promise<CollectorTasksResponse> {
+  async getMyTasks(params?: {
+    status?: 'pending' | 'in_progress' | 'completed';
+    page?: number;
+    limit?: number;
+  }): Promise<CollectorTasksResponse> {
     const queryParams = new URLSearchParams();
     
-    if (status) {
-      queryParams.append('status', status);
+    if (params?.status) {
+      queryParams.append('status', params.status);
+    }
+    if (params?.page) {
+      queryParams.append('page', params.page.toString());
+    }
+    if (params?.limit) {
+      queryParams.append('limit', params.limit.toString());
     }
 
     const url = queryParams.toString() ? `${this.baseUrl}/tasks?${queryParams}` : `${this.baseUrl}/tasks`;

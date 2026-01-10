@@ -49,10 +49,10 @@ router.get('/', auth, getAllSuppliers);
 router.get('/sectors', auth, getSectors);
 router.get('/:id', auth, getSupplierById);
 
-// Маршруты для администраторов
+// Маршруты для администраторов и менеджеров по закупкам
 router.post('/', 
   auth, 
-  requireRole('admin'), 
+  requireRole('admin', 'purchase_manager'), 
   upload.single('containerImage'),
   supplierValidation,
   handleUploadError,
@@ -61,7 +61,7 @@ router.post('/',
 
 router.put('/:id', 
   auth, 
-  requireRole('admin'), 
+  requireRole('admin', 'purchase_manager'), 
   upload.single('containerImage'),
   supplierValidation,
   handleUploadError,

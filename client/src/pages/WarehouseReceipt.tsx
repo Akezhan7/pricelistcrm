@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Layout } from '../components/Layout';
+import { Pagination } from '../components/Pagination';
 import warehouseApi from '../services/warehouseApi';
 import { Order } from '../types';
 import { Package, CheckCircle, AlertTriangle, Edit3 } from 'lucide-react';
@@ -19,22 +20,39 @@ export const WarehouseReceipt: React.FC = () => {
   const [generalNotes, setGeneralNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 1,
+    pages: 1,
+    limit: 20
+  });
 
   useEffect(() => {
     loadPendingOrders();
-  }, []);
+  }, [pagination.page]);
 
   const loadPendingOrders = async () => {
     try {
       setLoading(true);
-      const orders = await warehouseApi.getPendingReceipts();
-      setPendingOrders(orders);
+      const data = await warehouseApi.getPendingReceipts({
+        page: pagination.page,
+        limit: pagination.limit
+      });
+      setPendingOrders(data.orders);
+      if (data.pagination) {
+        setPagination(data.pagination);
+      }
     } catch (error) {
       console.error('Ошибка загрузки заявок:', error);
       alert('Не удалось загрузить заявки на приёмку');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePageChange = (page: number) => {
+    setPagination(prev => ({ ...prev, page }));
+    setSelectedOrder(null);
   };
 
   const selectOrder = (order: Order) => {
@@ -226,6 +244,17 @@ export const WarehouseReceipt: React.FC = () => {
                 </div>
               ))}
             </div>
+          )}
+          
+          {/* Пагинация */}
+          {pagination.pages > 1 && (
+            <Pagination
+              currentPage={pagination.page}
+              totalPages={pagination.pages}
+              totalItems={pagination.total}
+              itemsPerPage={pagination.limit}
+              onPageChange={handlePageChange}
+            />
           )}
         </div>
       ) : (

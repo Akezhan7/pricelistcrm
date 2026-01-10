@@ -21,6 +21,7 @@ import {
   Archive
 } from 'lucide-react';
 import { Layout } from '../components/Layout';
+import { useAuth } from '../context/AuthContext';
 import ordersApi from '../services/ordersApi';
 import CreateOrderModal from '../components/CreateOrderModal';
 import PaymentModal from '../components/PaymentModal';
@@ -28,6 +29,11 @@ import type { Order, OrderFilters, OrderStats, OrderStatus, PaymentStatus } from
 
 const Orders: React.FC = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  
+  // Проверка прав доступа
+  const canCreateOrders = user?.role === 'admin' || user?.role === 'purchase_manager';
+  const canManagePayments = user?.role === 'admin' || user?.role === 'accountant' || user?.role === 'purchase_manager';
   
   // Состояния
   const [orders, setOrders] = useState<Order[]>([]);
@@ -211,13 +217,15 @@ const Orders: React.FC = () => {
             >
               <RefreshCw className="w-5 h-5" />
             </button>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-              Создать заявку
-            </button>
+            {canCreateOrders && (
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+                Создать заявку
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -528,8 +536,8 @@ const Orders: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-2">
-                        {/* Кнопка оплаты - показываем только если заявка не полностью оплачена */}
-                        {order.paymentStatus !== 'Оплачено' && (
+                        {/* Кнопка оплаты - показываем только если есть права и заявка не полностью оплачена */}
+                        {canManagePayments && order.paymentStatus !== 'Оплачено' && (
                           <button
                             onClick={(e) => handlePaymentClick(e, order)}
                             className="inline-flex items-center px-3 py-1 border border-transparent text-xs leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"

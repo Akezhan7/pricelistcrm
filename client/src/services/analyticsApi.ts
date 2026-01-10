@@ -17,6 +17,8 @@ class AnalyticsApi {
   async getStockAnalytics(params?: {
     categoryId?: number;
     supplierId?: number;
+    page?: number;
+    limit?: number;
   }): Promise<StockAnalytics> {
     const queryParams = new URLSearchParams();
     
@@ -25,6 +27,12 @@ class AnalyticsApi {
     }
     if (params?.supplierId) {
       queryParams.append('supplierId', params.supplierId.toString());
+    }
+    if (params?.page) {
+      queryParams.append('page', params.page.toString());
+    }
+    if (params?.limit) {
+      queryParams.append('limit', params.limit.toString());
     }
 
     const url = queryParams.toString() 

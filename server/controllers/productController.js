@@ -222,7 +222,19 @@ const updateProduct = async (req, res) => {
     }
 
     const { id } = req.params;
-    const { name, article, costPrice, sellingPrice, description } = req.body;
+    const { 
+      name, 
+      article, 
+      internalName,
+      kaspiName,
+      kaspiArticle,
+      costPrice, 
+      sellingPrice, 
+      currentStock,
+      minStock,
+      categoryId,
+      description 
+    } = req.body;
     // suppliers may be sent as JSON string in multipart/form-data. Accept both array and JSON string.
     let suppliers = req.body.suppliers;
     if (suppliers && typeof suppliers === 'string') {
@@ -255,8 +267,14 @@ const updateProduct = async (req, res) => {
     const updateData = {};
     if (name) updateData.name = name;
     if (article) updateData.article = article;
+    if (internalName !== undefined) updateData.internalName = internalName;
+    if (kaspiName !== undefined) updateData.kaspiName = kaspiName;
+    if (kaspiArticle !== undefined) updateData.kaspiArticle = kaspiArticle;
     if (costPrice !== undefined) updateData.costPrice = costPrice;
     if (sellingPrice !== undefined) updateData.sellingPrice = sellingPrice;
+    if (currentStock !== undefined) updateData.currentStock = parseInt(currentStock) || 0;
+    if (minStock !== undefined) updateData.minStock = parseInt(minStock) || 0;
+    if (categoryId !== undefined) updateData.categoryId = categoryId ? parseInt(categoryId) : null;
     if (description !== undefined) updateData.description = description;
 
     // Обработка загрузки нового изображения

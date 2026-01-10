@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Supplier, Product } from '../types';
-import { MessageSquare, Phone, MapPin, Package, Plus, Edit, Trash2, Image as ImageIcon, CreditCard, FileText, DollarSign } from 'lucide-react';
-import { CreateSupplierModal } from './CreateSupplierModal';
+import { MessageSquare, Phone, MapPin, Package, Plus, Edit, Trash2, Image as ImageIcon, CreditCard, FileText, DollarSign, ChevronLeft, ChevronRight } from 'lucide-react';
+import { UnifiedSupplierForm } from './UnifiedSupplierForm';
 import { EditSupplierModal } from './EditSupplierModal';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
 import { SupplierFinanceModal } from './SupplierFinanceModal';
@@ -35,6 +35,14 @@ export const SupplierCards: React.FC<SupplierCardsProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   // Локальный поиск по поставщикам
   const [searchQuery, setSearchQuery] = useState('');
+  // Пагинация
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
+
+  // Сброс страницы при изменении фильтров
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedProduct, searchQuery]);
 
   // Фильтрация поставщиков по поисковому запросу
   const filteredSuppliers = suppliers.filter(supplier => {
@@ -50,6 +58,15 @@ export const SupplierCards: React.FC<SupplierCardsProps> = ({
       supplier.container?.toString().toLowerCase().includes(query)
     );
   });
+
+  // Пагинация поставщиков
+  const paginatedSuppliers = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredSuppliers.slice(startIndex, endIndex);
+  }, [filteredSuppliers, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredSuppliers.length / itemsPerPage);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('ru-RU').format(price);
@@ -143,7 +160,7 @@ export const SupplierCards: React.FC<SupplierCardsProps> = ({
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-            {filteredSuppliers.map((supplier) => {
+            {paginatedSuppliers.map((supplier) => {
               // Находим цену для выбранного товара
               const productPrice = selectedProduct
                 ? supplier.products?.find(p => p.id === selectedProduct.id)?.ProductSupplier
@@ -314,12 +331,44 @@ export const SupplierCards: React.FC<SupplierCardsProps> = ({
         )}
       </div>
 
+      {/* Пагинация */}
+      {totalPages > 1 && (
+        <div className="border-t border-gray-200 px-4 py-3 bg-gray-50">
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-gray-600">
+              {filteredSuppliers.length} поставщиков
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="p-1 text-gray-600 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <span className="text-sm text-gray-700">
+                {currentPage} / {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="p-1 text-gray-600 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Модальное окно создания поставщика */}
-      <CreateSupplierModal
+      <UnifiedSupplierForm
         isOpen={isCreateModalOpen}
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={onRefresh}
-        selectedProduct={selectedProduct}
+        mode={selectedProduct ? 'with-product' : 'standalone'}
+        productId={selectedProduct?.id}
+        productName={selectedProduct?.name}
       />
 
       {/* Модальное окно редактирования поставщика */}

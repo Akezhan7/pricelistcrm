@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Layout } from '../components/Layout';
+import { Pagination } from '../components/Pagination';
 import { 
   Package, 
   AlertTriangle, 
@@ -33,6 +34,8 @@ export const StockDashboard: React.FC = () => {
   const [purchaseSuggestions, setPurchaseSuggestions] = useState<any>(null);
   const [loadingPurchase, setLoadingPurchase] = useState(false);
   const [creatingOrders, setCreatingOrders] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(50);
 
   useEffect(() => {
     loadData();
@@ -127,6 +130,25 @@ export const StockDashboard: React.FC = () => {
 
     return products;
   };
+
+  // Получение товаров для текущей страницы
+  const getPaginatedProducts = () => {
+    const filteredProducts = getFilteredProducts();
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return filteredProducts.slice(startIndex, endIndex);
+  };
+
+  // Обработчик смены страницы
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Сброс страницы при изменении фильтров
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedStatus, selectedCategory, searchQuery]);
 
   const handleGeneratePurchaseList = async () => {
     try {
@@ -356,14 +378,14 @@ export const StockDashboard: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredProducts.length === 0 ? (
+                {getPaginatedProducts().length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
                       Товары не найдены
                     </td>
                   </tr>
                 ) : (
-                  filteredProducts.map((product) => (
+                  getPaginatedProducts().map((product) => (
                     <tr key={product.id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center gap-3">
@@ -423,11 +445,20 @@ export const StockDashboard: React.FC = () => {
               </tbody>
             </table>
           </div>
+          
+          {/* Пагинация */}
+          <Pagination
+            currentPage={currentPage}
+            totalPages={Math.ceil(getFilteredProducts().length / itemsPerPage)}
+            totalItems={getFilteredProducts().length}
+            itemsPerPage={itemsPerPage}
+            onPageChange={handlePageChange}
+          />
         </div>
 
         {/* Информация о результатах */}
         <div className="text-sm text-gray-500 text-center">
-          Показано товаров: {filteredProducts.length} из {analytics.stats.totalProducts}
+          Всего товаров: {analytics.stats.totalProducts}
         </div>
       </div>
 

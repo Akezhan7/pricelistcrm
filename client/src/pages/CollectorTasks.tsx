@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Layout } from '../components/Layout';
+import { Pagination } from '../components/Pagination';
 import { 
   ClipboardList, 
   CheckCircle2, 
@@ -13,7 +14,7 @@ import {
   Filter
 } from 'lucide-react';
 import collectorApi from '../services/collectorApi';
-import type { CollectorTask, CollectorTaskStatus } from '../types';
+import type { CollectorTask, CollectorTaskStatus, CollectorTasksResponse } from '../types';
 
 export const CollectorTasks: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -21,24 +22,39 @@ export const CollectorTasks: React.FC = () => {
   const [stats, setStats] = useState({ pending: 0, inProgress: 0, completed: 0 });
   const [filterStatus, setFilterStatus] = useState<CollectorTaskStatus | 'all'>('all');
   const [processingTaskId, setProcessingTaskId] = useState<number | null>(null);
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 1,
+    pages: 1,
+    limit: 20
+  });
 
   useEffect(() => {
     loadTasks();
-  }, [filterStatus]);
+  }, [filterStatus, pagination.page]);
 
   const loadTasks = async () => {
     try {
       setLoading(true);
-      const data = await collectorApi.getMyTasks(
-        filterStatus === 'all' ? undefined : filterStatus
-      );
+      const data = await collectorApi.getMyTasks({
+        status: filterStatus === 'all' ? undefined : filterStatus,
+        page: pagination.page,
+        limit: pagination.limit
+      });
       setTasks(data.tasks);
       setStats(data.stats);
+      if (data.pagination) {
+        setPagination(data.pagination);
+      }
     } catch (error) {
       console.error('Ошибка загрузки заданий:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePageChange = (page: number) => {
+    setPagination(prev => ({ ...prev, page }));
   };
 
   const handleStartTask = async (taskId: number) => {
@@ -327,6 +343,17 @@ export const CollectorTasks: React.FC = () => {
             ))
           )}
         </div>
+
+        {/* Пагинация */}
+        {pagination.pages > 1 && (
+          <Pagination
+            currentPage={pagination.page}
+            totalPages={pagination.pages}
+            totalItems={pagination.total}
+            itemsPerPage={pagination.limit}
+            onPageChange={handlePageChange}
+          />
+        )}
 
         {/* Подсказка */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">

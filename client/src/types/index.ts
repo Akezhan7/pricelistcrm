@@ -586,6 +586,12 @@ export interface CollectorTasksResponse {
     inProgress: number;
     completed: number;
   };
+  pagination?: {
+    total: number;
+    page: number;
+    pages: number;
+    limit: number;
+  };
 }
 
 export interface AssignCollectorDto {

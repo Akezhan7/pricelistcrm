@@ -32,6 +32,9 @@ const getAllSuppliers = async (req, res) => {
 
     const suppliers = await Supplier.findAndCountAll({
       where: whereClause,
+      attributes: ['id', 'name', 'address', 'phone', 'whatsapp', 'containerImage', 
+                   'sector', 'mapPosition', 'notes', 'debt', 'isActive', 
+                   'sectorId', 'rowId', 'row', 'container', 'createdAt', 'updatedAt'],
       include: [
         {
           model: Product,
@@ -97,6 +100,9 @@ const getSupplierById = async (req, res) => {
 
     const supplier = await Supplier.findOne({
       where: { id, isActive: true },
+      attributes: ['id', 'name', 'address', 'phone', 'whatsapp', 'containerImage', 
+                   'sector', 'mapPosition', 'notes', 'debt', 'isActive', 
+                   'sectorId', 'rowId', 'row', 'container', 'createdAt', 'updatedAt'],
       include: [
         {
           model: Product,
@@ -162,7 +168,9 @@ const createSupplier = async (req, res) => {
       sector, 
       mapPosition, 
       notes,
-      debt
+      debt,
+      row,
+      container
     } = req.body;
     // products may be sent as JSON string in multipart/form-data. Accept both array and JSON string.
     let products = req.body.products;
@@ -185,6 +193,8 @@ const createSupplier = async (req, res) => {
       // Если debt передан (в FormData приходит строкой), приводим к числу
       debt: debt !== undefined && debt !== '' ? parseFloat(debt) : undefined,
       containerImage: req.file ? `/uploads/${req.file.filename}` : null,
+      row: row || null,
+      container: container || null,
     });
 
     // Добавление товаров, если они указаны
@@ -250,7 +260,9 @@ const updateSupplier = async (req, res) => {
       sector, 
       mapPosition, 
       notes,
-      debt
+      debt,
+      row,
+      container
     } = req.body;
     // products may be sent as JSON string in multipart/form-data. Accept both array and JSON string.
     let products = req.body.products;
@@ -278,6 +290,8 @@ const updateSupplier = async (req, res) => {
     if (sector !== undefined) updateData.sector = sector;
     if (mapPosition) updateData.mapPosition = JSON.parse(mapPosition);
     if (notes !== undefined) updateData.notes = notes;
+    if (row !== undefined) updateData.row = row || null;
+    if (container !== undefined) updateData.container = container || null;
     // Обработка задолженности (debt)
     if (debt !== undefined && debt !== '') {
       const parsedDebt = parseFloat(debt);

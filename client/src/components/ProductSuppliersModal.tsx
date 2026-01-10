@@ -1,16 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Edit, Check, AlertCircle, UserPlus, Users, Upload } from 'lucide-react';
+import { X, Plus, Trash2, Edit, Check, AlertCircle, UserPlus, Users } from 'lucide-react';
 import { Product, Supplier, SupplierWithPrice } from '../types';
+import { UnifiedSupplierForm } from './UnifiedSupplierForm';
 import api from '../utils/api';
-
-type Sector = {
-  id: number;
-  name: string;
-  code: string;
-  productType: string;
-  color?: string;
-  icon?: string;
-};
 
 type ProductSuppliersModalProps = {
   isOpen: boolean;
@@ -27,25 +19,6 @@ type NewSupplierData = {
   notes: string;
 };
 
-type CreateSupplierData = {
-  name: string;
-  phone: string;
-  whatsapp: string;
-  address: string;
-  sector: string;
-  row: string;
-  container: string;
-  supplierPrice: string;
-  quantity: string;
-  isAvailable: boolean;
-  notes: string;
-  containerImage: File | null;
-  mapPosition: {
-    x: string;
-    y: string;
-  };
-};
-
 export const ProductSuppliersModal: React.FC<ProductSuppliersModalProps> = ({
   isOpen,
   onClose,
@@ -59,17 +32,6 @@ export const ProductSuppliersModal: React.FC<ProductSuppliersModalProps> = ({
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [actionType, setActionType] = useState<'existing' | 'create' | null>(null);
   
-  // Состояния для работы с секторами
-  const [sectors, setSectors] = useState<Sector[]>([]);
-  const [loadingSectors, setLoadingSectors] = useState(false);
-  const [showAddSector, setShowAddSector] = useState(false);
-  const [newSector, setNewSector] = useState({
-    name: '',
-    code: '',
-    productType: '',
-    color: '#6b7280',
-  });
-  const [addingSector, setAddingSector] = useState(false);
   const [newSupplierData, setNewSupplierData] = useState<NewSupplierData>({
     supplierId: '',
     supplierPrice: '',
@@ -77,24 +39,7 @@ export const ProductSuppliersModal: React.FC<ProductSuppliersModalProps> = ({
     isAvailable: true,
     notes: '',
   });
-  const [createSupplierData, setCreateSupplierData] = useState<CreateSupplierData>({
-    name: '',
-    phone: '',
-    whatsapp: '',
-    address: '',
-    sector: '',
-    row: '',
-    container: '',
-    supplierPrice: '',
-    quantity: '0',
-    isAvailable: true,
-    notes: '',
-    containerImage: null,
-    mapPosition: {
-      x: '',
-      y: '',
-    },
-  });
+  
   const [editingSupplier, setEditingSupplier] = useState<number | null>(null);
   const [editData, setEditData] = useState<Omit<NewSupplierData, 'supplierId'>>({
     supplierPrice: '',
@@ -107,7 +52,6 @@ export const ProductSuppliersModal: React.FC<ProductSuppliersModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       loadAvailableSuppliers();
-      loadSectors();
     }
   }, [isOpen]);
 
@@ -117,58 +61,6 @@ export const ProductSuppliersModal: React.FC<ProductSuppliersModalProps> = ({
       setAvailableSuppliers(response.data.data.suppliers || []);
     } catch (error) {
       console.error('Ошибка загрузки поставщиков:', error);
-    }
-  };
-
-  const loadSectors = async () => {
-    try {
-      setLoadingSectors(true);
-      const response = await api.get('/sectors');
-      setSectors(response.data.data || []);
-    } catch (err) {
-      console.error('Ошибка загрузки секторов:', err);
-    } finally {
-      setLoadingSectors(false);
-    }
-  };
-
-  const handleAddSector = async () => {
-    if (!newSector.name.trim() || !newSector.code.trim() || !newSector.productType.trim()) {
-      setError('Заполните все поля нового сектора');
-      return;
-    }
-
-    try {
-      setAddingSector(true);
-      setError('');
-      
-      const response = await api.post('/sectors', {
-        name: newSector.name,
-        code: newSector.code,
-        productType: newSector.productType,
-        color: newSector.color,
-      });
-
-      const createdSector = response.data.data;
-      
-      // Обновляем список секторов
-      setSectors([...sectors, createdSector]);
-      
-      // Автоматически выбираем новый сектор
-      setCreateSupplierData({ ...createSupplierData, sector: createdSector.name });
-      
-      // Сбрасываем форму добавления сектора
-      setNewSector({
-        name: '',
-        code: '',
-        productType: '',
-        color: '#6b7280',
-      });
-      setShowAddSector(false);
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка создания сектора');
-    } finally {
-      setAddingSector(false);
     }
   };
 
@@ -255,91 +147,6 @@ export const ProductSuppliersModal: React.FC<ProductSuppliersModalProps> = ({
       onSuccess();
     } catch (err: any) {
       setError(err.response?.data?.message || 'Ошибка обновления данных поставщика');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCreateSupplier = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!product) return;
-
-    setLoading(true);
-    setError('');
-
-    try {
-      // Создаем FormData для отправки с файлом
-      const formData = new FormData();
-      formData.append('name', createSupplierData.name);
-      formData.append('phone', createSupplierData.phone);
-      formData.append('whatsapp', createSupplierData.whatsapp || createSupplierData.phone);
-      formData.append('address', createSupplierData.address);
-      formData.append('sector', createSupplierData.sector);
-      formData.append('notes', createSupplierData.notes);
-      
-      if (createSupplierData.row) {
-        formData.append('row', createSupplierData.row);
-      }
-      if (createSupplierData.container) {
-        formData.append('container', createSupplierData.container);
-      }
-      
-      // Добавляем позицию на карте, если указана
-      if (createSupplierData.mapPosition.x && createSupplierData.mapPosition.y) {
-        const mapPosition = {
-          x: parseFloat(createSupplierData.mapPosition.x),
-          y: parseFloat(createSupplierData.mapPosition.y),
-        };
-        formData.append('mapPosition', JSON.stringify(mapPosition));
-      }
-      
-      if (createSupplierData.containerImage) {
-        formData.append('containerImage', createSupplierData.containerImage);
-      }
-
-      // Сначала создаем поставщика
-      const supplierResponse = await api.post('/suppliers', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-
-      const newSupplierId = supplierResponse.data.data.supplier.id;
-
-      // Затем привязываем его к товару
-      await api.post(`/products/${product.id}/suppliers`, {
-        supplierId: newSupplierId,
-        supplierPrice: parseFloat(createSupplierData.supplierPrice),
-        quantity: parseInt(createSupplierData.quantity),
-        isAvailable: createSupplierData.isAvailable,
-        notes: createSupplierData.notes,
-      });
-
-      // Сброс формы
-      setCreateSupplierData({
-        name: '',
-        phone: '',
-        whatsapp: '',
-        address: '',
-        sector: '',
-        row: '',
-        container: '',
-        supplierPrice: '',
-        quantity: '0',
-        isAvailable: true,
-        notes: '',
-        containerImage: null,
-        mapPosition: {
-          x: '',
-          y: '',
-        },
-      });
-      setShowCreateForm(false);
-      setActionType(null);
-      await loadAvailableSuppliers(); // Обновляем список поставщиков
-      onSuccess();
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка создания поставщика');
     } finally {
       setLoading(false);
     }
@@ -674,430 +481,6 @@ export const ProductSuppliersModal: React.FC<ProductSuppliersModalProps> = ({
               </form>
             )}
 
-            {/* Форма создания нового поставщика */}
-            {showCreateForm && actionType === 'create' && (
-              <form onSubmit={handleCreateSupplier} className="border border-gray-200 rounded-lg p-4 bg-green-50">
-                <h4 className="text-lg font-medium text-gray-900 mb-4">Создать нового поставщика</h4>
-                
-                {/* Основная информация о поставщике */}
-                <div className="mb-4">
-                  <h5 className="text-sm font-semibold text-gray-800 mb-3 uppercase tracking-wide">
-                    Основная информация
-                  </h5>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Имя поставщика *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        className="input-field"
-                        value={createSupplierData.name}
-                        onChange={(e) => setCreateSupplierData({ ...createSupplierData, name: e.target.value })}
-                        placeholder="Например: Юсуф"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Телефон *
-                      </label>
-                      <input
-                        type="tel"
-                        required
-                        className="input-field"
-                        value={createSupplierData.phone}
-                        onChange={(e) => setCreateSupplierData({ ...createSupplierData, phone: e.target.value })}
-                        placeholder="+7 777 123 45 67"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        WhatsApp
-                      </label>
-                      <input
-                        type="tel"
-                        className="input-field"
-                        value={createSupplierData.whatsapp}
-                        onChange={(e) => setCreateSupplierData({ ...createSupplierData, whatsapp: e.target.value })}
-                        placeholder="+7 777 123 45 67"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">
-                        Если отличается от основного телефона
-                      </p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Сектор
-                      </label>
-                      <div className="flex gap-2">
-                        <select
-                          className="input-field flex-1"
-                          value={createSupplierData.sector}
-                          onChange={(e) => setCreateSupplierData({ ...createSupplierData, sector: e.target.value })}
-                          disabled={loadingSectors}
-                        >
-                          <option value="">
-                            {loadingSectors ? 'Загрузка секторов...' : 'Выберите сектор'}
-                          </option>
-                          {sectors.map((sector) => (
-                            <option key={sector.id} value={sector.name}>
-                              {sector.name} ({sector.productType})
-                            </option>
-                          ))}
-                        </select>
-                        <button
-                          type="button"
-                          onClick={() => setShowAddSector(!showAddSector)}
-                          className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-1"
-                          title="Добавить новый сектор"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </button>
-                      </div>
-                      
-                      {/* Форма быстрого добавления сектора */}
-                      {showAddSector && (
-                        <div className="mt-3 p-3 bg-white border border-gray-300 rounded-lg space-y-3 shadow-sm">
-                          <h4 className="text-sm font-medium text-gray-900">Добавить новый сектор</h4>
-                          
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Название сектора *
-                            </label>
-                            <input
-                              type="text"
-                              className="input-field text-sm"
-                              placeholder="Например: Игрушки"
-                              value={newSector.name}
-                              onChange={(e) => setNewSector({ ...newSector, name: e.target.value })}
-                            />
-                          </div>
-                          
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Код сектора *
-                            </label>
-                            <input
-                              type="text"
-                              className="input-field text-sm"
-                              placeholder="Например: TOY"
-                              value={newSector.code}
-                              onChange={(e) => setNewSector({ ...newSector, code: e.target.value.toUpperCase() })}
-                            />
-                          </div>
-                          
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Тип продукции *
-                            </label>
-                            <input
-                              type="text"
-                              className="input-field text-sm"
-                              placeholder="Например: Детские товары"
-                              value={newSector.productType}
-                              onChange={(e) => setNewSector({ ...newSector, productType: e.target.value })}
-                            />
-                          </div>
-                          
-                          <div>
-                            <label className="block text-xs font-medium text-gray-700 mb-1">
-                              Цвет (опционально)
-                            </label>
-                            <div className="flex gap-2 items-center">
-                              <input
-                                type="color"
-                                className="h-10 w-16 rounded border border-gray-300 cursor-pointer"
-                                value={newSector.color}
-                                onChange={(e) => setNewSector({ ...newSector, color: e.target.value })}
-                              />
-                              <span className="text-xs text-gray-500">
-                                Цвет для отображения на карте
-                              </span>
-                            </div>
-                          </div>
-                          
-                          <div className="flex justify-end gap-2 pt-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setShowAddSector(false);
-                                setNewSector({
-                                  name: '',
-                                  code: '',
-                                  productType: '',
-                                  color: '#6b7280',
-                                });
-                              }}
-                              className="px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 transition-colors"
-                              disabled={addingSector}
-                            >
-                              Отмена
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleAddSector}
-                              className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors flex items-center gap-1"
-                              disabled={addingSector}
-                            >
-                              {addingSector ? (
-                                <>
-                                  <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-white"></div>
-                                  Добавление...
-                                </>
-                              ) : (
-                                <>
-                                  <Plus className="h-3 w-3" />
-                                  Добавить сектор
-                                </>
-                              )}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Местоположение */}
-                <div className="mb-4 pb-4 border-b border-gray-300">
-                  <h5 className="text-sm font-semibold text-gray-800 mb-3 uppercase tracking-wide">
-                    Местоположение на рынке
-                  </h5>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Ряд
-                      </label>
-                      <input
-                        type="text"
-                        className="input-field"
-                        placeholder="Напр.: 24"
-                        value={createSupplierData.row}
-                        onChange={(e) => setCreateSupplierData({ ...createSupplierData, row: e.target.value })}
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Номер ряда на рынке</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Контейнер
-                      </label>
-                      <input
-                        type="text"
-                        className="input-field"
-                        placeholder="Напр.: 6"
-                        value={createSupplierData.container}
-                        onChange={(e) => setCreateSupplierData({ ...createSupplierData, container: e.target.value })}
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Номер контейнера</p>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Адрес (опционально)
-                      </label>
-                      <input
-                        type="text"
-                        className="input-field"
-                        value={createSupplierData.address}
-                        onChange={(e) => setCreateSupplierData({ ...createSupplierData, address: e.target.value })}
-                        placeholder="Например: 24 ряд"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Если ряд/контейнер не указаны</p>
-                    </div>
-                  </div>
-                  
-                  {/* Позиция на карте */}
-                  <div className="mt-3">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Позиция на карте (опционально)
-                    </label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.1"
-                          className="input-field"
-                          placeholder="X (0-100)"
-                          value={createSupplierData.mapPosition.x}
-                          onChange={(e) => setCreateSupplierData({ 
-                            ...createSupplierData, 
-                            mapPosition: { ...createSupplierData.mapPosition, x: e.target.value } 
-                          })}
-                        />
-                        <p className="text-xs text-gray-500 mt-1">Координата X (0-100%)</p>
-                      </div>
-                      <div>
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          step="0.1"
-                          className="input-field"
-                          placeholder="Y (0-100)"
-                          value={createSupplierData.mapPosition.y}
-                          onChange={(e) => setCreateSupplierData({ 
-                            ...createSupplierData, 
-                            mapPosition: { ...createSupplierData.mapPosition, y: e.target.value } 
-                          })}
-                        />
-                        <p className="text-xs text-gray-500 mt-1">Координата Y (0-100%)</p>
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      Укажите позицию контейнера на карте в процентах от левого верхнего угла
-                    </p>
-                  </div>
-                </div>
-
-                {/* Фото контейнера */}
-                <div className="mb-4 pb-4 border-b border-gray-300">
-                  <h5 className="text-sm font-semibold text-gray-800 mb-3 uppercase tracking-wide">
-                    Фото контейнера
-                  </h5>
-                  <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg hover:border-gray-400 transition-colors bg-white">
-                    <div className="text-center">
-                      <Upload className="mx-auto h-8 w-8 text-gray-400" />
-                      <div className="mt-2">
-                        <label className="cursor-pointer">
-                          <span className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-                            Выберите файл
-                          </span>
-                          <input
-                            type="file"
-                            className="hidden"
-                            accept="image/*"
-                            onChange={(e) => setCreateSupplierData({ 
-                              ...createSupplierData, 
-                              containerImage: e.target.files?.[0] || null 
-                            })}
-                          />
-                        </label>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">PNG, JPG до 5MB</p>
-                      {createSupplierData.containerImage && (
-                        <p className="text-xs text-green-600 mt-1 font-medium">
-                          Выбрано: {createSupplierData.containerImage.name}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Условия для этого товара */}
-                <div className="border-t border-gray-300 pt-4 mt-4">
-                  <h5 className="text-sm font-semibold text-gray-800 mb-3 uppercase tracking-wide">
-                    Условия для товара "{product?.name}"
-                  </h5>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Цена поставщика *
-                      </label>
-                      <input
-                        type="number"
-                        required
-                        min="0"
-                        step="0.01"
-                        className="input-field"
-                        value={createSupplierData.supplierPrice}
-                        onChange={(e) => setCreateSupplierData({ ...createSupplierData, supplierPrice: e.target.value })}
-                        placeholder="0.00"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Количество на складе
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        className="input-field"
-                        value={createSupplierData.quantity}
-                        onChange={(e) => setCreateSupplierData({ ...createSupplierData, quantity: e.target.value })}
-                        placeholder="0"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Доступность
-                      </label>
-                      <select
-                        className="input-field"
-                        value={createSupplierData.isAvailable.toString()}
-                        onChange={(e) => setCreateSupplierData({ ...createSupplierData, isAvailable: e.target.value === 'true' })}
-                      >
-                        <option value="true">Доступен</option>
-                        <option value="false">Недоступен</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="mb-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Заметки для этого товара
-                    </label>
-                    <textarea
-                      className="input-field resize-none"
-                      rows={3}
-                      value={createSupplierData.notes}
-                      onChange={(e) => setCreateSupplierData({ ...createSupplierData, notes: e.target.value })}
-                      placeholder="Особые условия поставки, заметки о качестве и т.д."
-                    />
-                  </div>
-                </div>
-                
-                <div className="flex justify-end space-x-3 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowCreateForm(false);
-                      setActionType(null);
-                      setCreateSupplierData({
-                        name: '',
-                        phone: '',
-                        whatsapp: '',
-                        address: '',
-                        sector: '',
-                        row: '',
-                        container: '',
-                        supplierPrice: '',
-                        quantity: '0',
-                        isAvailable: true,
-                        notes: '',
-                        containerImage: null,
-                        mapPosition: {
-                          x: '',
-                          y: '',
-                        },
-                      });
-                    }}
-                    className="btn-secondary"
-                    disabled={loading}
-                  >
-                    Отмена
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn-primary flex items-center gap-2"
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        Создание...
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus className="h-4 w-4" />
-                        Создать поставщика и добавить к товару
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
-            )}
-
             {/* Информационные сообщения */}
             {!showAddForm && !showCreateForm && (
               <div>
@@ -1118,6 +501,24 @@ export const ProductSuppliersModal: React.FC<ProductSuppliersModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Унифицированная форма создания поставщика */}
+      <UnifiedSupplierForm
+        isOpen={showCreateForm && actionType === 'create'}
+        onClose={() => {
+          setShowCreateForm(false);
+          setActionType(null);
+        }}
+        onSuccess={async () => {
+          await loadAvailableSuppliers();
+          onSuccess();
+          setShowCreateForm(false);
+          setActionType(null);
+        }}
+        mode="with-product"
+        productId={product?.id}
+        productName={product?.name}
+      />
     </div>
   );
 };
