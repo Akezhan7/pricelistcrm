@@ -17,9 +17,7 @@ import {
   FileText,
   CreditCard,
   DollarSign,
-  TrendingUp,
   Download,
-  Printer,
   Send,
   CheckCircle,
   UserPlus,
@@ -40,7 +38,6 @@ const OrderDetails: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // Проверка прав доступа
   const canEditOrders = user?.role === 'admin' || user?.role === 'purchase_manager';
   const canDeleteOrders = user?.role === 'admin';
   const canManagePayments = user?.role === 'admin' || user?.role === 'accountant' || user?.role === 'purchase_manager';
@@ -101,7 +98,6 @@ const OrderDetails: React.FC = () => {
       'Забрана': 'bg-indigo-100 text-indigo-800 border-indigo-200',
       'Принята на складе': 'bg-teal-100 text-teal-800 border-teal-200',
       'Закрыта': 'bg-gray-200 text-gray-600 border-gray-300',
-      // Старые статусы для обратной совместимости
       'В работе': 'bg-blue-100 text-blue-800 border-blue-200',
       'На точке': 'bg-yellow-100 text-yellow-800 border-yellow-200',
       'В пути': 'bg-purple-100 text-purple-800 border-purple-200',
@@ -120,22 +116,12 @@ const OrderDetails: React.FC = () => {
       'Забрана': <Truck className="w-5 h-5" />,
       'Принята на складе': <Warehouse className="w-5 h-5" />,
       'Закрыта': <Package className="w-5 h-5" />,
-      // Старые статусы
       'В работе': <Package className="w-5 h-5" />,
       'На точке': <MapPin className="w-5 h-5" />,
       'В пути': <Truck className="w-5 h-5" />,
       'На складе': <Warehouse className="w-5 h-5" />
     };
     return icons[status] || <Package className="w-5 h-5" />;
-  };
-
-  const getPaymentStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      'Не оплачено': 'text-red-600',
-      'Частично оплачено': 'text-orange-600',
-      'Оплачено': 'text-green-600'
-    };
-    return colors[status] || 'text-gray-600';
   };
 
   const calculatePaymentProgress = () => {
@@ -161,7 +147,6 @@ const OrderDetails: React.FC = () => {
     }
   };
 
-  // Обработчик регистрации оплаты
   const handlePaymentSubmit = async (amount: number, comment?: string) => {
     if (!order) return;
 
@@ -169,7 +154,6 @@ const OrderDetails: React.FC = () => {
       setPaymentLoading(true);
       const response = await ordersApi.updateOrderPayment(order.id, amount, comment);
       
-      // Полная перезагрузка заказа для обновления всех связанных данных
       await loadOrder();
       
       alert(`Оплата успешно зарегистрирована! ${response.payment.statusChanged ? `Статус изменен на "${response.payment.newStatus}"` : ''}`);
@@ -182,7 +166,6 @@ const OrderDetails: React.FC = () => {
     }
   };
 
-  // Обработчик скачивания PDF
   const handleDownloadPDF = async () => {
     if (!order) return;
     
@@ -194,7 +177,6 @@ const OrderDetails: React.FC = () => {
     }
   };
 
-  // Обработчик отправки в WhatsApp
   const handleSendToWhatsApp = async () => {
     if (!order || !order.supplier?.whatsapp) {
       alert('У поставщика не указан номер WhatsApp');
@@ -213,13 +195,11 @@ const OrderDetails: React.FC = () => {
     }
   };
 
-  // Обработчик подтверждения заявки поставщиком
   const handleConfirmOrder = async (isPartial: boolean = false) => {
     if (!order) return;
 
     try {
       if (isPartial) {
-        // Частичное подтверждение
         const items = Object.entries(confirmationItems).map(([productId, quantity]) => ({
           productId: parseInt(productId),
           confirmedQuantity: quantity,
@@ -229,7 +209,6 @@ const OrderDetails: React.FC = () => {
         await ordersApi.partialConfirm(order.id, { items });
         alert('Заявка частично подтверждена поставщиком');
       } else {
-        // Полное подтверждение
         await ordersApi.confirmOrder(order.id);
         alert('Заявка полностью подтверждена поставщиком');
       }
@@ -243,7 +222,6 @@ const OrderDetails: React.FC = () => {
     }
   };
 
-  // Обработчик назначения сборщика
   const handleAssignCollector = async () => {
     if (!order || !selectedCollectorId) {
       alert('Выберите сборщика');
@@ -262,17 +240,14 @@ const OrderDetails: React.FC = () => {
     }
   };
 
-  // Загрузка списка сборщиков
   useEffect(() => {
     const loadCollectors = async () => {
       try {
-        // Динамически импортируем usersApi чтобы избежать циклических зависимостей
         const usersApi = (await import('../services/usersApi')).default;
         const users = await usersApi.getCollectors();
         setCollectors(users);
       } catch (error) {
         console.error('Ошибка загрузки сборщиков:', error);
-        // Если API не работает, показываем пустой список
         setCollectors([]);
       }
     };

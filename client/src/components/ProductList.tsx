@@ -58,7 +58,6 @@ export const ProductList: React.FC<ProductListProps> = ({
   const filteredProducts = useMemo(() => {
     let filtered = products;
     
-    // Сначала применяем глобальный поиск из Header
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(product =>
@@ -115,7 +114,7 @@ export const ProductList: React.FC<ProductListProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1" style={{ minHeight: 0 }}>
       {/* Кнопка добавления товара */}
       {canEdit && (
         <div className="p-4 border-b border-gray-200">
@@ -158,7 +157,7 @@ export const ProductList: React.FC<ProductListProps> = ({
       </div>
 
       {/* Список товаров */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto" style={{ minHeight: 0 }}>
         {filteredProducts.length === 0 ? (
           <div className="p-4 text-center text-gray-500">
             <div className="text-4xl mb-2">📦</div>
@@ -171,49 +170,50 @@ export const ProductList: React.FC<ProductListProps> = ({
             {paginatedProducts.map((product) => (
               <div
                 key={product.id}
-                className={`p-4 cursor-pointer hover:bg-gray-50 transition-colors ${
+                className={`p-3 lg:p-4 cursor-pointer hover:bg-gray-50 transition-colors ${
                   selectedProduct?.id === product.id ? 'bg-blue-50 border-r-2 border-blue-500' : ''
                 }`}
                 onClick={() => onSelectProduct(
                   selectedProduct?.id === product.id ? null : product
                 )}
               >
-                <div className="flex items-start space-x-3">
+                <div className="flex items-start space-x-2 lg:space-x-3">
                   {/* Изображение товара */}
                   <div className="flex-shrink-0">
                     {product.image ? (
                       <img
                         src={getImageUrl(product.image) || undefined}
                         alt={product.name}
-                        className="h-12 w-12 rounded-lg object-cover"
+                        className="h-10 w-10 lg:h-12 lg:w-12 rounded-lg object-cover"
                         onError={handleImgError}
                       />
                     ) : (
-                      <div className="h-12 w-12 bg-gray-200 rounded-lg flex items-center justify-center">
-                        <ImageIcon className="h-6 w-6 text-gray-400" />
+                      <div className="h-10 w-10 lg:h-12 lg:w-12 bg-gray-200 rounded-lg flex items-center justify-center">
+                        <ImageIcon className="h-5 w-5 lg:h-6 lg:w-6 text-gray-400" />
                       </div>
                     )}
                   </div>
 
                   {/* Информация о товаре */}
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-medium text-gray-900 truncate">
+                    <h3 className="text-sm font-medium text-gray-900 leading-tight mb-1 overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                       {product.name}
                     </h3>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Артикул: {product.article}
+                    <p className="text-xs text-gray-500 truncate mb-2">
+                      {product.article}
                     </p>
                     
-                    <div className="flex items-center justify-between mt-2">
-                      <div className="text-xs">
-                        <span className="text-gray-500">Себестоимость:</span>
-                        <span className="text-gray-900 font-medium ml-1">
+                    {/* Компактный блок цен */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-500">Себ-ть:</span>
+                        <span className="text-gray-900 font-semibold">
                           {formatPrice(product.costPrice)} ₸
                         </span>
                       </div>
-                      <div className="text-xs">
+                      <div className="flex items-center justify-between text-xs">
                         <span className="text-gray-500">Продажа:</span>
-                        <span className="text-green-600 font-medium ml-1">
+                        <span className="text-green-600 font-semibold">
                           {formatPrice(product.sellingPrice)} ₸
                         </span>
                       </div>
@@ -221,8 +221,8 @@ export const ProductList: React.FC<ProductListProps> = ({
 
                     {/* Количество поставщиков */}
                     {product.suppliers && product.suppliers.length > 0 && (
-                      <p className="text-xs text-blue-600 mt-1">
-                        Поставщиков: {product.suppliers.length}
+                      <p className="text-xs text-blue-600 mt-1.5">
+                        🏪 {product.suppliers.length}
                       </p>
                     )}
                   </div>
@@ -230,56 +230,56 @@ export const ProductList: React.FC<ProductListProps> = ({
 
                 {/* Кнопки управления для админа */}
                 {canEdit && (
-                  <div className="flex justify-end space-x-2 mt-3 pt-2 border-t border-gray-100">
+                  <div className="flex justify-end space-x-1 mt-2 pt-2 border-t border-gray-100">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setProductForPriceHistory(product);
                       }}
-                      className="p-1 text-gray-400 hover:text-orange-600 transition-colors"
+                      className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded transition-colors"
                       title="История цен"
                     >
-                      <TrendingUp className="h-4 w-4" />
+                      <TrendingUp className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setProductForSuppliers(product);
                       }}
-                      className="p-1 text-gray-400 hover:text-green-600 transition-colors"
+                      className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
                       title="Управление поставщиками"
                     >
-                      <Users className="h-4 w-4" />
+                      <Users className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setProductForVariations(product);
                       }}
-                      className="p-1 text-gray-400 hover:text-purple-600 transition-colors"
+                      className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded transition-colors"
                       title="Управление вариациями"
                     >
-                      <Settings className="h-4 w-4" />
+                      <Settings className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setEditingProduct(product);
                       }}
-                      className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
+                      className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                       title="Редактировать товар"
                     >
-                      <Edit className="h-4 w-4" />
+                      <Edit className="h-3.5 w-3.5" />
                     </button>
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setProductToDelete(product);
                       }}
-                      className="p-1 text-gray-400 hover:text-red-600 transition-colors"
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                       title="Удалить товар"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
                 )}
@@ -292,27 +292,71 @@ export const ProductList: React.FC<ProductListProps> = ({
       {/* Пагинация */}
       {totalPages > 1 && (
         <div className="border-t border-gray-200 px-4 py-3 bg-gray-50">
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-gray-600">
-              {filteredProducts.length} товаров
+          <div className="space-y-2">
+            <div className="text-xs text-gray-500 text-center">
+              Показано {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredProducts.length)} из {filteredProducts.length}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center space-x-2">
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="px-2 py-1 text-xs rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                title="Первая"
+              >
+                ««
+              </button>
               <button
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
-                className="p-1 text-gray-600 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed"
+                className="p-1 text-gray-600 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
-                <ChevronLeft className="h-5 w-5" />
+                <ChevronLeft className="h-4 w-4" />
               </button>
-              <span className="text-sm text-gray-700">
-                {currentPage} / {totalPages}
-              </span>
+              
+              {/* Номера страниц */}
+              <div className="flex items-center space-x-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum: number;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`px-2 py-1 text-xs rounded transition-colors ${
+                        currentPage === pageNum
+                          ? 'bg-blue-600 text-white font-medium'
+                          : 'hover:bg-gray-200 text-gray-700'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+              
               <button
                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                 disabled={currentPage === totalPages}
-                className="p-1 text-gray-600 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed"
+                className="p-1 text-gray-600 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
-                <ChevronRight className="h-5 w-5" />
+                <ChevronRight className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="px-2 py-1 text-xs rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                title="Последняя"
+              >
+                »»
               </button>
             </div>
           </div>

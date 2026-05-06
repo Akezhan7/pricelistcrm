@@ -10,18 +10,25 @@ module.exports = {
   async up(queryInterface, Sequelize) {
     console.log('➕ Добавляем поле email в таблицу suppliers...');
     
-    await queryInterface.addColumn('suppliers', 'email', {
-      type: Sequelize.STRING,
-      allowNull: true,
-      comment: 'Email поставщика для связи',
-    });
+    // Проверяем существование колонки
+    const tableInfo = await queryInterface.describeTable('suppliers');
     
-    // Добавляем индекс для быстрого поиска по email
-    await queryInterface.addIndex('suppliers', ['email'], {
-      name: 'suppliers_email_idx',
-    });
-    
-    console.log('✅ Поле email успешно добавлено');
+    if (!tableInfo.email) {
+      await queryInterface.addColumn('suppliers', 'email', {
+        type: Sequelize.STRING,
+        allowNull: true,
+        comment: 'Email поставщика для связи',
+      });
+      
+      // Добавляем индекс для быстрого поиска по email
+      await queryInterface.addIndex('suppliers', ['email'], {
+        name: 'suppliers_email_idx',
+      });
+      
+      console.log('✅ Поле email успешно добавлено');
+    } else {
+      console.log('ℹ️  Поле email уже существует, пропускаем');
+    }
   },
 
   async down(queryInterface, Sequelize) {

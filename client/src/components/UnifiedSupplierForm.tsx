@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
-import { X, Save, Upload, Building2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Save, Upload, Building2, Plus } from 'lucide-react';
 import api from '../utils/api';
+import { Market } from '../types';
+import { MarketManagementModal } from './MarketManagementModal';
 
 type UnifiedSupplierFormProps = {
   isOpen: boolean;
@@ -18,11 +20,13 @@ type UnifiedSupplierFormProps = {
 };
 
 type SupplierFormData = {
+  marketId: string;
   name: string;
   phone: string;
   whatsapp: string;
   row: string;
   container: string;
+  cityAddress: string; // Для поставщиков не на рынке
   notes: string;
   containerImage: File | null;
 };
@@ -45,14 +49,19 @@ export const UnifiedSupplierForm: React.FC<UnifiedSupplierFormProps> = ({
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [markets, setMarkets] = useState<Market[]>([]);
+  const [loadingMarkets, setLoadingMarkets] = useState(false);
+  const [showMarketModal, setShowMarketModal] = useState(false);
   
   // Данные поставщика
   const [supplierData, setSupplierData] = useState<SupplierFormData>({
+    marketId: '',
     name: '',
     phone: '',
     whatsapp: '',
     row: '',
     container: '',
+    cityAddress: '',
     notes: '',
     containerImage: null,
   });
@@ -65,13 +74,35 @@ export const UnifiedSupplierForm: React.FC<UnifiedSupplierFormProps> = ({
     notes: initialProductData?.notes || '',
   });
 
+  // Загрузка списка рынков при открытии формы
+  useEffect(() => {
+    if (isOpen) {
+      loadMarkets();
+    }
+  }, [isOpen]);
+
+  const loadMarkets = async () => {
+    setLoadingMarkets(true);
+    try {
+      const response = await api.get('/markets');
+      setMarkets(response.data.data.markets || []);
+    } catch (err) {
+      console.error('Ошибка загрузки рынков:', err);
+      setError('Не удалось загрузить список рынков');
+    } finally {
+      setLoadingMarkets(false);
+    }
+  };
+
   const resetForm = () => {
     setSupplierData({
+      marketId: '',
       name: '',
       phone: '',
       whatsapp: '',
       row: '',
       container: '',
+      cityAddress: '',
       notes: '',
       containerImage: null,
     });
@@ -90,18 +121,30 @@ export const UnifiedSupplierForm: React.FC<UnifiedSupplierFormProps> = ({
     setError('');
 
     try {
-      // Формируем адрес из ряда и контейнера
+      // Формируем адрес в зависимости от того, на рынке ли поставщик
       let address = '';
-      if (supplierData.row && supplierData.container) {
-        address = `Ряд ${supplierData.row}, Контейнер ${supplierData.container}`;
-      } else if (supplierData.row) {
-        address = `Ряд ${supplierData.row}`;
-      } else if (supplierData.container) {
-        address = `Контейнер ${supplierData.container}`;
+      
+      if (supplierData.marketId) {
+        // Поставщик на рынке - используем ряд/контейнер
+        if (supplierData.row && supplierData.container) {
+          address = `Ряд ${supplierData.row}, Контейнер ${supplierData.container}`;
+        } else if (supplierData.row) {
+          address = `Ряд ${supplierData.row}`;
+        } else if (supplierData.container) {
+          address = `Контейнер ${supplierData.container}`;
+        } else {
+          setError('Для поставщиков на рынке укажите хотя бы номер ряда или контейнера');
+          setLoading(false);
+          return;
+        }
       } else {
-        setError('Укажите хотя бы номер ряда или контейнера');
-        setLoading(false);
-        return;
+        // Поставщик не на рынке - используем городской адрес
+        if (!supplierData.cityAddress.trim()) {
+          setError('Укажите адрес поставщика в городе');
+          setLoading(false);
+          return;
+        }
+        address = supplierData.cityAddress.trim();
       }
 
       // Создаём FormData для отправки с файлом
@@ -110,6 +153,9 @@ export const UnifiedSupplierForm: React.FC<UnifiedSupplierFormProps> = ({
       formData.append('phone', supplierData.phone.trim());
       formData.append('whatsapp', supplierData.whatsapp.trim() || supplierData.phone.trim());
       formData.append('address', address);
+      if (supplierData.marketId) {
+        formData.append('marketId', supplierData.marketId);
+      }
       
       if (supplierData.row) {
         formData.append('row', supplierData.row.trim());
@@ -204,6 +250,44 @@ export const UnifiedSupplierForm: React.FC<UnifiedSupplierFormProps> = ({
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Рынок (опционально)
+                </label>
+                <div className="flex gap-2">
+                  {loadingMarkets ? (
+                    <div className="input-field flex-1 flex items-center gap-2 text-gray-500">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                      Загрузка рынков...
+                    </div>
+                  ) : (
+                    <select
+                      className="input-field flex-1"
+                      value={supplierData.marketId}
+                      onChange={(e) => setSupplierData({ ...supplierData, marketId: e.target.value })}
+                    >
+                      <option value="">Не на рынке / Где-то в городе</option>
+                      {markets.map((market) => (
+                        <option key={market.id} value={market.id}>
+                          {market.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowMarketModal(true)}
+                    className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1"
+                    title="Управление рынками"
+                  >
+                    <Plus className="h-4 w-4" />
+                  </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  Если поставщик на Байсате, Ялянь или другом рынке - выберите рынок
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Имя поставщика <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -249,45 +333,72 @@ export const UnifiedSupplierForm: React.FC<UnifiedSupplierFormProps> = ({
               </div>
             </div>
 
-            {/* МЕСТОПОЛОЖЕНИЕ */}
-            <div className="space-y-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
-              <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
-                Местоположение на рынке
-              </h3>
+            {/* МЕСТОПОЛОЖЕНИЕ - условная логика в зависимости от выбора рынка */}
+            {supplierData.marketId ? (
+              // Поставщик НА РЫНКЕ - показываем Ряд/Контейнер
+              <div className="space-y-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                  Местоположение на рынке
+                </h3>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Номер ряда <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required={!supplierData.container}
-                    className="input-field"
-                    value={supplierData.row}
-                    onChange={(e) => setSupplierData({ ...supplierData, row: e.target.value })}
-                    placeholder="Например: 24"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Номер ряда <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required={!supplierData.container}
+                      className="input-field"
+                      value={supplierData.row}
+                      onChange={(e) => setSupplierData({ ...supplierData, row: e.target.value })}
+                      placeholder="Например: 24"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Номер контейнера
+                    </label>
+                    <input
+                      type="text"
+                      className="input-field"
+                      value={supplierData.container}
+                      onChange={(e) => setSupplierData({ ...supplierData, container: e.target.value })}
+                      placeholder="Например: 6"
+                    />
+                  </div>
                 </div>
 
+                <p className="text-xs text-gray-600">
+                  Укажите хотя бы номер ряда или контейнера для точного поиска поставщика
+                </p>
+              </div>
+            ) : (
+              // Поставщик НЕ НА РЫНКЕ - показываем обычный адрес
+              <div className="space-y-4 bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wide">
+                  Адрес в городе
+                </h3>
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Номер контейнера
+                    Адрес <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
+                    required
                     className="input-field"
-                    value={supplierData.container}
-                    onChange={(e) => setSupplierData({ ...supplierData, container: e.target.value })}
-                    placeholder="Например: 6"
+                    value={supplierData.cityAddress}
+                    onChange={(e) => setSupplierData({ ...supplierData, cityAddress: e.target.value })}
+                    placeholder="Например: ул. Абая 123, офис 45"
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Укажите полный адрес поставщика в городе
+                  </p>
                 </div>
               </div>
-
-              <p className="text-xs text-gray-600">
-                Укажите хотя бы номер ряда или контейнера для точного поиска поставщика
-              </p>
-            </div>
+            )}
 
             {/* ФОТО КОНТЕЙНЕРА */}
             <div className="space-y-2">
@@ -437,6 +548,13 @@ export const UnifiedSupplierForm: React.FC<UnifiedSupplierFormProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Модальное окно управления рынками */}
+      <MarketManagementModal
+        isOpen={showMarketModal}
+        onClose={() => setShowMarketModal(false)}
+        onMarketsUpdated={loadMarkets}
+      />
     </div>
   );
 };

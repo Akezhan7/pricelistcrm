@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -38,10 +38,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
 
-  // Меню навигации
+  useEffect(() => {
+    const event = new CustomEvent('sidebar-width-change', {
+      detail: { width: 80 }
+    });
+    window.dispatchEvent(event);
+  }, []);
+
   const menuItems: MenuItem[] = [
     {
       id: 'dashboard',
@@ -85,13 +91,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
       id: 'products',
       label: 'Товары',
       icon: <Package className="w-5 h-5" />,
-      path: '/dashboard', // На главной странице есть товары
+      path: '/dashboard',
     },
     {
       id: 'suppliers',
       label: 'Поставщики',
       icon: <Truck className="w-5 h-5" />,
-      path: '/dashboard', // На главной странице есть поставщики
+      path: '/dashboard',
     },
     {
       id: 'map',
@@ -101,7 +107,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
     },
   ];
 
-  // Админ меню
   const adminMenuItems: MenuItem[] = [
     {
       id: 'users',
@@ -123,6 +128,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
     navigate(path);
   };
 
+  const toggleSidebar = () => {
+    const newCollapsed = !isCollapsed;
+    setIsCollapsed(newCollapsed);
+    const event = new CustomEvent('sidebar-width-change', {
+      detail: { width: newCollapsed ? 80 : 256 }
+    });
+    window.dispatchEvent(event);
+  };
+
   const isActivePath = (path: string) => {
     return location.pathname === path;
   };
@@ -142,14 +156,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
 
   return (
     <>
-      {/* Sidebar */}
       <aside
         className={`
           fixed left-0 top-0 h-screen bg-gray-900 text-white transition-all duration-300 z-40 flex flex-col
           ${isCollapsed ? 'w-20' : 'w-64'}
         `}
       >
-        {/* Логотип и название */}
         <div className="flex items-center justify-between p-4 border-b border-gray-800">
           {!isCollapsed && (
             <div className="flex items-center space-x-3">
@@ -169,7 +181,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
           )}
         </div>
 
-        {/* Поиск */}
         {!isCollapsed && onSearchChange && (
           <div className="p-4">
             <div className="relative">
@@ -185,7 +196,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
           </div>
         )}
 
-        {/* Основное меню */}
         <nav className="flex-1 overflow-y-auto py-4">
           <ul className="space-y-1 px-3">
             {menuItems
@@ -220,12 +230,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
             ))}
           </ul>
 
-          {/* Разделитель */}
           {user?.role === 'admin' && (
             <>
               <div className="my-4 mx-6 border-t border-gray-800"></div>
 
-              {/* Админ меню */}
               <ul className="space-y-1 px-3">
                 {adminMenuItems.map((item) => (
                   <li key={item.id}>
@@ -251,7 +259,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
           )}
         </nav>
 
-        {/* Информация о пользователе */}
         <div className="border-t border-gray-800 p-4">
           <div className="relative">
             <button
@@ -272,7 +279,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
               )}
             </button>
 
-            {/* Меню пользователя */}
             {showUserMenu && !isCollapsed && (
               <div className="absolute bottom-full left-0 right-0 mb-2 bg-gray-800 rounded-lg shadow-lg border border-gray-700 overflow-hidden">
                 <button
@@ -300,9 +306,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
           </div>
         </div>
 
-        {/* Кнопка сворачивания */}
         <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
+          onClick={toggleSidebar}
           className="absolute -right-3 top-20 bg-gray-900 border-2 border-gray-700 rounded-full p-1 hover:bg-gray-800 transition-colors"
         >
           {isCollapsed ? (
@@ -313,7 +318,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
         </button>
       </aside>
 
-      {/* Overlay для закрытия меню пользователя */}
       {showUserMenu && (
         <div
           className="fixed inset-0 z-30"

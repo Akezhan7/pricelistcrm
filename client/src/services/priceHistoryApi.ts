@@ -8,9 +8,6 @@ import {
   UpdatePricesResponse,
 } from '../types';
 
-/**
- * Получить историю цен товара
- */
 export const getProductPriceHistory = async (
   productId: number,
   params?: {
@@ -28,9 +25,6 @@ export const getProductPriceHistory = async (
   return response.data.data!;
 };
 
-/**
- * Получить аналитику по изменениям цен
- */
 export const getPriceAnalytics = async (params?: {
   dateFrom?: string;
   dateTo?: string;
@@ -43,14 +37,8 @@ export const getPriceAnalytics = async (params?: {
   return response.data.data!;
 };
 
-/**
- * Получить изменения цен для конкретного заказа
- */
 export const getOrderPriceChanges = async (orderId: number): Promise<{
-  order: {
-    id: number;
-    orderNumber: string;
-  };
+  order: { id: number; orderNumber: string };
   priceChanges: PriceHistory[];
 }> => {
   const response = await api.get<
@@ -62,9 +50,6 @@ export const getOrderPriceChanges = async (orderId: number): Promise<{
   return response.data.data!;
 };
 
-/**
- * Обновить базовые цены товаров через заявку
- */
 export const updateProductPricesFromOrder = async (
   orderId: number,
   data: UpdatePricesFromOrderDto

@@ -12,6 +12,7 @@ const { runMigrations } = require('./scripts/runMigrations');
 const authRoutes = require('./routes/auth');
 const productRoutes = require('./routes/products');
 const supplierRoutes = require('./routes/suppliers');
+const marketRoutes = require('./routes/markets');
 const sectorRoutes = require('./routes/sectors');
 const rowRoutes = require('./routes/rows');
 const orderRoutes = require('./routes/orders');
@@ -156,6 +157,7 @@ app.get('/health', async (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/suppliers', supplierRoutes);
+app.use('/api/markets', marketRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/collector', collectorRoutes);
 app.use('/api/sectors', sectorRoutes);

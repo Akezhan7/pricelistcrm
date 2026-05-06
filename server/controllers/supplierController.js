@@ -1,6 +1,6 @@
 const { validationResult } = require('express-validator');
 const { Op } = require('sequelize');
-const { Supplier, Product, ProductSupplier, Sector, Row } = require('../models');
+const { Supplier, Product, ProductSupplier, Market, Sector, Row } = require('../models');
 const path = require('path');
 const fs = require('fs').promises;
 
@@ -34,7 +34,7 @@ const getAllSuppliers = async (req, res) => {
       where: whereClause,
       attributes: ['id', 'name', 'address', 'phone', 'whatsapp', 'containerImage', 
                    'sector', 'mapPosition', 'notes', 'debt', 'isActive', 
-                   'sectorId', 'rowId', 'row', 'container', 'createdAt', 'updatedAt'],
+                   'marketId', 'sectorId', 'rowId', 'row', 'container', 'createdAt', 'updatedAt'],
       include: [
         {
           model: Product,
@@ -44,6 +44,12 @@ const getAllSuppliers = async (req, res) => {
             attributes: ['supplierPrice', 'quantity', 'isAvailable', 'notes'],
           },
           where: { isActive: true },
+          required: false,
+        },
+        {
+          model: Market,
+          as: 'market',
+          attributes: ['id', 'name', 'address'],
           required: false,
         },
         {
@@ -102,7 +108,7 @@ const getSupplierById = async (req, res) => {
       where: { id, isActive: true },
       attributes: ['id', 'name', 'address', 'phone', 'whatsapp', 'containerImage', 
                    'sector', 'mapPosition', 'notes', 'debt', 'isActive', 
-                   'sectorId', 'rowId', 'row', 'container', 'createdAt', 'updatedAt'],
+                   'marketId', 'sectorId', 'rowId', 'row', 'container', 'createdAt', 'updatedAt'],
       include: [
         {
           model: Product,
@@ -112,6 +118,12 @@ const getSupplierById = async (req, res) => {
             attributes: ['supplierPrice', 'quantity', 'isAvailable', 'notes'],
           },
           where: { isActive: true },
+          required: false,
+        },
+        {
+          model: Market,
+          as: 'market',
+          attributes: ['id', 'name', 'address'],
           required: false,
         },
         {
@@ -164,7 +176,8 @@ const createSupplier = async (req, res) => {
       name, 
       address, 
       phone, 
-      whatsapp, 
+      whatsapp,
+      marketId,
       sector, 
       mapPosition, 
       notes,
@@ -186,6 +199,7 @@ const createSupplier = async (req, res) => {
       name,
       address,
       phone,
+      marketId: marketId || null,
       whatsapp,
       sector,
       mapPosition: mapPosition ? JSON.parse(mapPosition) : null,
@@ -256,7 +270,8 @@ const updateSupplier = async (req, res) => {
       name, 
       address, 
       phone, 
-      whatsapp, 
+      whatsapp,
+      marketId,
       sector, 
       mapPosition, 
       notes,
@@ -287,6 +302,7 @@ const updateSupplier = async (req, res) => {
     if (address) updateData.address = address;
     if (phone) updateData.phone = phone;
     if (whatsapp !== undefined) updateData.whatsapp = whatsapp;
+    if (marketId !== undefined) updateData.marketId = marketId || null;
     if (sector !== undefined) updateData.sector = sector;
     if (mapPosition) updateData.mapPosition = JSON.parse(mapPosition);
     if (notes !== undefined) updateData.notes = notes;

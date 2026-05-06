@@ -23,7 +23,6 @@ export const Pagination: React.FC<PaginationProps> = ({
 
   return (
     <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-      {/* Мобильная версия */}
       <div className="flex-1 flex justify-between sm:hidden">
         <button
           onClick={() => onPageChange(currentPage - 1)}
@@ -41,7 +40,6 @@ export const Pagination: React.FC<PaginationProps> = ({
         </button>
       </div>
 
-      {/* Десктопная версия */}
       <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
         <div>
           <p className="text-sm text-gray-700">

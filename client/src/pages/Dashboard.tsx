@@ -16,8 +16,8 @@ export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showMap, setShowMap] = useState(false);
+  const [totalProducts, setTotalProducts] = useState(0);
 
-  // Загрузка данных
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -29,6 +29,7 @@ export const Dashboard: React.FC = () => {
 
         setProducts(productsRes.data.data.products);
         setSuppliers(suppliersRes.data.data.suppliers);
+        setTotalProducts(productsRes.data.data.pagination?.total || productsRes.data.data.products.length);
       } catch (error) {
         console.error('Ошибка загрузки данных:', error);
       } finally {
@@ -39,18 +40,21 @@ export const Dashboard: React.FC = () => {
     fetchData();
   }, []);
 
-  // Обновление данных после изменений
   const refreshData = async () => {
-    const [productsRes, suppliersRes] = await Promise.all([
-      api.get('/products'),
-      api.get('/suppliers')
-    ]);
+    try {
+      const [productsRes, suppliersRes] = await Promise.all([
+        api.get('/products'),
+        api.get('/suppliers')
+      ]);
 
-    setProducts(productsRes.data.data.products);
-    setSuppliers(suppliersRes.data.data.suppliers);
+      setProducts(productsRes.data.data.products);
+      setSuppliers(suppliersRes.data.data.suppliers);
+      setTotalProducts(productsRes.data.data.pagination?.total || productsRes.data.data.products.length);
+    } catch (error) {
+      console.error('Ошибка обновления данных:', error);
+    }
   };
 
-  // Фильтрация поставщиков по выбранному товару
   const filteredSuppliers = selectedProduct
     ? suppliers.filter(supplier => 
         supplier.products?.some(p => p.id === selectedProduct.id)
@@ -72,7 +76,6 @@ export const Dashboard: React.FC = () => {
     );
   }
 
-  // Отображение карты Bayside
   if (showMap) {
     return (
       <Layout>
@@ -104,14 +107,13 @@ export const Dashboard: React.FC = () => {
   }
 
   return (
-    <Layout searchQuery={searchQuery} onSearchChange={setSearchQuery}>
-      <div className="flex gap-6 h-[calc(100vh-12rem)]">
-        {/* Левая колонка - Товары */}
-        <div className="w-1/3 border border-gray-200 bg-white rounded-lg overflow-hidden flex flex-col shadow-sm">
+    <Layout searchQuery={searchQuery} onSearchChange={setSearchQuery} fullHeight={true}>
+      <div className="flex gap-4 h-full">
+        <div className="w-1/3 border border-gray-200 bg-white rounded-lg flex flex-col shadow-sm" style={{ minHeight: 0 }}>
           <div className="p-4 border-b border-gray-200 bg-gray-50">
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-semibold text-gray-900">
-                Товары ({products.length})
+                Товары ({totalProducts})
               </h2>
               <button
                 onClick={refreshData}
@@ -143,11 +145,10 @@ export const Dashboard: React.FC = () => {
           />
         </div>
 
-        {/* Правая часть - Поставщики */}
-        <div className="flex-1 border border-gray-200 bg-white rounded-lg overflow-hidden flex flex-col shadow-sm">
-          <div className="p-4 border-b border-gray-200 bg-gray-50">
+        <div className="flex-1 border border-gray-200 bg-white rounded-lg flex flex-col shadow-sm" style={{ minHeight: 0, minWidth: 0 }}>
+          <div className="p-3 lg:p-4 border-b border-gray-200 bg-gray-50">
             <div className="flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-gray-900">
+              <h2 className="text-base lg:text-lg font-semibold text-gray-900">
                 {selectedProduct ? (
                   <>
                     Поставщики товара: <span className="text-blue-600">{selectedProduct.name}</span>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Layout } from '../components/Layout';
-import { Users as UsersIcon, Plus, Edit, Trash2, UserCheck, X, Save } from 'lucide-react';
+import { Users as UsersIcon, Plus, UserCheck, X, Save } from 'lucide-react';
 import api from '../utils/api';
 
 interface User {
@@ -74,10 +74,8 @@ export const Users: React.FC = () => {
       setSubmitting(true);
       
       if (editingUser) {
-        // Обновление (пока не реализовано в API)
         alert('Редактирование пользователей пока не реализовано');
       } else {
-        // Создание нового
         await api.post('/auth/users', formData);
         alert('Пользователь успешно создан');
         setShowModal(false);
@@ -108,7 +106,6 @@ export const Users: React.FC = () => {
   return (
     <Layout>
       <div className="space-y-6">
-        {/* Заголовок */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <UsersIcon className="h-8 w-8 text-blue-600" />
@@ -123,7 +120,6 @@ export const Users: React.FC = () => {
           </button>
         </div>
 
-        {/* Таблица пользователей */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -186,7 +182,6 @@ export const Users: React.FC = () => {
           </div>
         </div>
 
-        {/* Подсказка */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex gap-3">
             <UsersIcon className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />

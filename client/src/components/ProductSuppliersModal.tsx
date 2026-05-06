@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Edit, Check, AlertCircle, UserPlus, Users } from 'lucide-react';
+import { X, Trash2, Edit, Check, AlertCircle, UserPlus, Users } from 'lucide-react';
 import { Product, Supplier, SupplierWithPrice } from '../types';
 import { UnifiedSupplierForm } from './UnifiedSupplierForm';
 import api from '../utils/api';

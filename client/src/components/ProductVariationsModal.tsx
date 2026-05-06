@@ -39,7 +39,7 @@ export const ProductVariationsModal: React.FC<ProductVariationsModalProps> = ({
     sortOrder: '0',
   });
 
-  // Загрузка вариаций при открытии модального окна
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (isOpen && product) {
       loadVariations();

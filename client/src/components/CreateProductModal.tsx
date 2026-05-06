@@ -1,13 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Upload } from 'lucide-react';
+import { X, Save, Upload, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import Select from 'react-select';
 import api from '../utils/api';
 import categoryApi from '../services/categoryApi';
-import type { Category } from '../types';
+import { UnifiedSupplierForm } from './UnifiedSupplierForm';
+import type { Category, Supplier } from '../types';
 
 type CreateProductModalProps = {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+};
+
+type SelectedSupplier = {
+  supplier: Supplier;
+  supplierPrice: string;
+  quantity: string;
+  isAvailable: boolean;
+  notes: string;
 };
 
 export const CreateProductModal: React.FC<CreateProductModalProps> = ({
@@ -32,13 +42,39 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
   const [image, setImage] = useState<File | null>(null);
   const [error, setError] = useState('');
   const [categories, setCategories] = useState<Category[]>([]);
+  
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [selectedSuppliers, setSelectedSuppliers] = useState<SelectedSupplier[]>([]);
+  const [showSupplierForm, setShowSupplierForm] = useState(false);
+  const [suppliersExpanded, setSuppliersExpanded] = useState(false);
 
-  // Загрузка категорий при открытии модального окна
   useEffect(() => {
     if (isOpen) {
       loadCategories();
+      loadSuppliers();
+      resetForm();
     }
   }, [isOpen]);
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      article: '',
+      internalName: '',
+      kaspiName: '',
+      kaspiArticle: '',
+      costPrice: '',
+      sellingPrice: '',
+      currentStock: '0',
+      minStock: '0',
+      categoryId: '',
+      description: '',
+    });
+    setImage(null);
+    setSelectedSuppliers([]);
+    setSuppliersExpanded(false);
+    setError('');
+  };
 
   const loadCategories = async () => {
     try {
@@ -47,6 +83,49 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
     } catch (error) {
       console.error('Ошибка загрузки категорий:', error);
     }
+  };
+
+  const loadSuppliers = async () => {
+    try {
+      const response = await api.get('/suppliers');
+      setSuppliers(response.data.data.suppliers || []);
+    } catch (error) {
+      console.error('Ошибка загрузки поставщиков:', error);
+    }
+  };
+
+  const handleSelectSupplier = (supplier: Supplier) => {
+    if (selectedSuppliers.find(s => s.supplier.id === supplier.id)) {
+      return;
+    }
+
+    setSelectedSuppliers([
+      ...selectedSuppliers,
+      {
+        supplier,
+        supplierPrice: formData.costPrice || '',
+        quantity: '0',
+        isAvailable: true,
+        notes: '',
+      }
+    ]);
+  };
+
+  const handleRemoveSupplier = (supplierId: number) => {
+    setSelectedSuppliers(selectedSuppliers.filter(s => s.supplier.id !== supplierId));
+  };
+
+  const handleUpdateSupplierData = (supplierId: number, field: keyof Omit<SelectedSupplier, 'supplier'>, value: any) => {
+    setSelectedSuppliers(selectedSuppliers.map(s => 
+      s.supplier.id === supplierId 
+        ? { ...s, [field]: value }
+        : s
+    ));
+  };
+
+  const handleSupplierCreated = () => {
+    loadSuppliers();
+    setShowSupplierForm(false);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -58,9 +137,9 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
       const data = new FormData();
       data.append('name', formData.name);
       data.append('article', formData.article);
-      data.append('internalName', formData.internalName);
-      data.append('kaspiName', formData.kaspiName);
-      data.append('kaspiArticle', formData.kaspiArticle);
+      data.append('internalName', formData.internalName || '');
+      data.append('kaspiName', formData.kaspiName || '');
+      data.append('kaspiArticle', formData.kaspiArticle || '');
       data.append('costPrice', formData.costPrice);
       data.append('sellingPrice', formData.sellingPrice);
       data.append('currentStock', formData.currentStock);
@@ -68,38 +147,53 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
       if (formData.categoryId) {
         data.append('categoryId', formData.categoryId);
       }
-      data.append('description', formData.description);
+      data.append('description', formData.description || '');
       
       if (image) {
         data.append('image', image);
       }
 
-      await api.post('/products', data, {
+
+      const response = await api.post('/products', data, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
 
-      // Очистка формы
-      setFormData({
-        name: '',
-        article: '',
-        internalName: '',
-        kaspiName: '',
-        kaspiArticle: '',
-        costPrice: '',
-        sellingPrice: '',
-        currentStock: '0',
-        minStock: '0',
-        categoryId: '',
-        description: '',
-      });
-      setImage(null);
+      const createdProduct = response.data?.data?.product;
+
+      if (!createdProduct || !createdProduct.id) {
+        throw new Error('Товар создан, но ID не получен');
+      }
+
+      if (selectedSuppliers.length > 0) {
+        const supplierPromises = selectedSuppliers.map(async (selected) => {
+          try {
+            await api.post(`/products/${createdProduct.id}/suppliers`, {
+              supplierId: selected.supplier.id,
+              supplierPrice: parseFloat(selected.supplierPrice) || 0,
+              quantity: parseInt(selected.quantity) || 0,
+              isAvailable: selected.isAvailable,
+              notes: selected.notes || '',
+            });
+          } catch (err: any) {
+    console.error('Ошибка привязки поставщика', selected.supplier.name, err);
+              throw err;
+          }
+        });
+
+        await Promise.all(supplierPromises);
+      }
+
+      resetForm();
 
       onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка создания товара');
+    console.error('Ошибка создания товара:', err);
+      const errorMessage = err.response?.data?.message || err.message || 'Ошибка создания товара';
+      setError(errorMessage);
+      console.error('Детали ошибки:', err.response?.data);
     } finally {
       setLoading(false);
     }
@@ -107,10 +201,20 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
 
   if (!isOpen) return null;
 
+  const availableSuppliers = suppliers.filter(
+    supplier => !selectedSuppliers.find(s => s.supplier.id === supplier.id)
+  );
+
+  const supplierOptions = availableSuppliers.map(supplier => ({
+    value: supplier.id,
+    label: `${supplier.name}${supplier.market ? ` (${supplier.market.name})` : supplier.address ? ` (${supplier.address})` : ''}`,
+    supplier: supplier,
+  }));
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg w-full max-w-md max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+      <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] flex flex-col">
+        <div className="flex items-center justify-between p-4 border-b border-gray-200 sticky top-0 bg-white z-10">
           <h2 className="text-lg font-semibold text-gray-900">Добавить товар</h2>
           <button
             onClick={onClose}
@@ -120,7 +224,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto flex-1">
           {error && (
             <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-sm text-red-700">
               {error}
@@ -340,6 +444,182 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
             </div>
           </div>
 
+          {/* Секция поставщиков */}
+          <div className="border border-gray-200 rounded-lg">
+            <button
+              type="button"
+              onClick={() => setSuppliersExpanded(!suppliersExpanded)}
+              className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+            >
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-semibold text-gray-900">
+                  Поставщики
+                </h3>
+                <span className="text-xs text-gray-500">
+                  (необязательно, {selectedSuppliers.length} выбрано)
+                </span>
+              </div>
+              {suppliersExpanded ? (
+                <ChevronUp className="h-4 w-4 text-gray-500" />
+              ) : (
+                <ChevronDown className="h-4 w-4 text-gray-500" />
+              )}
+            </button>
+
+            {suppliersExpanded && (
+              <div className="p-3 space-y-3 bg-white">
+                {/* Выбор существующего поставщика и кнопка создания */}
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Select
+                      options={supplierOptions}
+                      placeholder="Выбрать существующего..."
+                      noOptionsMessage={() => 'Поставщики не найдены'}
+                      onChange={(option) => option && handleSelectSupplier(option.supplier)}
+                      value={null}
+                      isClearable
+                      menuPlacement="auto"
+                      maxMenuHeight={250}
+                      styles={{
+                        control: (base) => ({
+                          ...base,
+                          minHeight: '42px',
+                          fontSize: '15px',
+                          borderColor: '#d1d5db',
+                        }),
+                        option: (base, state) => ({
+                          ...base,
+                          fontSize: '15px',
+                          padding: '10px 12px',
+                          backgroundColor: state.isFocused ? '#f3f4f6' : state.isSelected ? '#3b82f6' : 'white',
+                          color: state.isSelected ? 'white' : '#1f2937',
+                          cursor: 'pointer',
+                          ':active': {
+                            backgroundColor: '#e5e7eb',
+                          },
+                        }),
+                        menu: (base) => ({
+                          ...base,
+                          fontSize: '15px',
+                          zIndex: 50,
+                        }),
+                        menuList: (base) => ({
+                          ...base,
+                          maxHeight: '250px',
+                        }),
+                        placeholder: (base) => ({
+                          ...base,
+                          fontSize: '15px',
+                          color: '#9ca3af',
+                        }),
+                        singleValue: (base) => ({
+                          ...base,
+                          fontSize: '15px',
+                        }),
+                      }}
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowSupplierForm(true)}
+                    className="px-3 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg flex items-center gap-1 text-sm font-medium transition-colors flex-shrink-0"
+                    title="Создать нового поставщика"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Новый
+                  </button>
+                </div>
+
+                {/* Список выбранных поставщиков */}
+                {selectedSuppliers.length > 0 && (
+                  <div className="space-y-2">
+                    {selectedSuppliers.map((selected) => (
+                      <div
+                        key={selected.supplier.id}
+                        className="border border-gray-200 rounded-lg p-3 bg-gray-50"
+                      >
+                        {/* Заголовок с названием поставщика */}
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1 min-w-0">
+                            <h4 className="text-sm font-medium text-gray-900 truncate">
+                              {selected.supplier.name}
+                            </h4>
+                            <p className="text-xs text-gray-500 truncate">
+                              {selected.supplier.market 
+                                ? `${selected.supplier.market.name} - Ряд ${selected.supplier.row}, Контейнер ${selected.supplier.container}`
+                                : selected.supplier.address || '—'
+                              }
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveSupplier(selected.supplier.id)}
+                            className="p-1 text-gray-400 hover:text-red-600 transition-colors ml-2 flex-shrink-0"
+                            title="Удалить"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+
+                        {/* Поля для ввода цены и количества */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Цена поставщика *
+                            </label>
+                            <input
+                              type="number"
+                              required
+                              min="0"
+                              step="0.01"
+                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              value={selected.supplierPrice}
+                              onChange={(e) => handleUpdateSupplierData(selected.supplier.id, 'supplierPrice', e.target.value)}
+                              placeholder="0"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-medium text-gray-700 mb-1">
+                              Количество
+                            </label>
+                            <input
+                              type="number"
+                              min="0"
+                              step="1"
+                              className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                              value={selected.quantity}
+                              onChange={(e) => handleUpdateSupplierData(selected.supplier.id, 'quantity', e.target.value)}
+                              placeholder="0"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Чекбокс доступности */}
+                        <div className="mt-2">
+                          <label className="flex items-center cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={selected.isAvailable}
+                              onChange={(e) => handleUpdateSupplierData(selected.supplier.id, 'isAvailable', e.target.checked)}
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 mr-2"
+                            />
+                            <span className="text-xs text-gray-700">Товар в наличии</span>
+                          </label>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {selectedSuppliers.length === 0 && (
+                  <p className="text-sm text-gray-500 text-center py-4">
+                    Выберите поставщиков из списка или создайте нового
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+
           <div className="flex justify-end space-x-3 pt-4">
             <button
               type="button"
@@ -364,6 +644,14 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
           </div>
         </form>
       </div>
+
+      {/* Модальное окно создания нового поставщика */}
+      <UnifiedSupplierForm
+        isOpen={showSupplierForm}
+        onClose={() => setShowSupplierForm(false)}
+        onSuccess={handleSupplierCreated}
+        mode="standalone"
+      />
     </div>
   );
 };

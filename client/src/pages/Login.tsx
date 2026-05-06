@@ -116,13 +116,6 @@ export const Login: React.FC = () => {
             </p>
           </div>
 
-          {/* Подсказки для демо */}
-          <div className="mt-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <h4 className="text-sm font-medium text-blue-800 mb-2">Данные для входа по умолчанию:</h4>
-            <div className="text-xs text-blue-600 space-y-1">
-              <p><strong>Администратор:</strong> admin@example.com / admin123</p>
-            </div>
-          </div>
         </form>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MapPin, Package, Camera, Grid3x3, Map, Eye, EyeOff, Search, ZoomIn, ZoomOut, Settings, ArrowLeft, Users, Package2, X } from 'lucide-react';
+import { MapPin, Grid3x3, Map, Eye, EyeOff, Search, ZoomIn, ZoomOut, ArrowLeft, Users, Package2, X } from 'lucide-react';
 import { Supplier, Sector, Row } from '../types';
 import { sectorsApi } from '../services/sectorsApi';
 import { rowsApi } from '../services/rowsApi';
@@ -69,10 +69,13 @@ export const BaysideMap: React.FC<BaysideMapProps> = ({ suppliers }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     loadSectorsAndRows();
   }, []);
   
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (searchQuery.trim()) {
       performSearch(searchQuery.trim());
@@ -236,8 +239,8 @@ export const BaysideMap: React.FC<BaysideMapProps> = ({ suppliers }) => {
     let row: string | undefined;
     let container: string | undefined;
 
-    const rowMatch = a.match(/ряд\s*[:\-]?\s*(\d+)/i) || a.match(/(\d+)\s*ряд/i);
-    const contMatch = a.match(/контейн(?:ер|ерa)?\s*[:\-]?\s*(\d+)/i) || a.match(/(\d+)\s*контейн/i);
+    const rowMatch = a.match(/ряд\s*[:-]?\s*(\d+)/i) || a.match(/(\d+)\s*ряд/i);
+    const contMatch = a.match(/контейн(?:ер|ерa)?\s*[:-]?\s*(\d+)/i) || a.match(/(\d+)\s*контейн/i);
 
     if (rowMatch) row = rowMatch[1];
     if (contMatch) container = contMatch[1];
@@ -263,9 +266,6 @@ export const BaysideMap: React.FC<BaysideMapProps> = ({ suppliers }) => {
 
   const sectorKeys = Object.keys(sectorsData);
 
-  // Создание интерактивной карты с позициями
-  const mapSuppliers = suppliers.filter(s => s.mapPosition && s.mapPosition.x && s.mapPosition.y);
-  
   const renderSectorView = () => {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

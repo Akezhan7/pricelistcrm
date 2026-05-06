@@ -1,33 +1,95 @@
-# Getting Started with Create React App
+# CRM — Фронтенд
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+React + TypeScript фронтенд для CRM-системы управления закупками и складом.
 
-## Available Scripts
+**Стек:** React 18, TypeScript, Tailwind CSS, Axios, React Router v6, Lucide React
 
-In the project directory, you can run:
+---
 
-### `npm start`
+## Быстрый старт
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+```bash
+npm install
+npm run dev
+```
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+Откроется [http://localhost:3000](http://localhost:3000)
 
-### `npm test`
+**Логин для входа:**
+```
+Email:  admin@example.com
+Пароль: (любой)
+```
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+---
 
-### `npm run build`
+## Режимы запуска
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+| Команда | Описание |
+|---------|----------|
+| `npm run dev` | Мок-сервер + фронт одновременно (**рекомендуется**) |
+| `npm run mock` | Только мок-сервер на `localhost:5000` |
+| `npm start` | Только фронт (нужен реальный бэк на `localhost:5000`) |
+| `npm run build` | Продакшн-сборка |
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+---
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Мок-сервер
+
+Папка `mock-server/` содержит локальный API-сервер на чистом Node.js — без дополнительных зависимостей. Запускается автоматически через `npm run dev`.
+
+**Доступные данные:**
+- 5 товаров с категориями, остатками и ценами
+- 3 поставщика
+- 2 заявки
+- 3 пользователя (admin, operator, collector)
+
+Данные находятся в `mock-server/data.js` — редактируй как нужно.
+
+---
+
+## Структура проекта
+
+```
+src/
+  components/     # Переиспользуемые компоненты
+  pages/          # Страницы (роуты)
+  services/       # API-клиенты (по одному на ресурс)
+  context/        # AuthContext
+  types/          # TypeScript типы
+  utils/          # api.ts (axios instance), helpers
+mock-server/
+  index.js        # Mock API сервер
+  data.js         # Тестовые данные
+```
+
+---
+
+## Подключение к реальному бэку
+
+Прокси настроен в `package.json`:
+```json
+"proxy": "http://localhost:5000"
+```
+
+Запусти реальный бэк на порту `5000`, затем:
+```bash
+npm start
+```
+
+---
+
+## Роли пользователей
+
+| Роль | Доступ |
+|------|--------|
+| `admin` | Полный доступ |
+| `operator` | Заявки, товары, поставщики |
+| `accountant` | Финансы, оплаты |
+| `purchase_manager` | Закупки |
+| `warehouse_operator` | Приёмка склада |
+| `collector` | Задания на сбор |
+| `driver` | Ограниченный доступ |
 
 ### `npm run eject`
 

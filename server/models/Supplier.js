@@ -90,6 +90,11 @@ const Supplier = sequelize.define('Supplier', {
     allowNull: true,
     comment: 'Номер контейнера (для совместимости с существующими данными)',
   },
+  marketId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: 'ID рынка, на котором находится поставщик',
+  },
 }, {
   indexes: [
     {

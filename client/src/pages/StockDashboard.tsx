@@ -7,7 +7,6 @@ import {
   AlertCircle, 
   CheckCircle, 
   RefreshCw, 
-  Filter,
   ShoppingCart,
   TrendingDown,
   Search,
@@ -32,11 +31,11 @@ export const StockDashboard: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [showPurchaseModal, setShowPurchaseModal] = useState(false);
   const [purchaseSuggestions, setPurchaseSuggestions] = useState<any>(null);
-  const [loadingPurchase, setLoadingPurchase] = useState(false);
   const [creatingOrders, setCreatingOrders] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(50);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     loadData();
   }, [selectedCategory]);
@@ -57,7 +56,6 @@ export const StockDashboard: React.FC = () => {
     }
   };
 
-  // Получение цвета индикатора по статусу
   const getStatusColor = (status: StockStatus) => {
     switch (status) {
       case 'critical':
@@ -73,7 +71,6 @@ export const StockDashboard: React.FC = () => {
     }
   };
 
-  // Получение иконки по статусу
   const getStatusIcon = (status: StockStatus) => {
     switch (status) {
       case 'critical':
@@ -87,7 +84,6 @@ export const StockDashboard: React.FC = () => {
     }
   };
 
-  // Получение названия статуса
   const getStatusLabel = (status: StockStatus) => {
     switch (status) {
       case 'critical':
@@ -101,7 +97,6 @@ export const StockDashboard: React.FC = () => {
     }
   };
 
-  // Фильтрация товаров
   const getFilteredProducts = () => {
     if (!analytics) return [];
 
@@ -117,7 +112,6 @@ export const StockDashboard: React.FC = () => {
       products = analytics[selectedStatus];
     }
 
-    // Поиск по названию или артикулу
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       products = products.filter(
@@ -131,7 +125,6 @@ export const StockDashboard: React.FC = () => {
     return products;
   };
 
-  // Получение товаров для текущей страницы
   const getPaginatedProducts = () => {
     const filteredProducts = getFilteredProducts();
     const startIndex = (currentPage - 1) * itemsPerPage;
@@ -139,28 +132,23 @@ export const StockDashboard: React.FC = () => {
     return filteredProducts.slice(startIndex, endIndex);
   };
 
-  // Обработчик смены страницы
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Сброс страницы при изменении фильтров
   useEffect(() => {
     setCurrentPage(1);
   }, [selectedStatus, selectedCategory, searchQuery]);
 
   const handleGeneratePurchaseList = async () => {
     try {
-      setLoadingPurchase(true);
       const response = await analyticsApi.getPurchaseSuggestions();
       setPurchaseSuggestions(response);
       setShowPurchaseModal(true);
     } catch (error) {
       console.error('Ошибка загрузки рекомендаций:', error);
       alert('Ошибка при формировании списка закупа');
-    } finally {
-      setLoadingPurchase(false);
     }
   };
 
@@ -173,7 +161,6 @@ export const StockDashboard: React.FC = () => {
     try {
       setCreatingOrders(true);
       
-      // Создаём заявку для каждого поставщика
       const createdOrders = [];
       for (const supplierData of purchaseSuggestions.bySupplier) {
         const items = supplierData.products.map((product: any) => ({
@@ -196,7 +183,6 @@ export const StockDashboard: React.FC = () => {
       alert(`Создано ${createdOrders.length} заявок на закуп`);
       setShowPurchaseModal(false);
       
-      // Переход на страницу заявок
       if (createdOrders.length === 1) {
         navigate(`/orders/${createdOrders[0].id}`);
       } else {
@@ -229,8 +215,6 @@ export const StockDashboard: React.FC = () => {
       </Layout>
     );
   }
-
-  const filteredProducts = getFilteredProducts();
 
   return (
     <Layout>

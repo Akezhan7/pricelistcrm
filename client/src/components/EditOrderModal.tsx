@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Search, Loader2, AlertCircle, Package, PlusCircle, Save } from 'lucide-react';
+import { X, Trash2, Search, Loader2, AlertCircle, Package, PlusCircle, Save } from 'lucide-react';
 import ordersApi from '../services/ordersApi';
 import productsApi from '../services/productsApi';
 import api from '../utils/api';
@@ -26,26 +26,22 @@ interface OrderItemForm {
 }
 
 const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSuccess, order }) => {
-  // Состояния формы
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('');
   const [deliveryLocation, setDeliveryLocation] = useState('');
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<OrderItemForm[]>([]);
 
-  // Списки для выбора
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
 
-  // Поиск товара
   const [productSearch, setProductSearch] = useState('');
   const [showProductDropdown, setShowProductDropdown] = useState(false);
 
-  // Состояния UI
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState(true);
 
-  // Загрузка данных при открытии
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (isOpen && order) {
       loadInitialData();
@@ -68,10 +64,8 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
       setDeliveryLocation(order.deliveryLocation || 'Точка Байсад');
       setNotes(order.notes || '');
 
-      // Преобразовать существующие товары в формат для редактирования
       const formItems: OrderItemForm[] = await Promise.all(
         (order.items || []).map(async (item: OrderItem) => {
-          // Загрузить вариации для каждого товара
           let variations: ProductVariation[] = [];
           try {
             const response = await api.get(`/products/${item.productId}/variations`);
@@ -128,7 +122,6 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
     }
   };
 
-  // Фильтрация товаров при поиске
   useEffect(() => {
     if (productSearch.trim()) {
       const filtered = products.filter(p =>
@@ -141,9 +134,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
     }
   }, [productSearch, products]);
 
-  // Добавление товара в список
   const handleAddProduct = async (product: Product) => {
-    // Загрузить вариации товара
     let variations: ProductVariation[] = [];
     try {
       const response = await api.get(`/products/${product.id}/variations`);
@@ -169,58 +160,49 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
     setShowProductDropdown(false);
   };
 
-  // Удаление товара из списка
   const handleRemoveItem = (index: number) => {
     const newItems = [...items];
     const item = newItems[index];
 
     if (item.id) {
-      // Существующий товар - пометить как удаленный
       item.isDeleted = true;
     } else {
-      // Новый товар - просто удалить из массива
       newItems.splice(index, 1);
     }
 
     setItems(newItems);
   };
 
-  // Восстановить удаленный товар
   const handleRestoreItem = (index: number) => {
     const newItems = [...items];
     newItems[index].isDeleted = false;
     setItems(newItems);
   };
 
-  // Обновление количества товара
   const handleUpdateQuantity = (index: number, quantity: number) => {
     const newItems = [...items];
     newItems[index].quantity = quantity;
     setItems(newItems);
   };
 
-  // Обновление цены товара
   const handleUpdatePrice = (index: number, price: number) => {
     const newItems = [...items];
     newItems[index].priceAtPurchase = price;
     setItems(newItems);
   };
 
-  // Обновление заметок товара
   const handleUpdateNotes = (index: number, notes: string) => {
     const newItems = [...items];
     newItems[index].notes = notes;
     setItems(newItems);
   };
 
-  // Добавить вариацию как отдельную позицию
   const handleAddVariationAsNewItem = (productIndex: number, variationId: number) => {
     const sourceItem = items[productIndex];
     const variation = sourceItem.product?.variations?.find(v => v.id === variationId);
     
     if (!variation) return;
 
-    // Проверить, не добавлена ли уже эта вариация
     const alreadyExists = items.some(
       item => !item.isDeleted && item.productId === sourceItem.productId && item.productVariationId === variationId
     );
@@ -245,14 +227,12 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
     setItems([...items, newItem]);
   };
 
-  // Расчет общей суммы (только активные товары)
   const calculateTotal = () => {
     return items
       .filter(item => !item.isDeleted)
       .reduce((sum, item) => sum + (item.quantity * item.priceAtPurchase), 0);
   };
 
-  // Валидация формы
   const validateForm = (): string | null => {
     const activeItems = items.filter(item => !item.isDeleted);
     
@@ -268,7 +248,6 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
     return null;
   };
 
-  // Отправка формы
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -282,7 +261,6 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
       setLoading(true);
       setError(null);
 
-      // Подготовить данные для отправки (только активные товары)
       const activeItems = items.filter(item => !item.isDeleted);
 
       const orderData: UpdateOrderDto = {
@@ -308,7 +286,6 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
     }
   };
 
-  // Закрытие модального окна
   const handleClose = () => {
     setExpectedDeliveryDate('');
     setDeliveryLocation('');

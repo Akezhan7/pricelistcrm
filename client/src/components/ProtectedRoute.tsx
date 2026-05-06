@@ -15,12 +15,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   const location = useLocation();
 
   if (!user) {
-    // Сохраняем текущий путь для редиректа после логина
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   if (requireRole && user.role !== requireRole) {
-    // Если требуется определенная роль, но у пользователя её нет
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="max-w-md w-full bg-white rounded-lg shadow-md p-6 text-center">

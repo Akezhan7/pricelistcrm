@@ -80,6 +80,11 @@ const Sector = sequelize.define('Sector', {
     defaultValue: 0,
     comment: 'Порядок сортировки',
   },
+  marketId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: 'ID рынка, к которому принадлежит сектор',
+  },
 }, {
   indexes: [
     {

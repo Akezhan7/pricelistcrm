@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, CreditCard, Calendar, MessageSquare } from 'lucide-react';
-import { createPayment, getPaymentsBySupplier, formatPaymentAmount, formatPaymentDate, getPaymentMethodIcon, getPaymentMethodColor, type CreatePaymentData, type SupplierPaymentData, type UnpaidOrder } from '../services/paymentsApi';
+import { X, Plus, CreditCard, MessageSquare } from 'lucide-react';
+import { createPayment, getPaymentsBySupplier, formatPaymentAmount, formatPaymentDate, getPaymentMethodIcon, getPaymentMethodColor, type CreatePaymentData, type SupplierPaymentData } from '../services/paymentsApi';
 
 interface SupplierFinanceModalProps {
   isOpen: boolean;
@@ -32,7 +32,7 @@ export const SupplierFinanceModal: React.FC<SupplierFinanceModalProps> = ({
   const [selectedOrders, setSelectedOrders] = useState<number[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
-  // Загрузка данных поставщика при открытии модального окна
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (isOpen && supplierId) {
       loadSupplierData();

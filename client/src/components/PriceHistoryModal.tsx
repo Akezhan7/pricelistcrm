@@ -22,6 +22,7 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
   const [priceTypeFilter, setPriceTypeFilter] = useState<PriceType | 'all'>('all');
   const [page, setPage] = useState(1);
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (isOpen && productId) {
       fetchPriceHistory();

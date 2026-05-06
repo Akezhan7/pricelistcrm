@@ -4,6 +4,7 @@ const Product = require('./Product');
 const Supplier = require('./Supplier');
 const ProductSupplier = require('./ProductSupplier');
 const ProductVariation = require('./ProductVariation');
+const Market = require('./Market');
 const Sector = require('./Sector');
 const Row = require('./Row');
 const Order = require('./Order');
@@ -30,6 +31,7 @@ module.exports = {
   Supplier,
   ProductSupplier,
   ProductVariation,
+  Market,
   Sector,
   Row,
   Order,

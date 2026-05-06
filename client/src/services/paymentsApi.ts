@@ -76,7 +76,6 @@ export interface SupplierPaymentData {
   stats: PaymentStats;
 }
 
-// Получить список всех платежей с фильтрацией
 export const getPayments = async (filters?: PaymentFilters) => {
   const params = new URLSearchParams();
   
@@ -92,36 +91,30 @@ export const getPayments = async (filters?: PaymentFilters) => {
   return response.data;
 };
 
-// Получить все платежи конкретного поставщика
 export const getPaymentsBySupplier = async (supplierId: number): Promise<SupplierPaymentData> => {
   const response = await api.get(`/payments/supplier/${supplierId}`);
   return response.data.data;
 };
 
-// Получить информацию о конкретном платеже
 export const getPaymentById = async (id: number): Promise<Payment> => {
   const response = await api.get(`/payments/${id}`);
   return response.data.data.payment;
 };
 
-// Создать новый платеж
 export const createPayment = async (data: CreatePaymentData): Promise<Payment> => {
   const response = await api.post('/payments', data);
   return response.data.data;
 };
 
-// Обновить существующий платеж
 export const updatePayment = async (id: number, data: UpdatePaymentData): Promise<Payment> => {
   const response = await api.put(`/payments/${id}`, data);
   return response.data.data;
 };
 
-// Удалить платеж
 export const deletePayment = async (id: number): Promise<void> => {
   await api.delete(`/payments/${id}`);
 };
 
-// Вспомогательные функции для форматирования
 export const formatPaymentAmount = (amount: string | number): string => {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount;
   return new Intl.NumberFormat('ru-KZ', {

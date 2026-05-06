@@ -46,7 +46,7 @@ const getAllProducts = async (req, res) => {
       ],
       limit: parseInt(limit),
       offset: parseInt(offset),
-      order: [['name', 'ASC']],
+      order: [['createdAt', 'DESC']], // Новые товары первыми
     });
 
     res.json({

@@ -4,14 +4,12 @@ import {
   FileText, 
   Plus, 
   Search, 
-  Filter,
   ChevronLeft,
   ChevronRight,
   Loader2,
   AlertCircle,
   Package,
   Truck,
-  MapPin,
   Warehouse,
   RefreshCw,
   CreditCard,
@@ -31,11 +29,9 @@ const Orders: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   
-  // Проверка прав доступа
   const canCreateOrders = user?.role === 'admin' || user?.role === 'purchase_manager';
   const canManagePayments = user?.role === 'admin' || user?.role === 'accountant' || user?.role === 'purchase_manager';
   
-  // Состояния
   const [orders, setOrders] = useState<Order[]>([]);
   const [stats, setStats] = useState<OrderStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,7 +41,6 @@ const Orders: React.FC = () => {
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
   
-  // Фильтры
   const [filters, setFilters] = useState<OrderFilters>({
     page: 1,
     limit: 20,
@@ -54,7 +49,6 @@ const Orders: React.FC = () => {
     search: ''
   });
   
-  // Пагинация
   const [pagination, setPagination] = useState({
     total: 0,
     page: 1,
@@ -62,7 +56,6 @@ const Orders: React.FC = () => {
     limit: 20
   });
 
-  // Загрузка заявок
   const loadOrders = async () => {
     try {
       setLoading(true);
@@ -79,11 +72,11 @@ const Orders: React.FC = () => {
     }
   };
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     loadOrders();
   }, [filters]);
 
-  // Обработчики фильтров
   const handleStatusFilter = (status?: OrderStatus) => {
     setFilters(prev => ({ ...prev, status, page: 1 }));
   };
@@ -101,14 +94,12 @@ const Orders: React.FC = () => {
     setFilters(prev => ({ ...prev, page: newPage }));
   };
 
-  // Обработчик открытия модального окна оплаты
   const handlePaymentClick = (e: React.MouseEvent, order: Order) => {
-    e.stopPropagation(); // Предотвращаем переход к деталям заявки
+    e.stopPropagation();
     setSelectedOrder(order);
     setShowPaymentModal(true);
   };
 
-  // Обработчик регистрации оплаты
   const handlePaymentSubmit = async (amount: number, comment?: string) => {
     if (!selectedOrder) return;
 
@@ -116,14 +107,12 @@ const Orders: React.FC = () => {
       setPaymentLoading(true);
       const response = await ordersApi.updateOrderPayment(selectedOrder.id, amount, comment);
       
-      // Обновляем заявку в списке
       setOrders(prev => prev.map(order => 
         order.id === selectedOrder.id 
           ? response.order 
           : order
       ));
 
-      // Обновляем статистику
       loadOrders();
 
       alert(`Оплата успешно зарегистрирована! ${response.payment.statusChanged ? `Статус изменен на "${response.payment.newStatus}"` : ''}`);
@@ -135,7 +124,6 @@ const Orders: React.FC = () => {
     }
   };
 
-  // Цветовые схемы для статусов
   const getStatusColor = (status: OrderStatus) => {
     const colors: Record<OrderStatus, string> = {
       'Создана': 'bg-gray-100 text-gray-800',
@@ -233,7 +221,6 @@ const Orders: React.FC = () => {
       {/* Статистика */}
       {stats && (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
-          {/* Ожидают обработки */}
           <div 
             className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-gray-400"
             onClick={() => handleStatusFilter('Создана')}
@@ -247,7 +234,6 @@ const Orders: React.FC = () => {
             </div>
           </div>
           
-          {/* Отправлены */}
           <div 
             className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-blue-400"
             onClick={() => handleStatusFilter('Отправлена поставщику')}
@@ -261,7 +247,6 @@ const Orders: React.FC = () => {
             </div>
           </div>
           
-          {/* Подтверждены */}
           <div 
             className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-green-400"
             onClick={() => handleStatusFilter('Подтверждена')}
@@ -275,7 +260,6 @@ const Orders: React.FC = () => {
             </div>
           </div>
           
-          {/* В сборе */}
           <div 
             className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-purple-400"
             onClick={() => handleStatusFilter('В сборе')}
@@ -289,7 +273,6 @@ const Orders: React.FC = () => {
             </div>
           </div>
           
-          {/* Забраны */}
           <div 
             className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-indigo-400"
             onClick={() => handleStatusFilter('Забрана')}
@@ -303,7 +286,6 @@ const Orders: React.FC = () => {
             </div>
           </div>
           
-          {/* Приняты */}
           <div 
             className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-teal-400"
             onClick={() => handleStatusFilter('Принята на складе')}
@@ -317,7 +299,6 @@ const Orders: React.FC = () => {
             </div>
           </div>
 
-          {/* Закрыты */}
           <div 
             className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-gray-300"
             onClick={() => handleStatusFilter('Закрыта')}
@@ -536,8 +517,7 @@ const Orders: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-2">
-                        {/* Кнопка оплаты - показываем только если есть права и заявка не полностью оплачена */}
-                        {canManagePayments && order.paymentStatus !== 'Оплачено' && (
+        {canManagePayments && order.paymentStatus !== 'Оплачено' && (
                           <button
                             onClick={(e) => handlePaymentClick(e, order)}
                             className="inline-flex items-center px-3 py-1 border border-transparent text-xs leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"

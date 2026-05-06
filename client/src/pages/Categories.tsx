@@ -95,7 +95,6 @@ export const Categories: React.FC = () => {
     await loadCategories();
   };
 
-  // Получить все категории в плоский список для модального окна
   const getFlatCategories = (cats: Category[]): Category[] => {
     if (!cats || !Array.isArray(cats)) return [];
     let result: Category[] = [];
@@ -110,7 +109,6 @@ export const Categories: React.FC = () => {
 
   const flatCategories = getFlatCategories(categories);
 
-  // Рендер одной категории
   const renderCategory = (category: Category, level: number = 0) => {
     const hasChildren = category.subcategories && category.subcategories.length > 0;
     const isExpanded = expandedCategories.has(category.id);

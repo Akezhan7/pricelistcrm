@@ -14,7 +14,7 @@ import {
   Filter
 } from 'lucide-react';
 import collectorApi from '../services/collectorApi';
-import type { CollectorTask, CollectorTaskStatus, CollectorTasksResponse } from '../types';
+import type { CollectorTask, CollectorTaskStatus } from '../types';
 
 export const CollectorTasks: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -29,6 +29,7 @@ export const CollectorTasks: React.FC = () => {
     limit: 20
   });
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     loadTasks();
   }, [filterStatus, pagination.page]);

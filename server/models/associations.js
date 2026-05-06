@@ -1,4 +1,5 @@
 // Файл для определения связей между моделями
+const Market = require('./Market');
 const Sector = require('./Sector');
 const Row = require('./Row');
 const Supplier = require('./Supplier');
@@ -17,6 +18,32 @@ const CollectorTask = require('./CollectorTask');
 const WarehouseReceipt = require('./WarehouseReceipt');
 const WarehouseReceiptItem = require('./WarehouseReceiptItem');
 const StockHistory = require('./StockHistory');
+
+// Связи между рынками и секторами
+Market.hasMany(Sector, {
+  foreignKey: 'marketId',
+  as: 'sectors',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE',
+});
+
+Sector.belongsTo(Market, {
+  foreignKey: 'marketId',
+  as: 'market',
+});
+
+// Связи между рынками и поставщиками
+Market.hasMany(Supplier, {
+  foreignKey: 'marketId',
+  as: 'suppliers',
+  onDelete: 'SET NULL',
+  onUpdate: 'CASCADE',
+});
+
+Supplier.belongsTo(Market, {
+  foreignKey: 'marketId',
+  as: 'market',
+});
 
 // Связи между секторами и рядами
 Sector.hasMany(Row, {
@@ -418,6 +445,7 @@ Order.hasMany(StockHistory, {
 });
 
 module.exports = {
+  Market,
   Sector,
   Row,
   Supplier,

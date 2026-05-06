@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Supplier, Product } from '../types';
-import { MessageSquare, Phone, MapPin, Package, Plus, Edit, Trash2, Image as ImageIcon, CreditCard, FileText, DollarSign, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MessageSquare, Phone, MapPin, Package, Plus, Edit, Trash2, Image as ImageIcon, DollarSign, ChevronLeft, ChevronRight, Building2 } from 'lucide-react';
 import { UnifiedSupplierForm } from './UnifiedSupplierForm';
 import { EditSupplierModal } from './EditSupplierModal';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
@@ -98,7 +98,7 @@ export const SupplierCards: React.FC<SupplierCardsProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col flex-1" style={{ minHeight: 0 }}>
       {/* Кнопка добавления поставщика */}
       {canEdit && (
         <div className="p-4 border-b border-gray-200">
@@ -141,7 +141,7 @@ export const SupplierCards: React.FC<SupplierCardsProps> = ({
       </div>
 
       {/* Карточки поставщиков */}
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4" style={{ minHeight: 0 }}>
         {filteredSuppliers.length === 0 ? (
           <div className="text-center text-gray-500 py-12">
             <div className="text-4xl mb-2">
@@ -159,7 +159,7 @@ export const SupplierCards: React.FC<SupplierCardsProps> = ({
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-3 lg:gap-4" style={{ maxWidth: '1800px', margin: '0 auto' }}>
             {paginatedSuppliers.map((supplier) => {
               // Находим цену для выбранного товара
               const productPrice = selectedProduct
@@ -167,30 +167,36 @@ export const SupplierCards: React.FC<SupplierCardsProps> = ({
                 : null;
 
               return (
-                <div key={supplier.id} className="card p-4 hover:shadow-lg transition-shadow">
+                <div key={supplier.id} className="card p-3 lg:p-4 hover:shadow-lg transition-shadow">
                   {/* Изображение контейнера */}
-                  <div className="mb-3">
+                  <div className="mb-2 lg:mb-3">
                     {supplier.containerImage ? (
                       <img
                         src={getImageUrl(supplier.containerImage) || undefined}
                         alt={`Контейнер ${supplier.name}`}
-                        className="w-full h-32 object-cover rounded-lg"
+                        className="w-full h-28 lg:h-32 object-cover rounded-lg"
                         onError={handleImgError}
                       />
                     ) : (
-                      <div className="w-full h-32 bg-gray-200 rounded-lg flex items-center justify-center">
-                        <ImageIcon className="h-8 w-8 text-gray-400" />
+                      <div className="w-full h-28 lg:h-32 bg-gray-200 rounded-lg flex items-center justify-center">
+                        <ImageIcon className="h-6 w-6 lg:h-8 lg:w-8 text-gray-400" />
                       </div>
                     )}
                   </div>
 
                   {/* Основная информация */}
-                  <div className="mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                  <div className="mb-3 lg:mb-4">
+                    <h3 className="text-base lg:text-lg font-semibold text-gray-900 mb-1 truncate">
                       {supplier.name}
                     </h3>
-                    
-                    <div className="flex items-center text-sm text-gray-600 mb-2">
+                                        {/* Информация о рынке */}
+                    {supplier.market && (
+                      <div className="flex items-center text-sm text-blue-600 mb-2">
+                        <Building2 className="h-4 w-4 mr-1 flex-shrink-0" />
+                        <span className="font-medium">{supplier.market.name}</span>
+                      </div>
+                    )}
+                                        <div className="flex items-center text-sm text-gray-600 mb-2">
                       <MapPin className="h-4 w-4 mr-1 flex-shrink-0" />
                       <span className="truncate">
                         {supplier.row || supplier.container ? (
@@ -334,27 +340,71 @@ export const SupplierCards: React.FC<SupplierCardsProps> = ({
       {/* Пагинация */}
       {totalPages > 1 && (
         <div className="border-t border-gray-200 px-4 py-3 bg-gray-50">
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-gray-600">
-              {filteredSuppliers.length} поставщиков
+          <div className="space-y-2">
+            <div className="text-xs text-gray-500 text-center">
+              Показано {((currentPage - 1) * itemsPerPage) + 1}-{Math.min(currentPage * itemsPerPage, filteredSuppliers.length)} из {filteredSuppliers.length}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-center space-x-2">
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="px-2 py-1 text-xs rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                title="Первая"
+              >
+                ««
+              </button>
               <button
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
                 disabled={currentPage === 1}
-                className="p-1 text-gray-600 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed"
+                className="p-1 text-gray-600 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
-                <ChevronLeft className="h-5 w-5" />
+                <ChevronLeft className="h-4 w-4" />
               </button>
-              <span className="text-sm text-gray-700">
-                {currentPage} / {totalPages}
-              </span>
+              
+              {/* Номера страниц */}
+              <div className="flex items-center space-x-1">
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum: number;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`px-2 py-1 text-xs rounded transition-colors ${
+                        currentPage === pageNum
+                          ? 'bg-blue-600 text-white font-medium'
+                          : 'hover:bg-gray-200 text-gray-700'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+              
               <button
                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
                 disabled={currentPage === totalPages}
-                className="p-1 text-gray-600 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed"
+                className="p-1 text-gray-600 hover:text-gray-900 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               >
-                <ChevronRight className="h-5 w-5" />
+                <ChevronRight className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setCurrentPage(totalPages)}
+                disabled={currentPage === totalPages}
+                className="px-2 py-1 text-xs rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                title="Последняя"
+              >
+                »»
               </button>
             </div>
           </div>

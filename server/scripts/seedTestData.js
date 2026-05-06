@@ -1,143 +1,167 @@
 /**
  * Скрипт для создания тестовых данных
- * Создаёт товары, категории и поставщиков для тестирования
+ * Создаёт 40 товаров и 30 поставщиков для тестирования пагинации
  */
 
 require('dotenv').config();
-const { sequelize, Product, Category, Supplier, ProductSupplier, User } = require('../models');
+const sequelize = require('../config/database');
+const { Product, Supplier, Market, ProductSupplier } = require('../models/associations');
 
-async function createTestData() {
-  console.log('🌱 Создание тестовых данных...\n');
+const productNames = [
+  'Маска медицинская', 'Перчатки латексные', 'Антисептик гелевый', 'Респиратор FFP2',
+  'Термометр электронный', 'Бинт стерильный', 'Вата медицинская', 'Шприц 5мл',
+  'Пластырь бактерицидный', 'Йод раствор', 'Зеленка', 'Перекись водорода',
+  'Аспирин таблетки', 'Парацетамол', 'Активированный уголь', 'Но-шпа',
+  'Цитрамон', 'Нурофен', 'Супрастин', 'Мезим форте',
+  'Линекс капсулы', 'Смекта порошок', 'Корвалол капли', 'Валидол таблетки',
+  'Нашатырный спирт', 'Борная кислота', 'Фурацилин таблетки', 'Стрептоцид',
+  'Левомеколь мазь', 'Пантенол спрей', 'Бепантен крем', 'Солкосерил гель',
+  'Троксевазин гель', 'Финалгон мазь', 'Вольтарен эмульгель', 'Фастум гель',
+  'Звездочка бальзам', 'Доктор Мом мазь', 'Називин спрей', 'Пиносол капли',
+  'Мукалтин таблетки', 'Бромгексин', 'АЦЦ порошок', 'Амброксол сироп',
+  'Грудной сбор №4', 'Ромашка аптечная', 'Шалфей трава', 'Календула цветки',
+  'Эхинацея настойка', 'Элеутерококк экстракт'
+];
 
+const supplierNames = [
+  'ИП Иванов', 'ООО Медснаб', 'ТОО Фармлайн', 'ИП Петров', 'ООО Здоровье',
+  'ТОО Аптека плюс', 'ИП Сидоров', 'ООО Витамед', 'ТОО Медтех', 'ИП Смирнов',
+  'ООО Фармкомпани', 'ТОО Лекарства', 'ИП Козлов', 'ООО Медикал', 'ТОО Аптечный склад',
+  'ИП Новиков', 'ООО Фарминдустрия', 'ТОО Медпром', 'ИП Морозов', 'ООО Здравсервис',
+  'ТОО Витафарм', 'ИП Волков', 'ООО Фармацевт', 'ТОО Медцентр', 'ИП Соколов',
+  'ООО Аптечная сеть', 'ТОО Фармация', 'ИП Лебедев', 'ООО Медикаменты', 'ТОО Здравмед',
+  'ИП Егоров', 'ООО Фармторг', 'ТОО Аптечный мир', 'ИП Павлов'
+];
+
+const marketNames = ['Байсат', 'Ялянь', 'Алтын Орда', 'Оптима', 'Евразия'];
+
+const addresses = [
+  'мкр. Жулдыз, ул. Толе би 45', 'пр. Абая 120', 'ул. Сатпаева 90',
+  'мкр. Самал 1, дом 25', 'ул. Розыбакиева 247', 'пр. Райымбека 348',
+  'ул. Макатаева 127', 'пр. Достык 162', 'ул. Богенбай батыра 250',
+  'мкр. Мамыр, ул. Момышулы 18'
+];
+
+function randomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+function randomPhone() {
+  return `+7${randomInt(700, 799)}${randomInt(1000000, 9999999)}`;
+}
+
+function randomPrice(min, max) {
+  return randomInt(min, max) * 100;
+}
+
+async function seedData() {
   try {
-    // Подключаемся к БД
+    console.log('🌱 Начинаем заполнение базы данных тестовыми данными...\n');
+
     await sequelize.authenticate();
-    console.log('✓ Подключение к БД установлено\n');
+    console.log('✅ Подключение к БД установлено\n');
 
-    // 1. Проверяем/создаём тестового админа
-    console.log('👤 Проверка пользователя...');
-    let admin = await User.findOne({ where: { email: 'admin@example.com' } });
-    
-    if (!admin) {
-      const bcrypt = require('bcryptjs');
-      admin = await User.create({
-        name: 'Admin',
-        email: 'admin@example.com',
-        password: await bcrypt.hash('admin123', 10),
-        role: 'admin',
+    // Создаем рынки
+    console.log('📍 Создание рынков...');
+    const markets = [];
+    for (let i = 0; i < marketNames.length; i++) {
+      const [market] = await Market.findOrCreate({
+        where: { name: marketNames[i] },
+        defaults: {
+          name: marketNames[i],
+          address: addresses[i % addresses.length],
+          description: `Крупный оптово-розничный рынок ${marketNames[i]}`
+        }
       });
-      console.log('✓ Создан тестовый пользователь: admin@example.com / admin123');
-    } else {
-      console.log('✓ Пользователь admin@example.com уже существует');
+      markets.push(market);
+      console.log(`  ✅ ${market.name}`);
     }
 
-    // 2. Создаём категории
-    console.log('\n📁 Создание категорий...');
-    const categories = [
-      { name: 'Маски и респираторы', description: 'Средства защиты органов дыхания' },
-      { name: 'Перчатки', description: 'Защитные перчатки различных типов' },
-      { name: 'Очки и щитки', description: 'Защита для глаз и лица' },
-      { name: 'Спецодежда', description: 'Защитная одежда' },
-    ];
-
-    const createdCategories = [];
-    for (const catData of categories) {
-      const [category] = await Category.findOrCreate({
-        where: { name: catData.name },
-        defaults: catData,
-      });
-      createdCategories.push(category);
-      console.log(`  ✓ ${category.name}`);
-    }
-
-    // 3. Создаём поставщиков
+    // Создаем поставщиков
     console.log('\n👥 Создание поставщиков...');
-    const suppliers = [
-      { name: 'ООО Безопасность', phone: '+77001234567', whatsapp: '+77001234567', address: 'г. Алматы' },
-      { name: 'ТОО СпецОснащение', phone: '+77007654321', whatsapp: '+77007654321', address: 'г. Астана' },
-      { name: 'ИП Иванов', phone: '+77009876543', whatsapp: '+77009876543', address: 'г. Шымкент' },
-    ];
-
-    const createdSuppliers = [];
-    for (const supData of suppliers) {
-      const [supplier] = await Supplier.findOrCreate({
-        where: { name: supData.name },
-        defaults: supData,
+    const suppliers = [];
+    for (let i = 0; i < 30; i++) {
+      const useMarket = Math.random() > 0.3; // 70% на рынке
+      const marketId = useMarket ? markets[randomInt(0, markets.length - 1)].id : null;
+      
+      const supplier = await Supplier.create({
+        name: supplierNames[i % supplierNames.length] + (i >= supplierNames.length ? ` ${Math.floor(i / supplierNames.length) + 1}` : ''),
+        phone: randomPhone(),
+        whatsapp: randomPhone(),
+        address: useMarket 
+          ? `Ряд ${randomInt(1, 50)}, Контейнер ${randomInt(1, 20)}`
+          : addresses[randomInt(0, addresses.length - 1)],
+        marketId: marketId,
+        row: useMarket ? randomInt(1, 50) : null,
+        container: useMarket ? randomInt(1, 20) : null,
+        sector: ['Медицина', 'Косметика', 'Гигиена', 'Товары для дома'][randomInt(0, 3)],
+        debt: randomInt(0, 100000),
+        notes: i % 3 === 0 ? 'Надежный поставщик, работаем давно' : '',
+        isActive: true
       });
-      createdSuppliers.push(supplier);
-      console.log(`  ✓ ${supplier.name}`);
+      suppliers.push(supplier);
+      console.log(`  ✅ ${supplier.name} ${useMarket ? `(${markets.find(m => m.id === marketId)?.name})` : '(город)'}`);
     }
 
-    // 4. Создаём товары с разными остатками
+    // Создаем товары
     console.log('\n📦 Создание товаров...');
-    const products = [
-      // Критичные (остаток = 0)
-      { name: 'Маска сварная чёрная', article: 'MSK-001', costPrice: 500, sellingPrice: 800, currentStock: 0, minStock: 20, categoryId: createdCategories[0].id },
-      { name: 'Перчатки резиновые XL', article: 'PER-001', costPrice: 150, sellingPrice: 250, currentStock: 0, minStock: 50, categoryId: createdCategories[1].id },
+    for (let i = 0; i < 40; i++) {
+      const costPrice = randomPrice(50, 500);
+      const sellingPrice = Math.round(costPrice * (1 + randomInt(20, 80) / 100));
       
-      // Низкие (остаток <= minStock)
-      { name: 'Очки защитные прозрачные', article: 'OCH-001', costPrice: 300, sellingPrice: 500, currentStock: 5, minStock: 30, categoryId: createdCategories[2].id },
-      { name: 'Респиратор FFP2', article: 'RSP-001', costPrice: 800, sellingPrice: 1200, currentStock: 10, minStock: 25, categoryId: createdCategories[0].id },
-      { name: 'Перчатки латексные M', article: 'PER-002', costPrice: 100, sellingPrice: 180, currentStock: 15, minStock: 40, categoryId: createdCategories[1].id },
-      
-      // Средние (остаток <= minStock * 2)
-      { name: 'Комбинезон защитный', article: 'KOM-001', costPrice: 3000, sellingPrice: 4500, currentStock: 30, minStock: 20, categoryId: createdCategories[3].id },
-      { name: 'Очки сварщика', article: 'OCH-002', costPrice: 600, sellingPrice: 900, currentStock: 25, minStock: 15, categoryId: createdCategories[2].id },
-      
-      // Хорошие (остаток > minStock * 2)
-      { name: 'Маска медицинская 3-слойная', article: 'MSK-002', costPrice: 30, sellingPrice: 60, currentStock: 500, minStock: 100, categoryId: createdCategories[0].id },
-      { name: 'Перчатки х/б с ПВХ', article: 'PER-003', costPrice: 50, sellingPrice: 90, currentStock: 200, minStock: 50, categoryId: createdCategories[1].id },
-      { name: 'Каска защитная', article: 'KAS-001', costPrice: 1500, sellingPrice: 2200, currentStock: 80, minStock: 20, categoryId: createdCategories[3].id },
-    ];
-
-    for (const prodData of products) {
-      const [product] = await Product.findOrCreate({
-        where: { article: prodData.article },
-        defaults: {
-          ...prodData,
-          internalName: prodData.name,
-          kaspiName: prodData.name,
-          kaspiArticle: prodData.article,
-        },
+      const product = await Product.create({
+        name: productNames[i % productNames.length] + (i >= productNames.length ? ` ${String.fromCharCode(65 + Math.floor(i / productNames.length))}` : ''),
+        article: `ART-${String(1000 + i).padStart(4, '0')}`,
+        costPrice: costPrice,
+        sellingPrice: sellingPrice,
+        description: `Качественный товар для медицинских и бытовых нужд`,
+        isActive: true
       });
 
-      // Привязываем к случайному поставщику
-      const randomSupplier = createdSuppliers[Math.floor(Math.random() * createdSuppliers.length)];
-      await ProductSupplier.findOrCreate({
-        where: {
-          productId: product.id,
-          supplierId: randomSupplier.id,
-        },
-        defaults: {
-          supplierPrice: prodData.costPrice,
-          quantity: 100,
-          isAvailable: true,
-        },
-      });
+      // Связываем товар с несколькими поставщиками
+      const numSuppliers = randomInt(1, 3);
+      const usedSuppliers = new Set();
+      
+      for (let j = 0; j < numSuppliers; j++) {
+        const supplierIndex = randomInt(0, suppliers.length - 1);
+        if (!usedSuppliers.has(supplierIndex)) {
+          usedSuppliers.add(supplierIndex);
+          const supplier = suppliers[supplierIndex];
+          
+          await ProductSupplier.create({
+            productId: product.id,
+            supplierId: supplier.id,
+            supplierPrice: randomPrice(Math.floor(costPrice * 0.8), Math.floor(costPrice * 1.2)),
+            quantity: randomInt(0, 100),
+            isAvailable: Math.random() > 0.2,
+            notes: ''
+          });
+        }
+      }
 
-      const stockStatus = 
-        product.currentStock === 0 ? '🔴 КРИТИЧНО' :
-        product.currentStock <= product.minStock ? '🟡 НИЗКИЙ' :
-        product.currentStock <= product.minStock * 2 ? '🟠 СРЕДНИЙ' :
-        '✅ ХОРОШИЙ';
-
-      console.log(`  ${stockStatus} ${product.article} - ${product.name} (${product.currentStock}/${product.minStock})`);
+      console.log(`  ✅ ${product.name} (${product.article}) - ${numSuppliers} поставщик(ов)`);
     }
 
-    console.log('\n✅ Тестовые данные созданы успешно!\n');
-    console.log('📊 Статистика:');
-    console.log(`  Категорий: ${createdCategories.length}`);
-    console.log(`  Поставщиков: ${createdSuppliers.length}`);
-    console.log(`  Товаров: ${products.length}`);
-    console.log(`  Пользователь: admin@example.com / admin123`);
-    console.log('\n🚀 Теперь можно запустить тесты: node scripts/testStep3.js\n');
+    console.log('\n✨ Готово! Создано:');
+    console.log(`   📍 ${markets.length} рынков`);
+    console.log(`   👥 30 поставщиков`);
+    console.log(`   📦 40 товаров`);
+    console.log('\n💡 Запустите сервер и обновите страницу\n');
+
+    await sequelize.close();
 
   } catch (error) {
-    console.error('❌ Ошибка создания тестовых данных:', error);
+    console.error('❌ Ошибка при заполнении данных:', error);
+    console.error(error);
     process.exit(1);
-  } finally {
-    await sequelize.close();
   }
 }
 
-createTestData();
+// Запускаем скрипт
+seedData().then(() => {
+  console.log('🎉 Скрипт успешно завершен');
+  process.exit(0);
+}).catch(error => {
+  console.error('❌ Критическая ошибка:', error);
+  process.exit(1);
+});

@@ -19,7 +19,6 @@ const AppRoutes: React.FC = () => {
 
   return (
     <Routes>
-      {/* Публичные маршруты */}
       <Route 
         path="/login" 
         element={user ? <Navigate to="/" replace /> : <Login />} 
@@ -29,7 +28,6 @@ const AppRoutes: React.FC = () => {
         element={user ? <Navigate to="/" replace /> : <Register />} 
       />
       
-      {/* Защищенные маршруты */}
       <Route
         path="/"
         element={

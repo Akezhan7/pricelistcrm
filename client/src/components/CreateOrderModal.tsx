@@ -20,32 +20,27 @@ interface OrderItemForm {
   quantity: number;
   priceAtPurchase: number;
   notes?: string;
-  uniqueKey?: string; // Для различения одного товара с разными вариациями
+  uniqueKey?: string;
 }
 
 const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  // Состояния формы
   const [supplierId, setSupplierId] = useState<number | null>(null);
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('');
   const [deliveryLocation, setDeliveryLocation] = useState('Точка Байсад');
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<OrderItemForm[]>([]);
 
-  // Списки для выбора
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
 
-  // Поиск товара
   const [productSearch, setProductSearch] = useState('');
   const [showProductDropdown, setShowProductDropdown] = useState(false);
 
-  // Состояния UI
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState(true);
 
-  // Загрузка поставщиков и товаров при открытии
   useEffect(() => {
     if (isOpen) {
       loadInitialData();
@@ -61,7 +56,6 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ isOpen, onClose, on
         productsApi.getProducts({ isActive: true })
       ]);
       
-      // Проверяем, что данные являются массивами
       const suppliersArray = Array.isArray(suppliersData) ? suppliersData : [];
       const productsArray = Array.isArray(productsData) ? productsData : [];
       
@@ -79,7 +73,6 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ isOpen, onClose, on
     }
   };
 
-  // Фильтрация товаров при поиске
   useEffect(() => {
     if (productSearch.trim()) {
       const filtered = products.filter(p =>
@@ -92,9 +85,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ isOpen, onClose, on
     }
   }, [productSearch, products]);
 
-  // Добавление товара в список
   const handleAddProduct = async (product: Product) => {
-    // Загрузить вариации товара
     let variations: ProductVariation[] = [];
     try {
       const response = await api.get(`/products/${product.id}/variations`);
@@ -124,70 +115,40 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ isOpen, onClose, on
       setProductSearch('');
       setShowProductDropdown(false);
     } else {
-      // Нет вариаций, просто добавить основной товар
       setItems([...items, mainItem]);
       setProductSearch('');
       setShowProductDropdown(false);
     }
   };
 
-  // Удаление товара из списка
   const handleRemoveItem = (index: number) => {
     setItems(items.filter((_, i) => i !== index));
   };
 
-  // Обновление количества товара
   const handleUpdateQuantity = (index: number, quantity: number) => {
     const newItems = [...items];
     newItems[index].quantity = quantity;
     setItems(newItems);
   };
 
-  // Обновление цены товара
   const handleUpdatePrice = (index: number, price: number) => {
     const newItems = [...items];
     newItems[index].priceAtPurchase = price;
     setItems(newItems);
   };
 
-  // Обновление заметок товара
   const handleUpdateNotes = (index: number, notes: string) => {
     const newItems = [...items];
     newItems[index].notes = notes;
     setItems(newItems);
   };
 
-  // Выбор вариации товара
-  const handleSelectVariation = (index: number, variationId: number | null) => {
-    const newItems = [...items];
-    const item = newItems[index];
-    
-    if (variationId === null) {
-      // Выбран основной товар (без вариации)
-      item.productVariationId = null;
-      item.selectedVariation = null;
-      item.priceAtPurchase = Number(item.product?.costPrice) || 0;
-    } else {
-      // Выбрана конкретная вариация
-      const variation = item.product?.variations?.find(v => v.id === variationId);
-      if (variation) {
-        item.productVariationId = variationId;
-        item.selectedVariation = variation;
-        item.priceAtPurchase = Number(variation.price) || 0;
-      }
-    }
-    
-    setItems(newItems);
-  };
-
-  // Добавить вариацию как отдельную позицию
   const handleAddVariationAsNewItem = (productIndex: number, variationId: number) => {
     const sourceItem = items[productIndex];
     const variation = sourceItem.product?.variations?.find(v => v.id === variationId);
     
     if (!variation) return;
 
-    // Проверить, не добавлена ли уже эта вариация
     const alreadyExists = items.some(
       item => item.productId === sourceItem.productId && item.productVariationId === variationId
     );
@@ -211,12 +172,10 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ isOpen, onClose, on
     setItems([...items, newItem]);
   };
 
-  // Расчет общей суммы
   const calculateTotal = () => {
     return items.reduce((sum, item) => sum + (item.quantity * item.priceAtPurchase), 0);
   };
 
-  // Валидация формы
   const validateForm = (): string | null => {
     if (!supplierId) return 'Выберите поставщика';
     if (items.length === 0) return 'Добавьте хотя бы один товар';
@@ -229,7 +188,6 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ isOpen, onClose, on
     return null;
   };
 
-  // Отправка формы
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -267,7 +225,6 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ isOpen, onClose, on
     }
   };
 
-  // Закрытие модального окна
   const handleClose = () => {
     setSupplierId(null);
     setExpectedDeliveryDate('');

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Upload } from 'lucide-react';
+import { X, Save, Upload, Plus } from 'lucide-react';
 import { Supplier } from '../types';
 import api from '../utils/api';
 import getImageUrl from '../utils/image';
+import { MarketManagementModal } from './MarketManagementModal';
 
 type EditSupplierModalProps = {
   isOpen: boolean;
@@ -18,10 +19,16 @@ export const EditSupplierModal: React.FC<EditSupplierModalProps> = ({
   supplier,
 }) => {
   const [loading, setLoading] = useState(false);
+  const [markets, setMarkets] = useState<any[]>([]);
+  const [loadingMarkets, setLoadingMarkets] = useState(false);
+  const [showMarketModal, setShowMarketModal] = useState(false);
+  
   const [formData, setFormData] = useState({
     name: '',
+    marketId: '',
     row: '',
     container: '',
+    cityAddress: '',
     phone: '',
     whatsapp: '',
     notes: '',
@@ -31,15 +38,38 @@ export const EditSupplierModal: React.FC<EditSupplierModalProps> = ({
   const [error, setError] = useState('');
   const [currentImage, setCurrentImage] = useState<string | null>(null);
 
+  // Загрузка рынков при открытии модального окна
+  useEffect(() => {
+    if (isOpen) {
+      loadMarkets();
+    }
+  }, [isOpen]);
 
+  const loadMarkets = async () => {
+    setLoadingMarkets(true);
+    try {
+      const response = await api.get('/markets');
+      setMarkets(response.data.data.markets || []);
+    } catch (err) {
+      console.error('Ошибка загрузки рынков:', err);
+    } finally {
+      setLoadingMarkets(false);
+    }
+  };
 
   // Заполнение формы при открытии модального окна
   useEffect(() => {
     if (supplier) {
+      // Определяем cityAddress: если поставщик на рынке, используем пустую строку
+      // если не на рынке - используем address
+      const cityAddress = supplier.marketId ? '' : (supplier.address || '');
+      
       setFormData({
         name: supplier.name || '',
+        marketId: supplier.marketId ? String(supplier.marketId) : '',
         row: supplier.row !== undefined && supplier.row !== null ? String(supplier.row) : '',
         container: supplier.container !== undefined && supplier.container !== null ? String(supplier.container) : '',
+        cityAddress: cityAddress,
         phone: supplier.phone || '',
         whatsapp: supplier.whatsapp || '',
         notes: supplier.notes || '',
@@ -57,24 +87,39 @@ export const EditSupplierModal: React.FC<EditSupplierModalProps> = ({
     setError('');
 
     try {
-      // Формируем адрес из ряда и контейнера
+      // Формируем адрес в зависимости от того, на рынке ли поставщик
       let address = '';
-      if (formData.row && formData.container) {
-        address = `Ряд ${formData.row}, Контейнер ${formData.container}`;
-      } else if (formData.row) {
-        address = `Ряд ${formData.row}`;
-      } else if (formData.container) {
-        address = `Контейнер ${formData.container}`;
-      } else if (supplier.address) {
-        // Если не указаны ряд/контейнер, сохраняем старый адрес
-        address = supplier.address;
+      
+      if (formData.marketId) {
+        // Поставщик на рынке - используем ряд/контейнер
+        if (formData.row && formData.container) {
+          address = `Ряд ${formData.row}, Контейнер ${formData.container}`;
+        } else if (formData.row) {
+          address = `Ряд ${formData.row}`;
+        } else if (formData.container) {
+          address = `Контейнер ${formData.container}`;
+        }
+      } else {
+        // Поставщик не на рынке - используем городской адрес
+        address = formData.cityAddress;
       }
 
       const data = new FormData();
       data.append('name', formData.name);
-      data.append('address', address); // Всегда отправляем адрес
-      if (formData.row) data.append('row', formData.row);
-      if (formData.container) data.append('container', formData.container);
+      data.append('marketId', formData.marketId || '');
+      data.append('address', address);
+      
+      // Всегда отправляем row и container (даже пустые строки), чтобы очистить старые значения
+      if (formData.marketId) {
+        // Если на рынке - отправляем ряд и контейнер (или пустые строки)
+        data.append('row', formData.row || '');
+        data.append('container', formData.container || '');
+      } else {
+        // Если не на рынке - явно очищаем ряд и контейнер
+        data.append('row', '');
+        data.append('container', '');
+      }
+      
       data.append('phone', formData.phone);
       data.append('whatsapp', formData.whatsapp || formData.phone);
       data.append('notes', formData.notes);
@@ -96,6 +141,26 @@ export const EditSupplierModal: React.FC<EditSupplierModalProps> = ({
       setError(err.response?.data?.message || 'Ошибка обновления поставщика');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Обработчик изменения рынка - очищаем неактуальные поля
+  const handleMarketChange = (newMarketId: string) => {
+    if (newMarketId) {
+      // Переключились на рынок - очищаем городской адрес
+      setFormData({ 
+        ...formData, 
+        marketId: newMarketId,
+        cityAddress: ''
+      });
+    } else {
+      // Переключились на "не на рынке" - очищаем ряд и контейнер
+      setFormData({ 
+        ...formData, 
+        marketId: '',
+        row: '',
+        container: ''
+      });
     }
   };
 
@@ -134,34 +199,86 @@ export const EditSupplierModal: React.FC<EditSupplierModalProps> = ({
             />
           </div>
 
-          {/* Ряд и Контейнер — сразу после имени */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Ряд</label>
-              <input
-                type="text"
-                className="input-field"
-                value={formData.row}
-                onChange={(e) => setFormData({ ...formData, row: e.target.value })}
-                placeholder="Напр.: 24"
-              />
-              <p className="text-xs text-gray-500 mt-1">Номер ряда на рынке (опционально)</p>
+          {/* Выбор рынка */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Рынок (опционально)
+            </label>
+            <div className="flex gap-2">
+              {loadingMarkets ? (
+                <div className="input-field flex-1 flex items-center gap-2 text-gray-500">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                  Загрузка рынков...
+                </div>
+              ) : (
+                <select
+                  className="input-field flex-1"
+                  value={formData.marketId}
+                  onChange={(e) => handleMarketChange(e.target.value)}
+                >
+                  <option value="">Не на рынке / Где-то в городе</option>
+                  {markets.map((market) => (
+                    <option key={market.id} value={market.id}>
+                      {market.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowMarketModal(true)}
+                className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1"
+                title="Управление рынками"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Контейнер</label>
-              <input
-                type="text"
-                className="input-field"
-                value={formData.container}
-                onChange={(e) => setFormData({ ...formData, container: e.target.value })}
-                placeholder="Напр.: 6"
-              />
-              <p className="text-xs text-gray-500 mt-1">Номер контейнера (опционально)</p>
-            </div>
-            <p className="text-xs text-gray-600 mt-2">
-              Адрес автоматически формируется из номера ряда и контейнера
+            <p className="text-xs text-gray-500 mt-1">
+              Если поставщик на Байсате, Ялянь или другом рынке - выберите рынок
             </p>
           </div>
+
+          {/* Условное отображение полей в зависимости от выбора рынка */}
+          {formData.marketId ? (
+            // Поставщик на рынке - показываем ряд/контейнер
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Ряд</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={formData.row}
+                  onChange={(e) => setFormData({ ...formData, row: e.target.value })}
+                  placeholder="Напр.: 24"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Контейнер</label>
+                <input
+                  type="text"
+                  className="input-field"
+                  value={formData.container}
+                  onChange={(e) => setFormData({ ...formData, container: e.target.value })}
+                  placeholder="Напр.: 6"
+                />
+              </div>
+            </div>
+          ) : (
+            // Поставщик не на рынке - показываем городской адрес
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Адрес в городе *
+              </label>
+              <input
+                type="text"
+                className="input-field"
+                value={formData.cityAddress}
+                onChange={(e) => setFormData({ ...formData, cityAddress: e.target.value })}
+                placeholder="Укажите полный адрес"
+                required={!formData.marketId}
+              />
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -290,6 +407,12 @@ export const EditSupplierModal: React.FC<EditSupplierModalProps> = ({
           </div>
         </form>
       </div>
+
+      <MarketManagementModal
+        isOpen={showMarketModal}
+        onClose={() => setShowMarketModal(false)}
+        onMarketsUpdated={loadMarkets}
+      />
     </div>
   );
 };

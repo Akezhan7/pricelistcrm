@@ -2,16 +2,13 @@ export interface Product {
   id: number;
   name: string;
   article: string;
-  // Новые поля для Kaspi и внутреннего использования
-  internalName?: string; // Внутреннее название (маска для сотрудников)
-  kaspiName?: string; // Официальное название Kaspi
-  kaspiArticle?: string; // Артикул Kaspi
-  // Управление остатками
-  currentStock?: number; // Текущий остаток на складе
-  minStock?: number; // Минимальный порог остатков
-  categoryId?: number; // FK к категории
-  category?: Category; // Связь с категорией
-  // Основные поля
+  internalName?: string;
+  kaspiName?: string;
+  kaspiArticle?: string;
+  currentStock?: number;
+  minStock?: number;
+  categoryId?: number;
+  category?: Category;
   costPrice: number;
   sellingPrice: number;
   image?: string;
@@ -23,10 +20,6 @@ export interface Product {
   updatedAt: string;
 }
 
-// ===============================
-// Категории товаров
-// ===============================
-
 export interface Category {
   id: number;
   name: string;
@@ -35,14 +28,33 @@ export interface Category {
   parent?: Category;
   subcategories?: Category[];
   isActive: boolean;
-  productsCount?: number; // Количество товаров в категории
+  productsCount?: number;
   createdAt: string;
   updatedAt: string;
 }
 
-// Новые интерфейсы для секторов и рядов
+export interface Market {
+  id: number;
+  name: string;
+  address?: string;
+  description?: string;
+  workingHours?: string;
+  contactPhone?: string;
+  notes?: string;
+  isActive: boolean;
+  sortOrder: number;
+  sectors?: Sector[];
+  suppliers?: Supplier[];
+  supplierCount?: number;
+  sectorCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Sector {
   id: number;
+  marketId?: number;
+  market?: Market;
   name: string;
   code: string;
   productType: string;
@@ -91,7 +103,6 @@ export interface Supplier {
   name: string;
   address: string;
   phone: string;
-  // optional structured location on the market
   row?: string | number;
   container?: string | number;
   whatsapp?: string;
@@ -104,7 +115,8 @@ export interface Supplier {
   notes?: string;
   debt: number;
   isActive: boolean;
-  // Новые поля для связи с секторами и рядами
+  marketId?: number;
+  market?: Market;
   sectorId?: number;
   rowId?: number;
   sectorInfo?: Sector;
@@ -142,15 +154,14 @@ export interface ProductSupplier {
   notes?: string;
 }
 
-// Тип для вариаций товаров
 export interface ProductVariation {
   id: number;
   productId: number;
-  name: string; // Например: 'Размер', 'Цвет'
-  value: string; // Например: 'XL', 'красный'
-  price: number; // Цена данной вариации
-  costPrice?: number; // Себестоимость (опционально)
-  sku?: string; // Уникальный артикул вариации
+  name: string;
+  value: string;
+  price: number;
+  costPrice?: number;
+  sku?: string;
   isActive: boolean;
   sortOrder: number;
   createdAt: string;
@@ -173,10 +184,6 @@ export interface PaginatedResponse<T> {
     totalPages: number;
   };
 }
-
-// ===============================
-// Типы для модуля заявок (Orders)
-// ===============================
 
 export type OrderStatus = 
   | 'Создана'
@@ -310,23 +317,19 @@ export interface OrderFilters {
 }
 
 export interface OrderStats {
-  // Статистика по статусам
-  created: number;            // Создана
-  sentToSupplier: number;     // Отправлена поставщику
-  confirmed: number;          // Подтверждена + Частично подтверждена
-  inCollection: number;       // В сборе
-  collected: number;          // Забрана
-  received: number;           // Принята на складе
-  closed: number;             // Закрыта
-  // Агрегированные показатели
-  pending: number;            // Ожидают (созданы + отправлены)
-  inProgress: number;         // В работе (подтверждены + в сборе + забраны)
-  completed: number;          // Завершены (приняты + закрыты)
-  // Финансовые показатели
+  created: number;
+  sentToSupplier: number;
+  confirmed: number;
+  inCollection: number;
+  collected: number;
+  received: number;
+  closed: number;
+  pending: number;
+  inProgress: number;
+  completed: number;
   totalAmount: string;
   totalPaid: string;
   totalDebt: string;
-  // Старые поля для обратной совместимости (удалить позже)
   atLocation?: number;
   inTransit?: number;
   atWarehouse?: number;
@@ -342,10 +345,6 @@ export interface OrdersResponse {
   };
   stats: OrderStats;
 }
-
-// ===============================
-// Типы для истории цен (Price History)
-// ===============================
 
 export type PriceType = 'costPrice' | 'sellingPrice';
 
@@ -454,18 +453,14 @@ export interface UpdatePricesResponse {
   }>;
 }
 
-// ===============================
-// История остатков (Stock History)
-// ===============================
-
-export type StockChangeType = 
-  | 'receipt'           // Приёмка
-  | 'sale'              // Продажа
-  | 'manual_increase'   // Ручное увеличение
-  | 'manual_decrease'   // Ручное уменьшение
-  | 'correction'        // Корректировка
-  | 'return'            // Возврат
-  | 'write_off';        // Списание
+export type StockChangeType =
+  | 'receipt'
+  | 'sale'
+  | 'manual_increase'
+  | 'manual_decrease'
+  | 'correction'
+  | 'return'
+  | 'write_off';
 
 export interface StockHistory {
   id: number;
@@ -513,10 +508,6 @@ export interface StockHistoryResponse {
   };
 }
 
-// ===============================
-// Подтверждение заявок (Order Confirmation)
-// ===============================
-
 export interface OrderConfirmation {
   id: number;
   orderId: number;
@@ -543,9 +534,6 @@ export interface PartialConfirmationDto {
   }>;
 }
 
-// ===============================
-// Задания сборщикам (Collector Tasks)
-// ===============================
 
 export type CollectorTaskStatus = 'pending' | 'in_progress' | 'completed';
 
@@ -604,10 +592,6 @@ export interface UpdateCollectorTaskDto {
   notes?: string;
 }
 
-// ===============================
-// Приёмка товара (Warehouse Receipt)
-// ===============================
-
 export type WarehouseReceiptType = 'full' | 'partial';
 
 export interface WarehouseReceiptItem {
@@ -622,7 +606,7 @@ export interface WarehouseReceiptItem {
   };
   expectedQuantity: number;
   receivedQuantity: number;
-  discrepancy: number; // expected - received
+  discrepancy: number;
   notes?: string;
 }
 
@@ -665,10 +649,6 @@ export interface PendingReceiptOrder extends Order {
   collectorTask?: CollectorTask;
 }
 
-// ===============================
-// Аналитика остатков
-// ===============================
-
 export type StockStatus = 'critical' | 'low' | 'medium' | 'good';
 
 export interface StockAnalyticsItem {
@@ -684,15 +664,15 @@ export interface StockAnalyticsItem {
   currentStock: number;
   minStock: number;
   stockStatus: StockStatus;
-  stockPercentage: number; // currentStock / minStock * 100
+  stockPercentage: number;
   image?: string;
 }
 
 export interface StockAnalytics {
-  critical: StockAnalyticsItem[];   // currentStock = 0
-  low: StockAnalyticsItem[];        // currentStock <= minStock
-  medium: StockAnalyticsItem[];     // currentStock <= minStock * 2
-  good: StockAnalyticsItem[];       // currentStock > minStock * 2
+  critical: StockAnalyticsItem[];
+  low: StockAnalyticsItem[];
+  medium: StockAnalyticsItem[];
+  good: StockAnalyticsItem[];
   stats: {
     totalProducts: number;
     criticalCount: number;
@@ -701,10 +681,6 @@ export interface StockAnalytics {
     goodCount: number;
   };
 }
-
-// ===============================
-// Автоформирование закупа
-// ===============================
 
 export interface PurchaseSuggestionItem {
   productId: number;
@@ -721,8 +697,8 @@ export interface PurchaseSuggestionItem {
       name: string;
     };
   };
-  suggestedQuantity: number; // Рекомендуемое количество для заказа
-  priority: 'critical' | 'high' | 'medium'; // Приоритет закупки
+  suggestedQuantity: number;
+  priority: 'critical' | 'high' | 'medium';
 }
 
 export interface PurchaseSuggestionBySupplier {
@@ -736,7 +712,7 @@ export interface PurchaseSuggestionBySupplier {
   };
   items: PurchaseSuggestionItem[];
   totalItems: number;
-  estimatedAmount: number; // Примерная сумма заказа
+  estimatedAmount: number;
 }
 
 export interface PurchaseSuggestions {
@@ -745,14 +721,10 @@ export interface PurchaseSuggestions {
   totalSuppliers: number;
 }
 
-// ===============================
-// WhatsApp интеграция
-// ===============================
-
 export interface WhatsAppMessage {
   phoneNumber: string;
   message: string;
-  deepLink: string; // wa.me link
+  deepLink: string;
 }
 
 export interface SendPhotoToSupplierDto {

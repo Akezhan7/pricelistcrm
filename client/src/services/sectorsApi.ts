@@ -1,84 +1,38 @@
+import api from '../utils/api';
 import { Sector, ApiResponse } from '../types';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-
 export const sectorsApi = {
-  // Получить все сектора
   getAll: async (): Promise<Sector[]> => {
-    const response = await fetch(`${API_BASE_URL}/sectors`);
-    
-    if (!response.ok) {
-      throw new Error('Ошибка при получении секторов');
-    }
-    
-    const data: ApiResponse<Sector[]> = await response.json();
-    return data.data || [];
+    const response = await api.get<ApiResponse<Sector[]>>('/sectors');
+    return response.data.data || [];
   },
 
-  // Получить сектор по ID
   getById: async (id: number): Promise<Sector> => {
-    const response = await fetch(`${API_BASE_URL}/sectors/${id}`);
-    
-    if (!response.ok) {
-      throw new Error('Ошибка при получении сектора');
-    }
-    
-    const data: ApiResponse<Sector> = await response.json();
-    if (!data.data) {
-      throw new Error('Сектор не найден');
-    }
-    
-    return data.data;
+    const response = await api.get<ApiResponse<Sector>>(`/sectors/${id}`);
+    if (!response.data.data) throw new Error('Сектор не найден');
+    return response.data.data;
   },
 
-  // Создать новый сектор
   create: async (sectorData: Partial<Sector>): Promise<Sector> => {
-    const response = await fetch(`${API_BASE_URL}/sectors`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(sectorData),
-    });
-    
-    const data: ApiResponse<Sector> = await response.json();
-    
-    if (!response.ok || !data.success) {
-      throw new Error(data.message || 'Ошибка при создании сектора');
+    const response = await api.post<ApiResponse<Sector>>('/sectors', sectorData);
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.message || 'Ошибка при создании сектора');
     }
-    
-    return data.data!;
+    return response.data.data;
   },
 
-  // Обновить сектор
   update: async (id: number, sectorData: Partial<Sector>): Promise<Sector> => {
-    const response = await fetch(`${API_BASE_URL}/sectors/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(sectorData),
-    });
-    
-    const data: ApiResponse<Sector> = await response.json();
-    
-    if (!response.ok || !data.success) {
-      throw new Error(data.message || 'Ошибка при обновлении сектора');
+    const response = await api.put<ApiResponse<Sector>>(`/sectors/${id}`, sectorData);
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.message || 'Ошибка при обновлении сектора');
     }
-    
-    return data.data!;
+    return response.data.data;
   },
 
-  // Удалить сектор
   delete: async (id: number): Promise<void> => {
-    const response = await fetch(`${API_BASE_URL}/sectors/${id}`, {
-      method: 'DELETE',
-    });
-    
-    const data: ApiResponse<void> = await response.json();
-    
-    if (!response.ok || !data.success) {
-      throw new Error(data.message || 'Ошибка при удалении сектора');
+    const response = await api.delete<ApiResponse<void>>(`/sectors/${id}`);
+    if (!response.data.success) {
+      throw new Error(response.data.message || 'Ошибка при удалении сектора');
     }
   },
 };

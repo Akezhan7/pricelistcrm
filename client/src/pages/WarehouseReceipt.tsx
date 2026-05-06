@@ -27,6 +27,7 @@ export const WarehouseReceipt: React.FC = () => {
     limit: 20
   });
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     loadPendingOrders();
   }, [pagination.page]);
@@ -61,7 +62,7 @@ export const WarehouseReceipt: React.FC = () => {
       productId: item.product?.id || 0,
       productName: item.product?.internalName || item.product?.name || 'Неизвестный товар',
       expectedQuantity: item.quantity,
-      receivedQuantity: item.quantity, // По умолчанию = ожидаемому
+      receivedQuantity: item.quantity,
       notes: '',
     })) || [];
     setReceiptItems(items);
@@ -90,7 +91,6 @@ export const WarehouseReceipt: React.FC = () => {
   const handleAcceptFull = async () => {
     if (!selectedOrder) return;
 
-    // Проверяем, что все количества совпадают
     const hasDiscrepancies = receiptItems.some(
       item => item.receivedQuantity !== item.expectedQuantity
     );
@@ -107,7 +107,6 @@ export const WarehouseReceipt: React.FC = () => {
   const handleAcceptPartial = async () => {
     if (!selectedOrder) return;
 
-    // Проверяем, что есть расхождения
     const hasDiscrepancies = receiptItems.some(
       item => item.receivedQuantity !== item.expectedQuantity
     );
@@ -190,7 +189,6 @@ export const WarehouseReceipt: React.FC = () => {
       </div>
 
       {!selectedOrder ? (
-        // Список заявок на приёмку
         <div className="bg-white rounded-lg shadow">
           <div className="p-6 border-b border-gray-200">
             <h2 className="text-xl font-semibold flex items-center">
@@ -258,7 +256,6 @@ export const WarehouseReceipt: React.FC = () => {
           )}
         </div>
       ) : (
-        // Форма приёмки
         <div className="space-y-6">
           {/* Заголовок заявки */}
           <div className="bg-white rounded-lg shadow p-6">
