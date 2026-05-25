@@ -13,6 +13,10 @@ type SupplierCardsProps = {
   selectedProduct: Product | null;
   onRefresh: () => void;
   canEdit: boolean;
+  /** Если задан — карточка поставщика становится кликабельной (для master-detail UX) */
+  onSelectSupplier?: (supplier: Supplier) => void;
+  /** Подсветить выбранного поставщика */
+  selectedSupplierId?: number | null;
 };
 
 export const SupplierCards: React.FC<SupplierCardsProps> = ({
@@ -20,6 +24,8 @@ export const SupplierCards: React.FC<SupplierCardsProps> = ({
   selectedProduct,
   onRefresh,
   canEdit,
+  onSelectSupplier,
+  selectedSupplierId,
 }) => {
   const handleImgError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     const el = e.currentTarget;
@@ -166,8 +172,15 @@ export const SupplierCards: React.FC<SupplierCardsProps> = ({
                 ? supplier.products?.find(p => p.id === selectedProduct.id)?.ProductSupplier
                 : null;
 
+              const isSelected = selectedSupplierId === supplier.id;
               return (
-                <div key={supplier.id} className="card p-3 lg:p-4 hover:shadow-lg transition-shadow">
+                <div
+                  key={supplier.id}
+                  className={`card p-3 lg:p-4 hover:shadow-lg transition-shadow ${
+                    onSelectSupplier ? 'cursor-pointer' : ''
+                  } ${isSelected ? 'ring-2 ring-yellow-400' : ''}`}
+                  onClick={() => onSelectSupplier?.(supplier)}
+                >
                   {/* Изображение контейнера */}
                   <div className="mb-2 lg:mb-3">
                     {supplier.containerImage ? (
@@ -251,16 +264,22 @@ export const SupplierCards: React.FC<SupplierCardsProps> = ({
                   {/* Кнопки связи */}
                   <div className="flex space-x-2 mb-4">
                     <button
-                      onClick={() => handleWhatsApp(supplier.whatsapp || supplier.phone)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleWhatsApp(supplier.whatsapp || supplier.phone);
+                      }}
                       className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 px-3 rounded-lg flex items-center justify-center gap-2 text-sm font-medium transition-colors"
                       title="Написать в WhatsApp"
                     >
                       <MessageSquare className="h-4 w-4" />
                       WhatsApp
                     </button>
-                    
+
                     <button
-                      onClick={() => handleCall(supplier.phone)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCall(supplier.phone);
+                      }}
                       className="flex-1 bg-blue-500 hover:bg-blue-600 text-white py-2 px-3 rounded-lg flex items-center justify-center gap-2 text-sm font-medium transition-colors"
                       title="Позвонить"
                     >
@@ -279,7 +298,10 @@ export const SupplierCards: React.FC<SupplierCardsProps> = ({
                     <div className="flex items-center justify-between mb-2">
                       <div className="text-sm font-medium text-gray-700">Финансы</div>
                       <button
-                        onClick={() => setFinanceSupplier(supplier)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setFinanceSupplier(supplier);
+                        }}
                         className="text-blue-600 hover:text-blue-800 transition-colors"
                         title="Управление финансами"
                       >
@@ -311,7 +333,8 @@ export const SupplierCards: React.FC<SupplierCardsProps> = ({
                   {canEdit && (
                     <div className="flex justify-end space-x-2 pt-3 border-t border-gray-100">
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setEditingSupplier(supplier);
                         }}
                         className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
@@ -320,7 +343,8 @@ export const SupplierCards: React.FC<SupplierCardsProps> = ({
                         <Edit className="h-4 w-4" />
                       </button>
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setSupplierToDelete(supplier);
                         }}
                         className="p-2 text-gray-400 hover:text-red-600 transition-colors"

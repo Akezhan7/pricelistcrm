@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useUI } from '../context/UIContext';
 import {
   Home,
   Package,
@@ -17,7 +18,8 @@ import {
   FolderTree,
   Warehouse,
   ClipboardList,
-  PackageCheck
+  PackageCheck,
+  Tag,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -38,15 +40,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const [isCollapsed, setIsCollapsed] = useState(true);
+  const { isSidebarCollapsed: isCollapsed, toggleSidebar } = useUI();
   const [showUserMenu, setShowUserMenu] = useState(false);
-
-  useEffect(() => {
-    const event = new CustomEvent('sidebar-width-change', {
-      detail: { width: 80 }
-    });
-    window.dispatchEvent(event);
-  }, []);
 
   const menuItems: MenuItem[] = [
     {
@@ -60,6 +55,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
       label: 'Заявки',
       icon: <FileText className="w-5 h-5" />,
       path: '/orders',
+    },
+    {
+      id: 'products',
+      label: 'Товары',
+      icon: <Package className="w-5 h-5" />,
+      path: '/products',
+    },
+    {
+      id: 'suppliers',
+      label: 'Поставщики',
+      icon: <Truck className="w-5 h-5" />,
+      path: '/suppliers',
+    },
+    {
+      id: 'price-list',
+      label: 'Прайс',
+      icon: <Tag className="w-5 h-5" />,
+      path: '/price-list',
     },
     {
       id: 'stock',
@@ -86,18 +99,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
       icon: <PackageCheck className="w-5 h-5" />,
       path: '/warehouse/receipt',
       requiredRole: ['admin', 'warehouse_operator', 'purchase_manager'],
-    },
-    {
-      id: 'products',
-      label: 'Товары',
-      icon: <Package className="w-5 h-5" />,
-      path: '/dashboard',
-    },
-    {
-      id: 'suppliers',
-      label: 'Поставщики',
-      icon: <Truck className="w-5 h-5" />,
-      path: '/dashboard',
     },
     {
       id: 'map',
@@ -128,17 +129,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
     navigate(path);
   };
 
-  const toggleSidebar = () => {
-    const newCollapsed = !isCollapsed;
-    setIsCollapsed(newCollapsed);
-    const event = new CustomEvent('sidebar-width-change', {
-      detail: { width: newCollapsed ? 80 : 256 }
-    });
-    window.dispatchEvent(event);
-  };
-
   const isActivePath = (path: string) => {
-    return location.pathname === path;
+    return location.pathname === path || location.pathname.startsWith(path + '/');
   };
 
   const getRoleLabel = (role?: string) => {

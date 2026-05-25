@@ -24,6 +24,7 @@ class OrdersApi {
       if (filters.dateFrom) params.append('dateFrom', filters.dateFrom);
       if (filters.dateTo) params.append('dateTo', filters.dateTo);
       if (filters.search) params.append('search', filters.search);
+      if (filters.type) params.append('type', filters.type);
     }
 
     const url = params.toString() ? `${this.baseUrl}?${params}` : this.baseUrl;

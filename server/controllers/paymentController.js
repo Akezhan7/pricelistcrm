@@ -216,7 +216,19 @@ const createPayment = async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
-    const { supplierId, amount, paymentDate, paymentMethod, comment, orderIds } = req.body;
+    let { supplierId, amount, paymentDate, paymentMethod, comment, orderIds } = req.body;
+
+    // При multipart/form-data из FormData orderIds может прийти как строка JSON
+    if (typeof orderIds === 'string') {
+      try {
+        orderIds = JSON.parse(orderIds);
+      } catch (e) {
+        orderIds = [];
+      }
+    }
+
+    // Чек (файл) сохраняется опционально multer-ом в req.file
+    const receiptUrl = req.file ? `/uploads/${req.file.filename}` : null;
 
     // Валидация входных данных
     if (!supplierId || !amount) {
@@ -280,7 +292,8 @@ const createPayment = async (req, res) => {
       paymentMethod: paymentMethod || 'Наличные',
       comment: comment || null,
       createdBy: req.user.id,
-      relatedOrderIds: validOrderIds
+      relatedOrderIds: validOrderIds,
+      receiptUrl
     }, { transaction });
 
     // Если указаны конкретные заказы, распределяем платеж по ним

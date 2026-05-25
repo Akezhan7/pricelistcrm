@@ -337,10 +337,10 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
               )}
 
               {/* Предупреждение о статусе */}
-              {order.status !== 'Создана' && order.status !== 'Отправлена поставщику' && (
+              {!['Создана', 'Отправлена поставщику', 'Частично подтверждена', 'Подтверждена'].includes(order.status) && (
                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                   <p className="text-yellow-800 text-sm">
-                    ⚠️ <strong>Внимание:</strong> Эта заявка имеет статус "{order.status}". 
+                    ⚠️ <strong>Внимание:</strong> Эта заявка имеет статус "{order.status}".
                     Редактирование может быть ограничено системными правилами.
                   </p>
                 </div>

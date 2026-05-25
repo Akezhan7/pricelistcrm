@@ -358,38 +358,38 @@ const OrderDetails: React.FC = () => {
 
             {/* Кнопки действий */}
             <div className="flex items-center gap-2 flex-wrap">
-              {/* Основные действия по статусу */}
-              {order.status === 'Создана' && (
-                <>
-                  {canEditOrders && order.supplier?.whatsapp && (
-                    <button
-                      onClick={handleSendToWhatsApp}
-                      disabled={whatsappLoading}
-                      className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      <Send className="w-4 h-4" />
-                      {whatsappLoading ? 'Загрузка...' : 'WhatsApp'}
-                    </button>
-                  )}
-                  {canEditOrders && (
-                    <button
-                      onClick={() => setShowEditOrderModal(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                    >
-                      <Edit className="w-4 h-4" />
-                      Редактировать
-                    </button>
-                  )}
-                  {canDeleteOrders && (
-                    <button
-                      onClick={handleDelete}
-                      className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                      Удалить
-                    </button>
-                  )}
-                </>
+              {/* WhatsApp — пока заявка ещё не отправлена поставщику */}
+              {canEditOrders && order.status === 'Создана' && order.supplier?.whatsapp && (
+                <button
+                  onClick={handleSendToWhatsApp}
+                  disabled={whatsappLoading}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <Send className="w-4 h-4" />
+                  {whatsappLoading ? 'Загрузка...' : 'WhatsApp'}
+                </button>
+              )}
+
+              {/* Редактирование заявки разрешено до подтверждения включительно */}
+              {canEditOrders &&
+                ['Создана', 'Отправлена поставщику', 'Частично подтверждена', 'Подтверждена'].includes(order.status) && (
+                  <button
+                    onClick={() => setShowEditOrderModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                  >
+                    <Edit className="w-4 h-4" />
+                    Редактировать
+                  </button>
+                )}
+
+              {canDeleteOrders && order.status === 'Создана' && (
+                <button
+                  onClick={handleDelete}
+                  className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Удалить
+                </button>
               )}
 
               {canConfirmOrders && order.status === 'Отправлена поставщику' && (

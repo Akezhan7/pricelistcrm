@@ -1,15 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Search, Loader2, AlertCircle, Package, PlusCircle } from 'lucide-react';
+import { X, Plus, Trash2, Search, Loader2, AlertCircle, Package, PlusCircle, Undo2 } from 'lucide-react';
 import ordersApi from '../services/ordersApi';
 import suppliersApi from '../services/suppliersApi';
 import productsApi from '../services/productsApi';
 import api from '../utils/api';
-import type { Supplier, Product, CreateOrderDto, ProductVariation } from '../types';
+import type { Supplier, Product, CreateOrderDto, ProductVariation, OrderType } from '../types';
+
+export interface CreateOrderInitialItem {
+  productId: number;
+  quantity?: number;
+  priceAtPurchase?: number;
+  notes?: string;
+}
 
 interface CreateOrderModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  /** Тип создаваемого документа: заявка (по умолчанию) или возврат. */
+  type?: OrderType;
+  /** Предзаполненный поставщик (например, при создании заявки прямо из карточки поставщика). */
+  initialSupplierId?: number | null;
+  /** Предзаполненный список товаров. Если у товара есть costPrice, используется как priceAtPurchase. */
+  initialItems?: CreateOrderInitialItem[];
 }
 
 interface OrderItemForm {
@@ -23,8 +36,16 @@ interface OrderItemForm {
   uniqueKey?: string;
 }
 
-const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const [supplierId, setSupplierId] = useState<number | null>(null);
+const CreateOrderModal: React.FC<CreateOrderModalProps> = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  type = 'purchase',
+  initialSupplierId = null,
+  initialItems,
+}) => {
+  const isReturn = type === 'return';
+  const [supplierId, setSupplierId] = useState<number | null>(initialSupplierId ?? null);
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('');
   const [deliveryLocation, setDeliveryLocation] = useState('Точка Байсад');
   const [notes, setNotes] = useState('');
@@ -45,7 +66,15 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ isOpen, onClose, on
     if (isOpen) {
       loadInitialData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
+
+  // Когда меняется initialSupplierId извне (например, открыли модалку из другой карточки)
+  useEffect(() => {
+    if (isOpen && initialSupplierId) {
+      setSupplierId(initialSupplierId);
+    }
+  }, [isOpen, initialSupplierId]);
 
   const loadInitialData = async () => {
     try {
@@ -55,13 +84,38 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ isOpen, onClose, on
         suppliersApi.getSuppliers({ isActive: true }),
         productsApi.getProducts({ isActive: true })
       ]);
-      
+
       const suppliersArray = Array.isArray(suppliersData) ? suppliersData : [];
       const productsArray = Array.isArray(productsData) ? productsData : [];
-      
+
       setSuppliers(suppliersArray);
       setProducts(productsArray);
       setFilteredProducts(productsArray);
+
+      // Префилл стартовых товаров (для быстрого формирования заявки/возврата)
+      if (initialItems && initialItems.length > 0) {
+        const prefilled: OrderItemForm[] = initialItems
+          .map((init) => {
+            const product = productsArray.find((p) => p.id === init.productId);
+            if (!product) return null;
+            return {
+              productId: product.id,
+              product,
+              productVariationId: null,
+              selectedVariation: null,
+              quantity: init.quantity && init.quantity > 0 ? init.quantity : 1,
+              priceAtPurchase:
+                typeof init.priceAtPurchase === 'number'
+                  ? init.priceAtPurchase
+                  : Number(product.costPrice) || 0,
+              notes: init.notes || '',
+              uniqueKey: `product-${product.id}-main-${Date.now()}-${Math.random()}`,
+            } as OrderItemForm;
+          })
+          .filter(Boolean) as OrderItemForm[];
+
+        setItems(prefilled);
+      }
     } catch (err: any) {
       console.error('Ошибка загрузки данных:', err);
       setError(err.message || 'Ошибка загрузки данных');
@@ -203,6 +257,7 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ isOpen, onClose, on
 
       const orderData: CreateOrderDto = {
         supplierId: supplierId!,
+        type,
         expectedDeliveryDate: expectedDeliveryDate || undefined,
         deliveryLocation: deliveryLocation || undefined,
         notes: notes || undefined,
@@ -219,14 +274,14 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ isOpen, onClose, on
       onSuccess();
       handleClose();
     } catch (err: any) {
-      setError(err.message || 'Ошибка создания заявки');
+      setError(err.message || (isReturn ? 'Ошибка создания возврата' : 'Ошибка создания заявки'));
     } finally {
       setLoading(false);
     }
   };
 
   const handleClose = () => {
-    setSupplierId(null);
+    setSupplierId(initialSupplierId ?? null);
     setExpectedDeliveryDate('');
     setDeliveryLocation('Точка Байсад');
     setNotes('');
@@ -243,7 +298,10 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ isOpen, onClose, on
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Заголовок */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900">Создать новую заявку</h2>
+          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+            {isReturn && <Undo2 className="w-6 h-6 text-yellow-600" />}
+            {isReturn ? 'Оформить возврат' : 'Создать новую заявку'}
+          </h2>
           <button
             onClick={handleClose}
             className="text-gray-400 hover:text-gray-600 transition-colors"
@@ -549,12 +607,19 @@ const CreateOrderModal: React.FC<CreateOrderModalProps> = ({ isOpen, onClose, on
           <button
             onClick={handleSubmit}
             disabled={loading || loadingData}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            className={`px-6 py-2 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ${
+              isReturn ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-600 hover:bg-blue-700'
+            }`}
           >
             {loading ? (
               <>
                 <Loader2 className="w-5 h-5 animate-spin" />
-                Создание...
+                {isReturn ? 'Оформление...' : 'Создание...'}
+              </>
+            ) : isReturn ? (
+              <>
+                <Undo2 className="w-5 h-5" />
+                Оформить возврат
               </>
             ) : (
               <>

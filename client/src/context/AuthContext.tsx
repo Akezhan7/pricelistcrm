@@ -20,6 +20,8 @@ export type User = {
 type AuthContextType = {
   user: User | null;
   token: string | null;
+  /** false до чтения сессии из localStorage (чтобы не редиректить при F5) */
+  isAuthReady: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
@@ -30,12 +32,20 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
-    if (storedToken) setToken(storedToken);
-    if (storedUser) setUser(JSON.parse(storedUser));
+    try {
+      const storedToken = localStorage.getItem('token');
+      const storedUser = localStorage.getItem('user');
+      if (storedToken) setToken(storedToken);
+      if (storedUser) setUser(JSON.parse(storedUser));
+    } catch {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+    } finally {
+      setIsAuthReady(true);
+    }
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -64,7 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, isAuthReady, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

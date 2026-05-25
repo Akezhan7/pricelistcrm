@@ -4,6 +4,15 @@ const { body, param, query, validationResult } = require('express-validator');
 const paymentController = require('../controllers/paymentController');
 const { auth } = require('../middleware/auth');
 const checkRole = require('../middleware/checkRole');
+const { uploadReceipt, handleUploadError } = require('../middleware/upload');
+
+// Wrapper: ловит multer-ошибки и преобразует их в JSON-ответ
+const uploadReceiptSafe = (req, res, next) => {
+  uploadReceipt.single('receipt')(req, res, (err) => {
+    if (err) return handleUploadError(err, req, res, next);
+    next();
+  });
+};
 
 // Middleware для обработки ошибок валидации
 const handleValidationErrors = (req, res, next) => {
@@ -19,6 +28,7 @@ const handleValidationErrors = (req, res, next) => {
 };
 
 // Валидация для создания платежа
+// При multipart/form-data orderIds приходит как строка JSON (парсится в контроллере)
 const validateCreatePayment = [
   body('supplierId')
     .isInt({ min: 1 })
@@ -38,14 +48,6 @@ const validateCreatePayment = [
     .optional()
     .isLength({ max: 1000 })
     .withMessage('Комментарий не должен превышать 1000 символов'),
-  body('orderIds')
-    .optional()
-    .isArray()
-    .withMessage('orderIds должен быть массивом'),
-  body('orderIds.*')
-    .optional()
-    .isInt({ min: 1 })
-    .withMessage('ID заказа должен быть положительным числом')
 ];
 
 // Валидация для обновления платежа
@@ -163,9 +165,11 @@ router.get('/:id',
  *   - comment: комментарий (опционально)
  *   - orderIds: массив ID заказов для оплаты (опционально, если не указан - автоматическое распределение)
  */
-router.post('/', 
-  auth, 
+router.post('/',
+  auth,
   checkRole(['admin', 'accountant', 'purchase_manager']),
+  // multer должен отработать до валидаторов, иначе req.body не будет распарсен из multipart
+  uploadReceiptSafe,
   ...validateCreatePayment,
   handleValidationErrors,
   paymentController.createPayment

@@ -1,6 +1,7 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { UIProvider } from './context/UIContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
@@ -13,19 +14,38 @@ import { Categories } from './pages/Categories';
 import { CollectorTasks } from './pages/CollectorTasks';
 import { WarehouseReceipt } from './pages/WarehouseReceipt';
 import { Users } from './pages/Users';
+import { ProductsPage } from './pages/ProductsPage';
+import { SuppliersPage } from './pages/SuppliersPage';
+import { SupplierDetailsPage } from './pages/SupplierDetailsPage';
+import { PriceListPage } from './pages/PriceListPage';
+
+/** Уже авторизован — уходим с /login, сохраняя целевой URL после редиректа с защищённой страницы */
+const RedirectIfAuthenticated: React.FC = () => {
+  const location = useLocation();
+  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
+  return <Navigate to={from || '/dashboard'} replace />;
+};
 
 const AppRoutes: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isAuthReady } = useAuth();
+
+  if (!isAuthReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-yellow-500" />
+      </div>
+    );
+  }
 
   return (
     <Routes>
       <Route 
         path="/login" 
-        element={user ? <Navigate to="/" replace /> : <Login />} 
+        element={user ? <RedirectIfAuthenticated /> : <Login />} 
       />
       <Route 
         path="/register" 
-        element={user ? <Navigate to="/" replace /> : <Register />} 
+        element={user ? <RedirectIfAuthenticated /> : <Register />} 
       />
       
       <Route
@@ -63,7 +83,43 @@ const AppRoutes: React.FC = () => {
           </ProtectedRoute>
         }
       />
-      
+
+      <Route
+        path="/products"
+        element={
+          <ProtectedRoute>
+            <ProductsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/suppliers"
+        element={
+          <ProtectedRoute>
+            <SuppliersPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/suppliers/:id"
+        element={
+          <ProtectedRoute>
+            <SupplierDetailsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/price-list"
+        element={
+          <ProtectedRoute>
+            <PriceListPage />
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/map"
         element={
@@ -127,9 +183,11 @@ const AppRoutes: React.FC = () => {
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <AppRoutes />
-      </Router>
+      <UIProvider>
+        <Router>
+          <AppRoutes />
+        </Router>
+      </UIProvider>
     </AuthProvider>
   );
 }

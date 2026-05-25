@@ -1,5 +1,6 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 type ProtectedRouteProps = {
@@ -11,8 +12,16 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children, 
   requireRole 
 }) => {
-  const { user } = useAuth();
+  const { user, isAuthReady } = useAuth();
   const location = useLocation();
+
+  if (!isAuthReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <Loader2 className="h-10 w-10 animate-spin text-yellow-500" />
+      </div>
+    );
+  }
 
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />;

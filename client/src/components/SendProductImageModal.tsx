@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Send, Image as ImageIcon } from 'lucide-react';
 import { Product, Supplier } from '../types';
 import suppliersApi from '../services/suppliersApi';
+import getImageUrl from '../utils/image';
 
 interface SendProductImageModalProps {
   isOpen: boolean;
@@ -61,11 +62,9 @@ export const SendProductImageModal: React.FC<SendProductImageModalProps> = ({
     // Формируем текст сообщения
     let fullMessage = message;
 
-    // Если у товара есть изображение, добавляем ссылку
-    if (product.image) {
-      const imageUrl = product.image.startsWith('http')
-        ? product.image
-        : `${window.location.origin}/${product.image}`;
+    // Публичная ссылка на API (/uploads), без авторизации
+    const imageUrl = getImageUrl(product.image);
+    if (imageUrl) {
       fullMessage += `\n\nФото: ${imageUrl}`;
     }
 
@@ -116,7 +115,7 @@ export const SendProductImageModal: React.FC<SendProductImageModalProps> = ({
             <div className="flex items-start gap-4">
               {product.image ? (
                 <img
-                  src={product.image}
+                  src={getImageUrl(product.image) || undefined}
                   alt={product.name}
                   className="w-24 h-24 object-cover rounded-lg border border-gray-200"
                 />

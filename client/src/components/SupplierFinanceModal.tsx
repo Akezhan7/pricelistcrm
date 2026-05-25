@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, CreditCard, MessageSquare } from 'lucide-react';
+import { X, Plus, CreditCard, MessageSquare, Paperclip, FileText } from 'lucide-react';
 import { createPayment, getPaymentsBySupplier, formatPaymentAmount, formatPaymentDate, getPaymentMethodIcon, getPaymentMethodColor, type CreatePaymentData, type SupplierPaymentData } from '../services/paymentsApi';
+import getImageUrl from '../utils/image';
 
 interface SupplierFinanceModalProps {
   isOpen: boolean;
@@ -31,6 +32,7 @@ export const SupplierFinanceModal: React.FC<SupplierFinanceModalProps> = ({
   
   const [selectedOrders, setSelectedOrders] = useState<number[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
@@ -60,6 +62,7 @@ export const SupplierFinanceModal: React.FC<SupplierFinanceModalProps> = ({
       comment: '',
     });
     setSelectedOrders([]);
+    setReceiptFile(null);
     onClose();
   };
 
@@ -98,11 +101,12 @@ export const SupplierFinanceModal: React.FC<SupplierFinanceModalProps> = ({
       await createPayment({
         ...paymentForm,
         orderIds: selectedOrders.length > 0 ? selectedOrders : undefined,
+        receipt: receiptFile || undefined,
       });
-      
+
       // Перезагрузить данные
       await loadSupplierData();
-      
+
       // Сбросить форму
       setShowAddPayment(false);
       setPaymentForm({
@@ -112,7 +116,8 @@ export const SupplierFinanceModal: React.FC<SupplierFinanceModalProps> = ({
         comment: '',
       });
       setSelectedOrders([]);
-      
+      setReceiptFile(null);
+
       onSuccess?.();
     } catch (error) {
       console.error('Ошибка создания платежа:', error);
@@ -237,6 +242,41 @@ export const SupplierFinanceModal: React.FC<SupplierFinanceModalProps> = ({
                       />
                     </div>
 
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Чек (необязательно)
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-sm transition-colors">
+                          <Paperclip className="h-4 w-4 text-gray-500" />
+                          <span className="text-gray-700">
+                            {receiptFile ? 'Заменить файл' : 'Прикрепить чек'}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*,application/pdf"
+                            className="hidden"
+                            onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
+                          />
+                        </label>
+                        {receiptFile && (
+                          <div className="flex items-center gap-2 text-sm text-gray-700">
+                            <FileText className="h-4 w-4 text-yellow-600" />
+                            <span className="truncate max-w-[200px]">{receiptFile.name}</span>
+                            <button
+                              type="button"
+                              onClick={() => setReceiptFile(null)}
+                              className="text-red-500 hover:text-red-700"
+                              title="Удалить файл"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Изображение или PDF, до 5 МБ</p>
+                    </div>
+
                     <div className="flex justify-end space-x-3">
                       <button
                         type="button"
@@ -358,6 +398,19 @@ export const SupplierFinanceModal: React.FC<SupplierFinanceModalProps> = ({
                         {payment.comment && (
                           <div className="mt-2 text-sm text-gray-600 bg-gray-50 p-2 rounded">
                             {payment.comment}
+                          </div>
+                        )}
+                        {payment.receiptUrl && (
+                          <div className="mt-2">
+                            <a
+                              href={getImageUrl(payment.receiptUrl) || '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 text-sm text-yellow-700 hover:text-yellow-800 bg-yellow-50 border border-yellow-200 px-2 py-1 rounded"
+                            >
+                              <FileText className="h-4 w-4" />
+                              Открыть чек
+                            </a>
                           </div>
                         )}
                       </div>

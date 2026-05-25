@@ -16,14 +16,15 @@ import {
   Send,
   CheckCircle,
   AlertTriangle,
-  Archive
+  Archive,
+  Undo2
 } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import ordersApi from '../services/ordersApi';
 import CreateOrderModal from '../components/CreateOrderModal';
 import PaymentModal from '../components/PaymentModal';
-import type { Order, OrderFilters, OrderStats, OrderStatus, PaymentStatus } from '../types';
+import type { Order, OrderFilters, OrderStats, OrderStatus, OrderType, PaymentStatus } from '../types';
 
 const Orders: React.FC = () => {
   const navigate = useNavigate();
@@ -37,6 +38,7 @@ const Orders: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createModalType, setCreateModalType] = useState<OrderType>('purchase');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
@@ -85,6 +87,15 @@ const Orders: React.FC = () => {
     setFilters(prev => ({ ...prev, paymentStatus, page: 1 }));
   };
 
+  const handleTypeFilter = (type?: OrderType) => {
+    setFilters(prev => ({ ...prev, type, page: 1 }));
+  };
+
+  const openCreateModal = (type: OrderType) => {
+    setCreateModalType(type);
+    setShowCreateModal(true);
+  };
+
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     loadOrders();
@@ -130,6 +141,7 @@ const Orders: React.FC = () => {
       'Отправлена поставщику': 'bg-blue-100 text-blue-800',
       'Частично подтверждена': 'bg-yellow-100 text-yellow-800',
       'Подтверждена': 'bg-green-100 text-green-800',
+      'Доставка': 'bg-orange-100 text-orange-800',
       'В сборе': 'bg-purple-100 text-purple-800',
       'Забрана': 'bg-indigo-100 text-indigo-800',
       'Принята на складе': 'bg-teal-100 text-teal-800',
@@ -153,6 +165,7 @@ const Orders: React.FC = () => {
       'Отправлена поставщику': <Send className="w-4 h-4" />,
       'Частично подтверждена': <AlertTriangle className="w-4 h-4" />,
       'Подтверждена': <CheckCircle className="w-4 h-4" />,
+      'Доставка': <Truck className="w-4 h-4" />,
       'В сборе': <Package className="w-4 h-4" />,
       'Забрана': <Truck className="w-4 h-4" />,
       'Принята на складе': <Warehouse className="w-4 h-4" />,
@@ -163,13 +176,14 @@ const Orders: React.FC = () => {
 
   return (
     <Layout>
-      {/* Модальное окно создания заявки */}
+      {/* Модальное окно создания заявки/возврата */}
       <CreateOrderModal
         isOpen={showCreateModal}
+        type={createModalType}
         onClose={() => setShowCreateModal(false)}
         onSuccess={() => {
           loadOrders();
-          alert('Заявка успешно создана!');
+          alert(createModalType === 'return' ? 'Возврат успешно оформлен!' : 'Заявка успешно создана!');
         }}
       />
 
@@ -206,13 +220,23 @@ const Orders: React.FC = () => {
               <RefreshCw className="w-5 h-5" />
             </button>
             {canCreateOrders && (
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors"
-              >
-                <Plus className="w-5 h-5" />
-                Создать заявку
-              </button>
+              <>
+                <button
+                  onClick={() => openCreateModal('return')}
+                  className="bg-black hover:bg-gray-800 text-white px-5 py-3 rounded-lg flex items-center gap-2 transition-colors"
+                  title="Оформить возврат поставщику"
+                >
+                  <Undo2 className="w-5 h-5" />
+                  Возврат
+                </button>
+                <button
+                  onClick={() => openCreateModal('purchase')}
+                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors"
+                >
+                  <Plus className="w-5 h-5" />
+                  Создать заявку
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -220,7 +244,7 @@ const Orders: React.FC = () => {
 
       {/* Статистика */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-6">
           <div 
             className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-gray-400"
             onClick={() => handleStatusFilter('Создана')}
@@ -273,7 +297,7 @@ const Orders: React.FC = () => {
             </div>
           </div>
           
-          <div 
+          <div
             className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-indigo-400"
             onClick={() => handleStatusFilter('Забрана')}
           >
@@ -285,8 +309,21 @@ const Orders: React.FC = () => {
               <Truck className="w-6 h-6 text-indigo-400" />
             </div>
           </div>
-          
-          <div 
+
+          <div
+            className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-orange-400"
+            onClick={() => handleStatusFilter('Доставка')}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-500 uppercase">Доставка</p>
+                <p className="text-2xl font-bold text-orange-600">{stats.delivery || 0}</p>
+              </div>
+              <Truck className="w-6 h-6 text-orange-400" />
+            </div>
+          </div>
+
+          <div
             className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-teal-400"
             onClick={() => handleStatusFilter('Принята на складе')}
           >
@@ -377,7 +414,7 @@ const Orders: React.FC = () => {
             Искать
           </button>
           
-          {(filters.status || filters.paymentStatus || filters.search) && (
+          {(filters.status || filters.paymentStatus || filters.type || filters.search) && (
             <button
               type="button"
               onClick={() => setFilters({ page: 1, limit: 20 })}
@@ -421,6 +458,37 @@ const Orders: React.FC = () => {
             }`}
           >
             Оплачено
+          </button>
+        </div>
+
+        {/* Фильтры по типу документа */}
+        <div className="flex gap-2 mt-3 items-center">
+          <span className="text-xs text-gray-500 uppercase tracking-wide mr-1">Тип:</span>
+          <button
+            onClick={() => handleTypeFilter(undefined)}
+            className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${
+              !filters.type ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Все
+          </button>
+          <button
+            onClick={() => handleTypeFilter('purchase')}
+            className={`px-3 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1 ${
+              filters.type === 'purchase' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <FileText className="w-3 h-3" />
+            Заявки
+          </button>
+          <button
+            onClick={() => handleTypeFilter('return')}
+            className={`px-3 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1 ${
+              filters.type === 'return' ? 'bg-yellow-500 text-black' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            <Undo2 className="w-3 h-3" />
+            Возвраты
           </button>
         </div>
       </div>
@@ -483,7 +551,15 @@ const Orders: React.FC = () => {
                     className="hover:bg-gray-50 cursor-pointer transition-colors"
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{order.orderNumber}</div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-900">{order.orderNumber}</span>
+                        {order.type === 'return' && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-yellow-100 text-yellow-800 border border-yellow-300" title="Возвратная накладная">
+                            <Undo2 className="w-3 h-3" />
+                            Возврат
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">{order.supplier?.name}</div>

@@ -48,6 +48,11 @@ const Payment = sequelize.define('Payment', {
     defaultValue: [],
     comment: 'Массив ID заявок, которые были оплачены этим платежом',
   },
+  receiptUrl: {
+    type: DataTypes.STRING(500),
+    allowNull: true,
+    comment: 'Путь к файлу чека (например /uploads/receipt-...)',
+  },
 }, {
   tableName: 'payments',
   timestamps: true,

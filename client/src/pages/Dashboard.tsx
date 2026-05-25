@@ -2,17 +2,21 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ProductList } from '../components/ProductList';
 import { SupplierCards } from '../components/SupplierCards';
+import { SupplierProductsPanel } from '../components/SupplierProductsPanel';
 import { BaysideMap } from '../components/BaysideMap';
 import { Layout } from '../components/Layout';
 import { Product, Supplier } from '../types';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
 import api from '../utils/api';
 
+const API_LIST_LIMIT = 1000;
+
 export const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showMap, setShowMap] = useState(false);
@@ -23,8 +27,8 @@ export const Dashboard: React.FC = () => {
       try {
         setLoading(true);
         const [productsRes, suppliersRes] = await Promise.all([
-          api.get('/products'),
-          api.get('/suppliers')
+          api.get(`/products?limit=${API_LIST_LIMIT}`),
+          api.get(`/suppliers?limit=${API_LIST_LIMIT}`)
         ]);
 
         setProducts(productsRes.data.data.products);
@@ -43,8 +47,8 @@ export const Dashboard: React.FC = () => {
   const refreshData = async () => {
     try {
       const [productsRes, suppliersRes] = await Promise.all([
-        api.get('/products'),
-        api.get('/suppliers')
+        api.get(`/products?limit=${API_LIST_LIMIT}`),
+        api.get(`/suppliers?limit=${API_LIST_LIMIT}`)
       ]);
 
       setProducts(productsRes.data.data.products);
@@ -64,6 +68,15 @@ export const Dashboard: React.FC = () => {
         return priceA - priceB;
       })
     : suppliers;
+
+  // При обновлении списка поставщиков подставляем актуальные данные в выбранного
+  useEffect(() => {
+    if (selectedSupplier) {
+      const fresh = suppliers.find((s) => s.id === selectedSupplier.id);
+      if (fresh) setSelectedSupplier(fresh);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suppliers]);
 
   if (loading) {
     return (
@@ -149,7 +162,11 @@ export const Dashboard: React.FC = () => {
           <div className="p-3 lg:p-4 border-b border-gray-200 bg-gray-50">
             <div className="flex items-center justify-between">
               <h2 className="text-base lg:text-lg font-semibold text-gray-900">
-                {selectedProduct ? (
+                {selectedSupplier ? (
+                  <>
+                    Товары поставщика: <span className="text-yellow-600">{selectedSupplier.name}</span>
+                  </>
+                ) : selectedProduct ? (
                   <>
                     Поставщики товара: <span className="text-blue-600">{selectedProduct.name}</span>
                   </>
@@ -157,14 +174,33 @@ export const Dashboard: React.FC = () => {
                   <>Все поставщики</>
                 )}
               </h2>
+              {selectedSupplier && (
+                <button
+                  onClick={() => setSelectedSupplier(null)}
+                  className="text-sm text-yellow-700 hover:text-yellow-800 transition-colors flex items-center gap-1"
+                >
+                  <ArrowLeft className="h-3 w-3" />
+                  К списку поставщиков
+                </button>
+              )}
             </div>
           </div>
-          <SupplierCards
-            suppliers={filteredSuppliers}
-            selectedProduct={selectedProduct}
-            onRefresh={refreshData}
-            canEdit={user?.role === 'admin' || user?.role === 'purchase_manager'}
-          />
+          {selectedSupplier ? (
+            <SupplierProductsPanel
+              supplier={selectedSupplier}
+              canCreate={user?.role === 'admin' || user?.role === 'purchase_manager'}
+              onOrderSuccess={refreshData}
+            />
+          ) : (
+            <SupplierCards
+              suppliers={filteredSuppliers}
+              selectedProduct={selectedProduct}
+              onRefresh={refreshData}
+              canEdit={user?.role === 'admin' || user?.role === 'purchase_manager'}
+              onSelectSupplier={(s) => setSelectedSupplier(s)}
+              selectedSupplierId={selectedSupplier ? (selectedSupplier as Supplier).id : null}
+            />
+          )}
         </div>
       </div>
     </Layout>

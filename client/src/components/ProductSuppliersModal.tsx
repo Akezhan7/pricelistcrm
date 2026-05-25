@@ -57,7 +57,7 @@ export const ProductSuppliersModal: React.FC<ProductSuppliersModalProps> = ({
 
   const loadAvailableSuppliers = async () => {
     try {
-      const response = await api.get('/suppliers');
+      const response = await api.get('/suppliers?limit=1000');
       setAvailableSuppliers(response.data.data.suppliers || []);
     } catch (error) {
       console.error('Ошибка загрузки поставщиков:', error);

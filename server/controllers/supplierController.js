@@ -1,6 +1,6 @@
 const { validationResult } = require('express-validator');
 const { Op } = require('sequelize');
-const { Supplier, Product, ProductSupplier, Market, Sector, Row } = require('../models');
+const { Supplier, Product, ProductSupplier, Market, Sector, Row, Order, Payment, User } = require('../models');
 const path = require('path');
 const fs = require('fs').promises;
 
@@ -477,6 +477,179 @@ const getSectors = async (req, res) => {
   }
 };
 
+/**
+ * Сверка с поставщиком за период.
+ * GET /api/suppliers/:id/reconciliation?from=YYYY-MM-DD&to=YYYY-MM-DD
+ *
+ * Возвращает:
+ *   - данные поставщика
+ *   - период
+ *   - opening_balance: сумма (totalAmount - paidAmount) активных заявок poставщика,
+ *     созданных до начала периода, минус сумма всех платежей до начала периода,
+ *     минус (totalAmount возвратов до начала периода).
+ *   - movements: список «строк» отчёта (orders type=purchase, orders type=return, payments),
+ *     отсортированный по дате asc.
+ *   - totals: сумма приходов (purchase), возвратов, оплат за период.
+ *   - closing_balance: opening + приход - возврат - оплата.
+ */
+const getReconciliation = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { from, to } = req.query;
+
+    const supplier = await Supplier.findOne({
+      where: { id, isActive: true },
+      attributes: ['id', 'name', 'phone', 'whatsapp', 'address', 'debt'],
+    });
+
+    if (!supplier) {
+      return res.status(404).json({
+        success: false,
+        message: 'Поставщик не найден',
+      });
+    }
+
+    const fromDate = from ? new Date(from) : null;
+    const toDate = to ? new Date(to) : null;
+    // Включаем конец дня для toDate
+    if (toDate) {
+      toDate.setHours(23, 59, 59, 999);
+    }
+
+    const periodWhere = {};
+    if (fromDate || toDate) {
+      periodWhere[Op.and] = [];
+      if (fromDate) periodWhere[Op.and].push({ createdAt: { [Op.gte]: fromDate } });
+      if (toDate) periodWhere[Op.and].push({ createdAt: { [Op.lte]: toDate } });
+    }
+
+    // 1) Заявки на поставку и возвраты за период
+    const orders = await Order.findAll({
+      where: {
+        supplierId: id,
+        isActive: true,
+        ...periodWhere,
+      },
+      attributes: ['id', 'orderNumber', 'type', 'totalAmount', 'paidAmount', 'status', 'createdAt'],
+      order: [['createdAt', 'ASC']],
+    });
+
+    // 2) Платежи за период
+    const paymentsWhere = { supplierId: id };
+    if (fromDate || toDate) {
+      paymentsWhere[Op.and] = [];
+      if (fromDate) paymentsWhere[Op.and].push({ paymentDate: { [Op.gte]: fromDate } });
+      if (toDate) paymentsWhere[Op.and].push({ paymentDate: { [Op.lte]: toDate } });
+    }
+    const payments = await Payment.findAll({
+      where: paymentsWhere,
+      attributes: ['id', 'amount', 'paymentMethod', 'comment', 'paymentDate', 'receiptUrl'],
+      order: [['paymentDate', 'ASC']],
+    });
+
+    // 3) Расчёт открывающего сальдо: всё, что было до from
+    let openingBalance = 0;
+    if (fromDate) {
+      const beforeOrders = await Order.findAll({
+        where: {
+          supplierId: id,
+          isActive: true,
+          createdAt: { [Op.lt]: fromDate },
+        },
+        attributes: ['totalAmount', 'type'],
+      });
+
+      const beforePayments = await Payment.findAll({
+        where: {
+          supplierId: id,
+          paymentDate: { [Op.lt]: fromDate },
+        },
+        attributes: ['amount'],
+      });
+
+      const ordersPurchaseSum = beforeOrders
+        .filter((o) => o.type !== 'return')
+        .reduce((s, o) => s + parseFloat(o.totalAmount), 0);
+      const ordersReturnSum = beforeOrders
+        .filter((o) => o.type === 'return')
+        .reduce((s, o) => s + parseFloat(o.totalAmount), 0);
+      const paymentsSum = beforePayments.reduce((s, p) => s + parseFloat(p.amount), 0);
+
+      // Долг перед поставщиком на начало периода
+      openingBalance = ordersPurchaseSum - ordersReturnSum - paymentsSum;
+    }
+
+    // 4) Формируем единый список движений
+    const movements = [
+      ...orders.map((o) => ({
+        date: o.createdAt,
+        kind: o.type === 'return' ? 'return' : 'purchase',
+        documentNumber: o.orderNumber,
+        purchase: o.type === 'return' ? 0 : parseFloat(o.totalAmount),
+        returned: o.type === 'return' ? parseFloat(o.totalAmount) : 0,
+        payment: 0,
+        comment: o.status,
+      })),
+      ...payments.map((p) => ({
+        date: p.paymentDate,
+        kind: 'payment',
+        documentNumber: `PAY-${p.id}`,
+        purchase: 0,
+        returned: 0,
+        payment: parseFloat(p.amount),
+        comment: [p.paymentMethod, p.comment].filter(Boolean).join(' · '),
+        receiptUrl: p.receiptUrl || null,
+      })),
+    ];
+
+    movements.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    // 5) Подсчёт running balance и итогов
+    let running = openingBalance;
+    const enriched = movements.map((m) => {
+      running = running + m.purchase - m.returned - m.payment;
+      return { ...m, balance: Number(running.toFixed(2)) };
+    });
+
+    const totals = movements.reduce(
+      (acc, m) => ({
+        purchase: acc.purchase + m.purchase,
+        returned: acc.returned + m.returned,
+        payment: acc.payment + m.payment,
+      }),
+      { purchase: 0, returned: 0, payment: 0 }
+    );
+
+    const closingBalance = openingBalance + totals.purchase - totals.returned - totals.payment;
+
+    res.json({
+      success: true,
+      data: {
+        supplier,
+        period: {
+          from: from || null,
+          to: to || null,
+        },
+        openingBalance: Number(openingBalance.toFixed(2)),
+        closingBalance: Number(closingBalance.toFixed(2)),
+        totals: {
+          purchase: Number(totals.purchase.toFixed(2)),
+          returned: Number(totals.returned.toFixed(2)),
+          payment: Number(totals.payment.toFixed(2)),
+        },
+        movements: enriched,
+      },
+    });
+  } catch (error) {
+    console.error('Ошибка формирования сверки:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка формирования сверки',
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   getAllSuppliers,
   getSupplierById,
@@ -485,4 +658,5 @@ module.exports = {
   deleteSupplier,
   deleteSupplierPermanently,
   getSectors,
+  getReconciliation,
 };

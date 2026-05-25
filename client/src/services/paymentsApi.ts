@@ -9,6 +9,7 @@ export interface Payment {
   comment?: string;
   createdBy: number;
   relatedOrderIds: number[];
+  receiptUrl?: string | null;
   createdAt: string;
   updatedAt: string;
   supplier?: {
@@ -31,6 +32,8 @@ export interface CreatePaymentData {
   paymentMethod?: 'Наличные' | 'Перевод' | 'Карта' | 'Другое';
   comment?: string;
   orderIds?: number[];
+  /** Файл чека (PDF или изображение). Если указан — запрос будет multipart/form-data. */
+  receipt?: File | null;
 }
 
 export interface UpdatePaymentData {
@@ -102,7 +105,27 @@ export const getPaymentById = async (id: number): Promise<Payment> => {
 };
 
 export const createPayment = async (data: CreatePaymentData): Promise<Payment> => {
-  const response = await api.post('/payments', data);
+  // Если есть файл чека — используем multipart/form-data, иначе обычный JSON.
+  if (data.receipt) {
+    const formData = new FormData();
+    formData.append('supplierId', String(data.supplierId));
+    formData.append('amount', String(data.amount));
+    if (data.paymentDate) formData.append('paymentDate', data.paymentDate);
+    if (data.paymentMethod) formData.append('paymentMethod', data.paymentMethod);
+    if (data.comment) formData.append('comment', data.comment);
+    if (data.orderIds && data.orderIds.length > 0) {
+      formData.append('orderIds', JSON.stringify(data.orderIds));
+    }
+    formData.append('receipt', data.receipt);
+
+    const response = await api.post('/payments', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data.data;
+  }
+
+  const { receipt, ...payload } = data;
+  const response = await api.post('/payments', payload);
   return response.data.data;
 };
 

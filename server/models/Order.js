@@ -11,7 +11,7 @@ const Order = sequelize.define('Order', {
     type: DataTypes.STRING(50),
     allowNull: false,
     unique: true,
-    comment: 'Уникальный номер заявки (например, ORD-2025-0001)',
+    comment: 'Уникальный номер заявки (например, ORD-260521-003)',
   },
   supplierId: {
     type: DataTypes.INTEGER,
@@ -53,6 +53,7 @@ const Order = sequelize.define('Order', {
       'Отправлена поставщику',
       'Частично подтверждена',
       'Подтверждена',
+      'Доставка',
       'В сборе',
       'Забрана',
       'Принята на складе',
@@ -61,6 +62,12 @@ const Order = sequelize.define('Order', {
     allowNull: false,
     defaultValue: 'Создана',
     comment: 'Статус выполнения заявки',
+  },
+  type: {
+    type: DataTypes.ENUM('purchase', 'return'),
+    allowNull: false,
+    defaultValue: 'purchase',
+    comment: 'Тип документа: purchase — заявка на поставку, return — возвратная накладная',
   },
   paymentStatus: {
     type: DataTypes.ENUM('Не оплачено', 'Частично оплачено', 'Оплачено'),
@@ -119,6 +126,10 @@ const Order = sequelize.define('Order', {
     {
       fields: ['created_at'],
       name: 'orders_created_at_idx',
+    },
+    {
+      fields: ['type'],
+      name: 'orders_type_idx',
     },
   ],
 });

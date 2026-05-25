@@ -23,30 +23,76 @@ const calculatePaymentStatus = (order) => {
   }
 };
 
+/** Часовой пояс для даты в номере заявки (можно переопределить в .env) */
+const ORDER_NUMBER_TIMEZONE = process.env.ORDER_NUMBER_TIMEZONE || 'Asia/Almaty';
+
 /**
- * Генерация уникального номера заявки в формате ORD-YYYY-NNNN 
+ * Ключ даты для номера: ГГММДД (например 260521)
  */
-const generateOrderNumber = async () => {
-  const year = new Date().getFullYear();
-  const prefix = `ORD-${year}-`;
-  
-  // Найти последнюю заявку текущего года
+const getOrderDateKey = (date = new Date()) => {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: ORDER_NUMBER_TIMEZONE,
+    year: '2-digit',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+
+  const year = parts.find((p) => p.type === 'year')?.value ?? '00';
+  const month = parts.find((p) => p.type === 'month')?.value ?? '01';
+  const day = parts.find((p) => p.type === 'day')?.value ?? '01';
+
+  return `${year}${month}${day}`;
+};
+
+/**
+ * Следующий порядковый номер за день: ORD-ГГММДД-NNN (например ORD-260521-003).
+ * Возвраты используют тот же формат.
+ */
+const buildNextOrderNumberCandidate = async () => {
+  const dateKey = getOrderDateKey();
+  const prefix = `ORD-${dateKey}-`;
+
   const lastOrder = await Order.findOne({
     where: {
       orderNumber: {
-        [Op.like]: `${prefix}%`
-      }
+        [Op.like]: `${prefix}%`,
+      },
     },
-    order: [['createdAt', 'DESC']]
+    order: [['orderNumber', 'DESC']],
+    attributes: ['orderNumber'],
   });
-  
+
   let nextNumber = 1;
-  if (lastOrder) {
-    const lastNumber = parseInt(lastOrder.orderNumber.split('-')[2]);
-    nextNumber = lastNumber + 1;
+  if (lastOrder?.orderNumber) {
+    const seqPart = lastOrder.orderNumber.slice(prefix.length);
+    const lastSeq = parseInt(seqPart, 10);
+    if (!Number.isNaN(lastSeq)) {
+      nextNumber = lastSeq + 1;
+    }
   }
-  
-  return `${prefix}${String(nextNumber).padStart(4, '0')}`;
+
+  if (nextNumber > 999) {
+    throw new Error('Превышен лимит номеров заявок за день (999)');
+  }
+
+  return `${prefix}${String(nextNumber).padStart(3, '0')}`;
+};
+
+const generateOrderNumber = async () => {
+  const maxAttempts = 5;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const candidate = await buildNextOrderNumberCandidate();
+    const exists = await Order.findOne({
+      where: { orderNumber: candidate },
+      attributes: ['id'],
+    });
+    if (!exists) {
+      return candidate;
+    }
+  }
+
+  throw new Error('Не удалось сгенерировать уникальный номер заявки');
 };
 
 /**
@@ -61,6 +107,7 @@ exports.getOrders = async (req, res) => {
       status,
       paymentStatus,
       supplierId,
+      type,
       dateFrom,
       dateTo,
       search
@@ -79,6 +126,10 @@ exports.getOrders = async (req, res) => {
 
     if (supplierId) {
       where.supplierId = parseInt(supplierId);
+    }
+
+    if (type) {
+      where.type = type;
     }
 
     if (search) {
@@ -136,6 +187,8 @@ exports.getOrders = async (req, res) => {
         [sequelize.fn('COUNT', sequelize.literal('CASE WHEN status = \'В сборе\' THEN 1 END')), 'inCollection'],
         // Товар забран у поставщика
         [sequelize.fn('COUNT', sequelize.literal('CASE WHEN status = \'Забрана\' THEN 1 END')), 'collected'],
+        // В пути / доставка
+        [sequelize.fn('COUNT', sequelize.literal('CASE WHEN status = \'Доставка\' THEN 1 END')), 'delivery'],
         // Принято на складе
         [sequelize.fn('COUNT', sequelize.literal('CASE WHEN status = \'Принята на складе\' THEN 1 END')), 'received'],
         // Закрытые заявки
@@ -168,11 +221,12 @@ exports.getOrders = async (req, res) => {
           confirmed: parseInt(statsResult.confirmed || 0),
           inCollection: parseInt(statsResult.inCollection || 0),
           collected: parseInt(statsResult.collected || 0),
+          delivery: parseInt(statsResult.delivery || 0),
           received: parseInt(statsResult.received || 0),
           closed: parseInt(statsResult.closed || 0),
           // Агрегированные показатели для удобства
           pending: parseInt(statsResult.created || 0) + parseInt(statsResult.sentToSupplier || 0),
-          inProgress: parseInt(statsResult.confirmed || 0) + parseInt(statsResult.inCollection || 0) + parseInt(statsResult.collected || 0),
+          inProgress: parseInt(statsResult.confirmed || 0) + parseInt(statsResult.inCollection || 0) + parseInt(statsResult.collected || 0) + parseInt(statsResult.delivery || 0),
           completed: parseInt(statsResult.received || 0) + parseInt(statsResult.closed || 0),
           // Финансовые показатели
           totalAmount: totalAmount.toFixed(2),
@@ -275,7 +329,8 @@ exports.createOrder = async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
-    const { supplierId, expectedDeliveryDate, deliveryLocation, notes, items } = req.body;
+    const { supplierId, expectedDeliveryDate, deliveryLocation, notes, items, type } = req.body;
+    const orderType = type === 'return' ? 'return' : 'purchase';
 
     // Проверка существования поставщика
     const supplier = await Supplier.findByPk(supplierId);
@@ -341,6 +396,7 @@ exports.createOrder = async (req, res) => {
     const order = await Order.create({
       orderNumber,
       supplierId,
+      type: orderType,
       expectedDeliveryDate: expectedDeliveryDate || null,
       deliveryLocation: deliveryLocation || 'Точка Байсад',
       totalAmount: totalAmount.toFixed(2),
@@ -371,7 +427,7 @@ exports.createOrder = async (req, res) => {
       oldStatus: null,
       newStatus: 'Создана',
       changedBy: req.user.id,
-      comment: 'Заявка создана',
+      comment: orderType === 'return' ? 'Возвратная накладная создана' : 'Заявка создана',
       changedAt: new Date()
     }, { transaction });
 
@@ -450,8 +506,8 @@ exports.updateOrder = async (req, res) => {
       });
     }
 
-    // Проверка, что заявку можно редактировать (статусы до подтверждения)
-    const editableStatuses = ['Создана', 'Отправлена поставщику', 'Частично подтверждена'];
+    // Проверка, что заявку можно редактировать (до того, как товар отправился в доставку/склад)
+    const editableStatuses = ['Создана', 'Отправлена поставщику', 'Частично подтверждена', 'Подтверждена'];
     if (!editableStatuses.includes(order.status)) {
       await transaction.rollback();
       return res.status(409).json({
@@ -605,6 +661,7 @@ exports.changeOrderStatus = async (req, res) => {
       'Отправлена поставщику',
       'Частично подтверждена',
       'Подтверждена',
+      'Доставка',
       'В сборе',
       'Забрана',
       'Принята на складе',
@@ -650,11 +707,12 @@ exports.changeOrderStatus = async (req, res) => {
     const statusFlow = {
       'Создана': ['Отправлена поставщику', 'Закрыта'],
       'Отправлена поставщику': ['Подтверждена', 'Частично подтверждена', 'Создана', 'Закрыта'],
-      'Частично подтверждена': ['Подтверждена', 'В сборе', 'Отправлена поставщику', 'Закрыта'],
-      'Подтверждена': ['В сборе', 'Частично подтверждена', 'Закрыта'],
-      'В сборе': ['Забрана', 'Подтверждена', 'Закрыта'],
-      'Забрана': ['Принята на складе', 'В сборе', 'Закрыта'],
-      'Принята на складе': ['Закрыта', 'Забрана'],
+      'Частично подтверждена': ['Подтверждена', 'В сборе', 'Доставка', 'Отправлена поставщику', 'Закрыта'],
+      'Подтверждена': ['В сборе', 'Доставка', 'Частично подтверждена', 'Закрыта'],
+      'Доставка': ['Принята на складе', 'Подтверждена', 'Закрыта'],
+      'В сборе': ['Забрана', 'Доставка', 'Подтверждена', 'Закрыта'],
+      'Забрана': ['Принята на складе', 'Доставка', 'В сборе', 'Закрыта'],
+      'Принята на складе': ['Закрыта', 'Забрана', 'Доставка'],
       'Закрыта': [] // Из закрытой заявки нельзя перейти никуда
     };
 
@@ -668,11 +726,16 @@ exports.changeOrderStatus = async (req, res) => {
         'Отправлена поставщику → Создана',
         'Частично подтверждена → Подтверждена',
         'Частично подтверждена → В сборе',
+        'Частично подтверждена → Доставка',
         'Частично подтверждена → Отправлена поставщику',
         'Подтверждена → В сборе',
+        'Подтверждена → Доставка',
         'Подтверждена → Частично подтверждена',
+        'Доставка → Принята на складе',
+        'Доставка → Подтверждена',
       ],
       'warehouse_operator': [
+        'Доставка → Принята на складе',
         'Забрана → Принята на складе',
         'Принята на складе → Закрыта',
       ],
@@ -681,6 +744,8 @@ exports.changeOrderStatus = async (req, res) => {
       ],
       'driver': [
         'В сборе → Забрана',
+        'Забрана → Доставка',
+        'Доставка → Принята на складе',
         'Забрана → Принята на складе',
       ],
     };
@@ -1282,7 +1347,7 @@ exports.sendToWhatsApp = async (req, res) => {
           oldStatus,
           newStatus: 'Отправлена поставщику',
           changedBy: req.user.id,
-          notes: 'Отправлено в WhatsApp',
+          comment: 'Отправлено в WhatsApp',
         },
         { transaction }
       );
@@ -1378,7 +1443,7 @@ exports.confirmOrder = async (req, res) => {
           oldStatus,
           newStatus: 'Подтверждена',
           changedBy: req.user.id,
-          notes: notes || 'Заявка полностью подтверждена поставщиком',
+          comment: notes || 'Заявка полностью подтверждена поставщиком',
         },
         { transaction }
       );
@@ -1479,7 +1544,7 @@ exports.partialConfirmOrder = async (req, res) => {
           oldStatus,
           newStatus,
           changedBy: req.user.id,
-          notes: notes || 'Заявка частично подтверждена поставщиком',
+          comment: notes || 'Заявка частично подтверждена поставщиком',
         },
         { transaction }
       );
@@ -1577,7 +1642,7 @@ exports.assignCollector = async (req, res) => {
           oldStatus,
           newStatus: 'В сборе',
           changedBy: req.user.id,
-          notes: `Назначен сборщик: ${collector.name}`,
+          comment: `Назначен сборщик: ${collector.name}`,
         },
         { transaction }
       );
@@ -1653,7 +1718,7 @@ exports.markAsCollected = async (req, res) => {
           oldStatus,
           newStatus: 'Забрана',
           changedBy: req.user.id,
-          notes: notes || 'Товар забран у поставщика',
+          comment: notes || 'Товар забран у поставщика',
         },
         { transaction }
       );

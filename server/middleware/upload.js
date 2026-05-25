@@ -51,11 +51,37 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
+// Для чеков платежей: фото + PDF
+const receiptFileFilter = (req, file, cb) => {
+  const allowedMimeTypes = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'application/pdf',
+  ];
+
+  if (allowedMimeTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Недопустимый тип файла. Разрешены изображения (JPEG, PNG, GIF, WebP) и PDF'), false);
+  }
+};
+
 const upload = multer({
   storage,
   fileFilter,
   limits: {
     fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024, // 5MB по умолчанию
+  },
+});
+
+const uploadReceipt = multer({
+  storage,
+  fileFilter: receiptFileFilter,
+  limits: {
+    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024,
   },
 });
 
@@ -94,5 +120,6 @@ const handleUploadError = (err, req, res, next) => {
 
 module.exports = {
   upload,
+  uploadReceipt,
   handleUploadError,
 };

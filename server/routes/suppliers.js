@@ -10,6 +10,7 @@ const {
   deleteSupplier,
   deleteSupplierPermanently,
   getSectors,
+  getReconciliation,
 } = require('../controllers/supplierController');
 
 const router = express.Router();
@@ -47,6 +48,7 @@ const supplierValidation = [
 // Публичные маршруты (для всех авторизованных пользователей)
 router.get('/', auth, getAllSuppliers);
 router.get('/sectors', auth, getSectors);
+router.get('/:id/reconciliation', auth, getReconciliation);
 router.get('/:id', auth, getSupplierById);
 
 // Маршруты для администраторов и менеджеров по закупкам

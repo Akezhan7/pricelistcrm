@@ -190,10 +190,13 @@ export type OrderStatus =
   | 'Отправлена поставщику'
   | 'Частично подтверждена'
   | 'Подтверждена'
+  | 'Доставка'
   | 'В сборе'
   | 'Забрана'
   | 'Принята на складе'
   | 'Закрыта';
+
+export type OrderType = 'purchase' | 'return';
 
 export type PaymentStatus = 'Не оплачено' | 'Частично оплачено' | 'Оплачено';
 
@@ -208,6 +211,7 @@ export interface Order {
     whatsapp?: string;
     address?: string;
   };
+  type?: OrderType;
   expectedDeliveryDate?: string;
   deliveryLocation: string;
   totalAmount: string | number;
@@ -275,6 +279,7 @@ export interface OrderStatusHistory {
 
 export interface CreateOrderDto {
   supplierId: number;
+  type?: OrderType;
   expectedDeliveryDate?: string;
   deliveryLocation?: string;
   notes?: string;
@@ -311,6 +316,7 @@ export interface OrderFilters {
   status?: OrderStatus;
   paymentStatus?: PaymentStatus;
   supplierId?: number;
+  type?: OrderType;
   dateFrom?: string;
   dateTo?: string;
   search?: string;
@@ -322,6 +328,7 @@ export interface OrderStats {
   confirmed: number;
   inCollection: number;
   collected: number;
+  delivery?: number;
   received: number;
   closed: number;
   pending: number;

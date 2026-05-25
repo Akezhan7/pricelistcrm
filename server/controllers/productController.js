@@ -44,6 +44,8 @@ const getAllProducts = async (req, res) => {
           required: false,
         },
       ],
+      distinct: true,
+      subQuery: false,
       limit: parseInt(limit),
       offset: parseInt(offset),
       order: [['createdAt', 'DESC']], // Новые товары первыми
