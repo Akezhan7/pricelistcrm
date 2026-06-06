@@ -7,11 +7,13 @@ class SuppliersApi {
   async getSuppliers(params?: {
     search?: string;
     isActive?: boolean;
+    limit?: number;
   }): Promise<Supplier[]> {
     const queryParams = new URLSearchParams();
 
     if (params?.search) queryParams.append('search', params.search);
     if (params?.isActive !== undefined) queryParams.append('isActive', params.isActive.toString());
+    if (params?.limit !== undefined) queryParams.append('limit', String(params.limit));
 
     const url = queryParams.toString() ? `${this.baseUrl}?${queryParams}` : this.baseUrl;
     const response = await api.get<ApiResponse<{ suppliers: Supplier[]; pagination: any }>>(url);

@@ -18,6 +18,8 @@ import { ProductsPage } from './pages/ProductsPage';
 import { SuppliersPage } from './pages/SuppliersPage';
 import { SupplierDetailsPage } from './pages/SupplierDetailsPage';
 import { PriceListPage } from './pages/PriceListPage';
+import { OrderDraftProvider } from './context/OrderDraftContext';
+import CreateOrderModal from './components/CreateOrderModal';
 
 /** Уже авторизован — уходим с /login, сохраняя целевой URL после редиректа с защищённой страницы */
 const RedirectIfAuthenticated: React.FC = () => {
@@ -185,7 +187,10 @@ function App() {
     <AuthProvider>
       <UIProvider>
         <Router>
-          <AppRoutes />
+          <OrderDraftProvider>
+            <AppRoutes />
+            <CreateOrderModal />
+          </OrderDraftProvider>
         </Router>
       </UIProvider>
     </AuthProvider>

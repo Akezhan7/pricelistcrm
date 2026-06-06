@@ -7,11 +7,15 @@ class ProductsApi {
   async getProducts(params?: {
     search?: string;
     isActive?: boolean;
+    limit?: number;
+    page?: number;
   }): Promise<Product[]> {
     const queryParams = new URLSearchParams();
 
     if (params?.search) queryParams.append('search', params.search);
     if (params?.isActive !== undefined) queryParams.append('isActive', params.isActive.toString());
+    if (params?.limit !== undefined) queryParams.append('limit', String(params.limit));
+    if (params?.page !== undefined) queryParams.append('page', String(params.page));
 
     const url = queryParams.toString() ? `${this.baseUrl}?${queryParams}` : this.baseUrl;
     const response = await api.get<ApiResponse<{ products: Product[]; pagination: any }>>(url);

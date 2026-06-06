@@ -1,0 +1,85 @@
+import type { Product, ProductVariation, ProductWithPrice } from '../types';
+
+/** Строка товара в форме создания заявки / возврата */
+export type OrderLineForm = {
+  productId: number;
+  product?: Product;
+  productVariationId?: number | null;
+  selectedVariation?: ProductVariation | null;
+  quantity: number;
+  priceAtPurchase: number;
+  notes?: string;
+  uniqueKey?: string;
+};
+
+/** Предзаполнение из панели поставщика — с полным объектом товара */
+export interface CreateOrderInitialItem {
+  product: Product;
+  quantity?: number;
+  priceAtPurchase?: number;
+  notes?: string;
+}
+
+function newLineKey(productId: number, suffix: string): string {
+  return `product-${productId}-${suffix}-${Date.now()}-${Math.random()}`;
+}
+
+/** Основная позиция без вариации (заявка / возврат) */
+export function buildMainOrderLine(
+  product: Product,
+  options?: { quantity?: number; priceAtPurchase?: number; notes?: string }
+): OrderLineForm {
+  const quantity = options?.quantity && options.quantity > 0 ? options.quantity : 1;
+  const priceAtPurchase =
+    typeof options?.priceAtPurchase === 'number'
+      ? options.priceAtPurchase
+      : Number(product.costPrice) || 0;
+
+  return {
+    productId: product.id,
+    product,
+    productVariationId: null,
+    selectedVariation: null,
+    quantity,
+    priceAtPurchase,
+    notes: options?.notes ?? '',
+    uniqueKey: newLineKey(product.id, 'main'),
+  };
+}
+
+export function buildOrderLinesFromInitialItems(
+  initialItems: CreateOrderInitialItem[]
+): OrderLineForm[] {
+  return initialItems.map((init) =>
+    buildMainOrderLine(init.product, {
+      quantity: init.quantity,
+      priceAtPurchase: init.priceAtPurchase,
+      notes: init.notes,
+    })
+  );
+}
+
+/** Каталог для поиска в модалке: API-список + уже выбранные товары */
+export function mergeProductCatalog(catalog: Product[], extra: Product[] = []): Product[] {
+  const byId = new Map<number, Product>();
+  for (const p of catalog) byId.set(p.id, p);
+  for (const p of extra) byId.set(p.id, p);
+  return Array.from(byId.values());
+}
+
+/** Цена закупки у поставщика (из связи) или себестоимость */
+export function getSupplierListPrice(product: Product): number {
+  const supplierPrice = (product as ProductWithPrice).ProductSupplier?.supplierPrice;
+  return Number(supplierPrice ?? product.costPrice ?? 0);
+}
+
+/** Поиск по названию / артикулу в каталоге поставщика */
+export function filterProductsBySearch<T extends Product>(products: T[], search: string): T[] {
+  const q = search.trim().toLowerCase();
+  if (!q) return products;
+  return products.filter(
+    (p) =>
+      p.name.toLowerCase().includes(q) ||
+      (p.article || '').toLowerCase().includes(q)
+  );
+}

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Sidebar } from './Sidebar';
+import { OrderDraftBanner } from './OrderDraftBanner';
 import { useUI } from '../context/UIContext';
 
 interface LayoutProps {
@@ -25,6 +26,7 @@ export const Layout: React.FC<LayoutProps> = ({
         className="flex-1 flex flex-col overflow-hidden transition-all duration-300"
         style={{ marginLeft: `${sidebarWidth}px` }}
       >
+        <OrderDraftBanner />
         {fullHeight ? (
           <div className="flex-1 p-6 overflow-hidden">{children}</div>
         ) : (

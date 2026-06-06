@@ -22,13 +22,14 @@ import {
 import { Layout } from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import ordersApi from '../services/ordersApi';
-import CreateOrderModal from '../components/CreateOrderModal';
 import PaymentModal from '../components/PaymentModal';
+import { useOrderDraft } from '../context/OrderDraftContext';
 import type { Order, OrderFilters, OrderStats, OrderStatus, OrderType, PaymentStatus } from '../types';
 
 const Orders: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { openModal } = useOrderDraft();
   
   const canCreateOrders = user?.role === 'admin' || user?.role === 'purchase_manager';
   const canManagePayments = user?.role === 'admin' || user?.role === 'accountant' || user?.role === 'purchase_manager';
@@ -37,8 +38,6 @@ const Orders: React.FC = () => {
   const [stats, setStats] = useState<OrderStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [createModalType, setCreateModalType] = useState<OrderType>('purchase');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
@@ -92,8 +91,14 @@ const Orders: React.FC = () => {
   };
 
   const openCreateModal = (type: OrderType) => {
-    setCreateModalType(type);
-    setShowCreateModal(true);
+    openModal(type, {
+      origin: 'modal',
+      returnPath: '/orders',
+      onSuccess: () => {
+        loadOrders();
+        alert(type === 'return' ? 'Возврат успешно оформлен!' : 'Заявка успешно создана!');
+      },
+    });
   };
 
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
@@ -176,17 +181,6 @@ const Orders: React.FC = () => {
 
   return (
     <Layout>
-      {/* Модальное окно создания заявки/возврата */}
-      <CreateOrderModal
-        isOpen={showCreateModal}
-        type={createModalType}
-        onClose={() => setShowCreateModal(false)}
-        onSuccess={() => {
-          loadOrders();
-          alert(createModalType === 'return' ? 'Возврат успешно оформлен!' : 'Заявка успешно создана!');
-        }}
-      />
-
       {/* Модальное окно оплаты */}
       {selectedOrder && (
         <PaymentModal
