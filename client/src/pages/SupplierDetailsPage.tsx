@@ -164,6 +164,7 @@ export const SupplierDetailsPage: React.FC = () => {
           <SupplierProductsPanel
             supplier={supplier}
             canCreate={canEdit}
+            canEdit={canEdit}
             onOrderSuccess={fetchSupplier}
           />
         </div>

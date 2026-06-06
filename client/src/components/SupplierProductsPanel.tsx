@@ -1,9 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Plus, Undo2 } from 'lucide-react';
+import { Plus, Undo2, PackagePlus, Link2 } from 'lucide-react';
 import { Supplier } from '../types';
 import { SupplierProductCatalog } from './SupplierProductCatalog';
 import { useSupplierProducts } from '../hooks/useSupplierProducts';
+import { useProductEditor } from '../hooks/useProductEditor';
+import { useSupplierProductActions } from '../hooks/useSupplierProductActions';
 import { useOrderDraft } from '../context/OrderDraftContext';
 import { calcDraftTotal, countDraftProducts } from '../utils/orderDraftStorage';
 
@@ -11,12 +13,14 @@ interface SupplierProductsPanelProps {
   supplier: Supplier;
   onOrderSuccess?: () => void;
   canCreate?: boolean;
+  canEdit?: boolean;
 }
 
 export const SupplierProductsPanel: React.FC<SupplierProductsPanelProps> = ({
   supplier,
   onOrderSuccess,
   canCreate = true,
+  canEdit = false,
 }) => {
   const location = useLocation();
   const {
@@ -30,7 +34,16 @@ export const SupplierProductsPanel: React.FC<SupplierProductsPanelProps> = ({
     setDraftReturnPath,
   } = useOrderDraft();
 
-  const { products, loading } = useSupplierProducts(supplier.id);
+  const { products, loading, refetch } = useSupplierProducts(supplier.id);
+  const { openEdit, openSuppliers, loadingProductId, editorModals } = useProductEditor({
+    onUpdated: refetch,
+    contextSupplierId: supplier.id,
+  });
+  const { openLinkModal, openCreateModal, actionModals } = useSupplierProductActions({
+    supplier,
+    onUpdated: refetch,
+  });
+
   const [search, setSearch] = useState('');
 
   const returnPath = location.pathname;
@@ -88,6 +101,26 @@ export const SupplierProductsPanel: React.FC<SupplierProductsPanelProps> = ({
       </div>
 
       <div className="flex-1 flex flex-col p-4 bg-white min-h-0">
+        {canEdit && (
+          <div className="flex gap-2 mb-3 flex-shrink-0">
+            <button
+              type="button"
+              onClick={openLinkModal}
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              <Link2 className="w-4 h-4" />
+              Из каталога
+            </button>
+            <button
+              type="button"
+              onClick={openCreateModal}
+              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium bg-yellow-400 hover:bg-yellow-500 text-black rounded-lg transition-colors"
+            >
+              <PackagePlus className="w-4 h-4" />
+              Создать новый
+            </button>
+          </div>
+        )}
         <SupplierProductCatalog
           products={products}
           loading={loading}
@@ -100,6 +133,10 @@ export const SupplierProductsPanel: React.FC<SupplierProductsPanelProps> = ({
           onToggleSelect={toggleSelect}
           quantities={quantities}
           onQuantityChange={setQuantity}
+          canEdit={canEdit}
+          onEditProduct={openEdit}
+          onManageSuppliers={openSuppliers}
+          loadingProductId={loadingProductId}
         />
       </div>
 
@@ -133,6 +170,9 @@ export const SupplierProductsPanel: React.FC<SupplierProductsPanelProps> = ({
           </div>
         </div>
       )}
+
+      {editorModals}
+      {actionModals}
     </div>
   );
 };

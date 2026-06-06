@@ -10,6 +10,11 @@ type CreateProductModalProps = {
   isOpen: boolean;
   onClose: () => void;
   onSuccess: () => void;
+  /** Предзаполнить поставщика (со страницы поставщика) */
+  initialSupplier?: Supplier | null;
+  /** Заблокировать выбор других поставщиков */
+  lockSupplier?: boolean;
+  title?: string;
 };
 
 type SelectedSupplier = {
@@ -24,6 +29,9 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
+  initialSupplier = null,
+  lockSupplier = false,
+  title = 'Добавить товар',
 }) => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -51,10 +59,24 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       loadCategories();
-      loadSuppliers();
+      if (!lockSupplier) {
+        loadSuppliers();
+      }
       resetForm();
+      if (initialSupplier) {
+        setSelectedSuppliers([
+          {
+            supplier: initialSupplier,
+            supplierPrice: '',
+            quantity: '0',
+            isAvailable: true,
+            notes: '',
+          },
+        ]);
+        setSuppliersExpanded(true);
+      }
     }
-  }, [isOpen]);
+  }, [isOpen, initialSupplier, lockSupplier]);
 
   const resetForm = () => {
     setFormData({
@@ -74,6 +96,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
     setSelectedSuppliers([]);
     setSuppliersExpanded(false);
     setError('');
+    setShowSupplierForm(false);
   };
 
   const loadCategories = async () => {
@@ -130,8 +153,17 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
+
+    if (lockSupplier && selectedSuppliers.length > 0) {
+      const price = parseFloat(selectedSuppliers[0].supplierPrice);
+      if (Number.isNaN(price) || price < 0) {
+        setError('Укажите цену у поставщика');
+        return;
+      }
+    }
+
+    setLoading(true);
 
     try {
       const data = new FormData();
@@ -168,10 +200,14 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
 
       if (selectedSuppliers.length > 0) {
         const supplierPromises = selectedSuppliers.map(async (selected) => {
+          const price = parseFloat(selected.supplierPrice);
+          if (lockSupplier && (Number.isNaN(price) || price < 0)) {
+            throw new Error('Укажите цену у поставщика');
+          }
           try {
             await api.post(`/products/${createdProduct.id}/suppliers`, {
               supplierId: selected.supplier.id,
-              supplierPrice: parseFloat(selected.supplierPrice) || 0,
+              supplierPrice: Number.isNaN(price) ? 0 : price,
               quantity: parseInt(selected.quantity) || 0,
               isAvailable: selected.isAvailable,
               notes: selected.notes || '',
@@ -215,7 +251,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg w-full max-w-2xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-gray-200 sticky top-0 bg-white z-10">
-          <h2 className="text-lg font-semibold text-gray-900">Добавить товар</h2>
+          <h2 className="text-lg font-semibold text-gray-900">{title}</h2>
           <button
             onClick={onClose}
             className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
@@ -379,7 +415,15 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                 step="0.01"
                 className="input-field"
                 value={formData.costPrice}
-                onChange={(e) => setFormData({ ...formData, costPrice: e.target.value })}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFormData({ ...formData, costPrice: value });
+                  if (lockSupplier && selectedSuppliers.length === 1 && !selectedSuppliers[0].supplierPrice) {
+                    setSelectedSuppliers([
+                      { ...selectedSuppliers[0], supplierPrice: value },
+                    ]);
+                  }
+                }}
                 placeholder="1000"
               />
             </div>
@@ -446,29 +490,38 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
 
           {/* Секция поставщиков */}
           <div className="border border-gray-200 rounded-lg">
-            <button
-              type="button"
-              onClick={() => setSuppliersExpanded(!suppliersExpanded)}
-              className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
-            >
-              <div className="flex items-center gap-2">
-                <h3 className="text-sm font-semibold text-gray-900">
-                  Поставщики
-                </h3>
-                <span className="text-xs text-gray-500">
-                  (необязательно, {selectedSuppliers.length} выбрано)
-                </span>
-              </div>
-              {suppliersExpanded ? (
-                <ChevronUp className="h-4 w-4 text-gray-500" />
-              ) : (
-                <ChevronDown className="h-4 w-4 text-gray-500" />
-              )}
-            </button>
+            {!lockSupplier && (
+              <button
+                type="button"
+                onClick={() => setSuppliersExpanded(!suppliersExpanded)}
+                className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
+              >
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-semibold text-gray-900">
+                    Поставщики
+                  </h3>
+                  <span className="text-xs text-gray-500">
+                    (необязательно, {selectedSuppliers.length} выбрано)
+                  </span>
+                </div>
+                {suppliersExpanded ? (
+                  <ChevronUp className="h-4 w-4 text-gray-500" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-gray-500" />
+                )}
+              </button>
+            )}
 
-            {suppliersExpanded && (
+            {lockSupplier && initialSupplier && (
+              <div className="p-3 bg-yellow-50 border-b border-yellow-200">
+                <h3 className="text-sm font-semibold text-gray-900">Поставщик</h3>
+                <p className="text-sm text-gray-700 mt-0.5">{initialSupplier.name}</p>
+              </div>
+            )}
+
+            {(suppliersExpanded || lockSupplier) && (
               <div className="p-3 space-y-3 bg-white">
-                {/* Выбор существующего поставщика и кнопка создания */}
+                {!lockSupplier && (
                 <div className="flex gap-2">
                   <div className="flex-1">
                     <Select
@@ -529,6 +582,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                     Новый
                   </button>
                 </div>
+                )}
 
                 {/* Список выбранных поставщиков */}
                 {selectedSuppliers.length > 0 && (
@@ -551,14 +605,16 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                               }
                             </p>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveSupplier(selected.supplier.id)}
-                            className="p-1 text-gray-400 hover:text-red-600 transition-colors ml-2 flex-shrink-0"
-                            title="Удалить"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {!lockSupplier && (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveSupplier(selected.supplier.id)}
+                              className="p-1 text-gray-400 hover:text-red-600 transition-colors ml-2 flex-shrink-0"
+                              title="Удалить"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
 
                         {/* Поля для ввода цены и количества */}
@@ -611,7 +667,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
                   </div>
                 )}
 
-                {selectedSuppliers.length === 0 && (
+                {selectedSuppliers.length === 0 && !lockSupplier && (
                   <p className="text-sm text-gray-500 text-center py-4">
                     Выберите поставщиков из списка или создайте нового
                   </p>

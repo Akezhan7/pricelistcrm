@@ -7,12 +7,27 @@ const { createPriceHistoryRecord } = require('./priceHistoryController');
 
 const getAllProducts = async (req, res) => {
   try {
-    const { search, page = 1, limit = 50 } = req.query;
+    const { search, page = 1, limit = 50, excludeSupplierId } = req.query;
     const offset = (page - 1) * limit;
 
     const whereClause = {
       isActive: true,
     };
+
+    if (excludeSupplierId) {
+      const supplierId = parseInt(excludeSupplierId, 10);
+      if (!Number.isNaN(supplierId)) {
+        const linkedRows = await ProductSupplier.findAll({
+          where: { supplierId },
+          attributes: ['productId'],
+          raw: true,
+        });
+        const linkedIds = linkedRows.map((row) => row.productId);
+        if (linkedIds.length > 0) {
+          whereClause.id = { [Op.notIn]: linkedIds };
+        }
+      }
+    }
 
     if (search) {
       whereClause[Op.or] = [

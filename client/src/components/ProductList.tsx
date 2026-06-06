@@ -2,9 +2,8 @@ import React, { useMemo, useState, useEffect } from 'react';
 import { Product } from '../types';
 import { Plus, Edit, Trash2, Image as ImageIcon, Users, Settings, TrendingUp, ChevronLeft, ChevronRight } from 'lucide-react';
 import { CreateProductModal } from './CreateProductModal';
-import { EditProductModal } from './EditProductModal';
 import { DeleteConfirmModal } from './DeleteConfirmModal';
-import { ProductSuppliersModal } from './ProductSuppliersModal';
+import { useProductEditor } from '../hooks/useProductEditor';
 import { ProductVariationsModal } from './ProductVariationsModal';
 import { PriceHistoryModal } from './PriceHistoryModal';
 import api from '../utils/api';
@@ -35,12 +34,13 @@ export const ProductList: React.FC<ProductListProps> = ({
   };
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  // Новые состояния для управления поставщиками и вариациями
-  const [productForSuppliers, setProductForSuppliers] = useState<Product | null>(null);
   const [productForVariations, setProductForVariations] = useState<Product | null>(null);
+
+  const { openEdit, openSuppliers, editorModals } = useProductEditor({
+    onUpdated: onRefresh,
+  });
   // Состояние для истории цен
   const [productForPriceHistory, setProductForPriceHistory] = useState<Product | null>(null);
   // Локальный поиск по товарам
@@ -244,7 +244,7 @@ export const ProductList: React.FC<ProductListProps> = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setProductForSuppliers(product);
+                        openSuppliers(product);
                       }}
                       className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded transition-colors"
                       title="Управление поставщиками"
@@ -264,7 +264,7 @@ export const ProductList: React.FC<ProductListProps> = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setEditingProduct(product);
+                        openEdit(product);
                       }}
                       className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                       title="Редактировать товар"
@@ -370,16 +370,7 @@ export const ProductList: React.FC<ProductListProps> = ({
         onSuccess={onRefresh}
       />
 
-      {/* Модальное окно редактирования товара */}
-      <EditProductModal
-        isOpen={!!editingProduct}
-        onClose={() => setEditingProduct(null)}
-        onSuccess={() => {
-          onRefresh();
-          setEditingProduct(null);
-        }}
-        product={editingProduct}
-      />
+      {editorModals}
 
       {/* Модальное окно подтверждения удаления */}
       <DeleteConfirmModal
@@ -390,22 +381,6 @@ export const ProductList: React.FC<ProductListProps> = ({
         title="Удалить товар"
         message="Вы уверены, что хотите удалить этот товар?"
         itemName={productToDelete?.name}
-      />
-
-      {/* Модальное окно управления поставщиками */}
-      <ProductSuppliersModal
-        isOpen={!!productForSuppliers}
-        onClose={() => setProductForSuppliers(null)}
-        onSuccess={() => {
-          onRefresh();
-          // Обновляем выбранный товар если он совпадает с редактируемым
-          if (selectedProduct?.id === productForSuppliers?.id) {
-            // Перезагрузить сведения о товаре
-            onSelectProduct(null);
-            // Можно было бы перезагрузить конкретные данные, но для простоты перезагружаем все
-          }
-        }}
-        product={productForSuppliers}
       />
 
       {/* Модальное окно управления вариациями */}

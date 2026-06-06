@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Trash2, Edit, Check, AlertCircle, UserPlus, Users } from 'lucide-react';
 import { Product, Supplier, SupplierWithPrice } from '../types';
 import { UnifiedSupplierForm } from './UnifiedSupplierForm';
@@ -9,6 +9,8 @@ type ProductSuppliersModalProps = {
   onClose: () => void;
   onSuccess: () => void;
   product: Product | null;
+  /** При открытии со страницы поставщика — выделить и сразу редактировать его цену */
+  contextSupplierId?: number;
 };
 
 type NewSupplierData = {
@@ -24,6 +26,7 @@ export const ProductSuppliersModal: React.FC<ProductSuppliersModalProps> = ({
   onClose,
   onSuccess,
   product,
+  contextSupplierId,
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -48,12 +51,43 @@ export const ProductSuppliersModal: React.FC<ProductSuppliersModalProps> = ({
     notes: '',
   });
 
-  // Загрузка списка доступных поставщиков при открытии модального окна
+  const sortedSuppliers = useMemo(() => {
+    if (!product?.suppliers?.length) return [];
+    const list = [...product.suppliers];
+    if (contextSupplierId) {
+      list.sort((a, b) => {
+        if (a.id === contextSupplierId) return -1;
+        if (b.id === contextSupplierId) return 1;
+        return 0;
+      });
+    }
+    return list;
+  }, [product?.suppliers, contextSupplierId]);
+
   useEffect(() => {
     if (isOpen) {
       loadAvailableSuppliers();
+      return;
     }
+    setEditingSupplier(null);
+    setShowAddForm(false);
+    setShowCreateForm(false);
+    setActionType(null);
+    setError('');
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen || !product || !contextSupplierId) return;
+    const contextSupplier = product.suppliers?.find((s) => s.id === contextSupplierId);
+    if (!contextSupplier) return;
+    setEditingSupplier(contextSupplier.id);
+    setEditData({
+      supplierPrice: contextSupplier.ProductSupplier.supplierPrice.toString(),
+      quantity: contextSupplier.ProductSupplier.quantity.toString(),
+      isAvailable: contextSupplier.ProductSupplier.isAvailable,
+      notes: contextSupplier.ProductSupplier.notes || '',
+    });
+  }, [isOpen, product, contextSupplierId]);
 
   const loadAvailableSuppliers = async () => {
     try {
@@ -199,18 +233,32 @@ export const ProductSuppliersModal: React.FC<ProductSuppliersModalProps> = ({
           {/* Текущие поставщики */}
           <div className="mb-6">
             <h3 className="text-md font-medium text-gray-900 mb-3">Текущие поставщики</h3>
-            {product.suppliers && product.suppliers.length > 0 ? (
+            {sortedSuppliers.length > 0 ? (
               <div className="space-y-3">
-                {product.suppliers.map((supplier) => (
-                  <div key={supplier.id} className="border border-gray-200 rounded-lg p-4">
+                {sortedSuppliers.map((supplier) => (
+                  <div
+                    key={supplier.id}
+                    className={`border rounded-lg p-4 ${
+                      supplier.id === contextSupplierId
+                        ? 'border-yellow-400 bg-yellow-50/50'
+                        : 'border-gray-200'
+                    }`}
+                  >
                     {editingSupplier === supplier.id ? (
                       // Форма редактирования
                       <div className="space-y-3">
-                        <div className="font-medium text-gray-900">{supplier.name}</div>
+                        <div className="font-medium text-gray-900">
+                          {supplier.name}
+                          {supplier.id === contextSupplierId && (
+                            <span className="ml-2 text-xs font-normal text-yellow-700">
+                              (текущий поставщик)
+                            </span>
+                          )}
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                           <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Цена поставщика
+                              Цена у поставщика, ₸
                             </label>
                             <input
                               type="number"

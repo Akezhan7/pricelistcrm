@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import suppliersApi from '../services/suppliersApi';
 import type { ProductWithPrice } from '../types';
 
@@ -6,6 +6,11 @@ export function useSupplierProducts(supplierId: number | null | undefined) {
   const [products, setProducts] = useState<ProductWithPrice[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const refetch = useCallback(() => {
+    setRefreshKey((k) => k + 1);
+  }, []);
 
   useEffect(() => {
     if (!supplierId) {
@@ -27,7 +32,8 @@ export function useSupplierProducts(supplierId: number | null | undefined) {
         }
       } catch (err: unknown) {
         if (!cancelled) {
-          const message = err instanceof Error ? err.message : 'Ошибка загрузки товаров поставщика';
+          const message =
+            err instanceof Error ? err.message : 'Ошибка загрузки товаров поставщика';
           setError(message);
           setProducts([]);
         }
@@ -39,7 +45,7 @@ export function useSupplierProducts(supplierId: number | null | undefined) {
     return () => {
       cancelled = true;
     };
-  }, [supplierId]);
+  }, [supplierId, refreshKey]);
 
-  return { products, loading, error };
+  return { products, loading, error, refetch };
 }

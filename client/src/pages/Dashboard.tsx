@@ -189,6 +189,7 @@ export const Dashboard: React.FC = () => {
             <SupplierProductsPanel
               supplier={selectedSupplier}
               canCreate={user?.role === 'admin' || user?.role === 'purchase_manager'}
+              canEdit={user?.role === 'admin' || user?.role === 'purchase_manager'}
               onOrderSuccess={refreshData}
             />
           ) : (

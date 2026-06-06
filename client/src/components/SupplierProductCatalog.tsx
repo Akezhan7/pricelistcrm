@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Search, Image as ImageIcon, Check, Plus, Loader2 } from 'lucide-react';
+import { Search, Image as ImageIcon, Check, Plus, Loader2, Edit, Users } from 'lucide-react';
 import type { ProductWithPrice } from '../types';
 import getImageUrl from '../utils/image';
 import { filterProductsBySearch, getSupplierListPrice } from '../utils/orderItems';
@@ -22,6 +22,10 @@ interface SupplierProductCatalogProps {
   onToggleSelect?: (productId: number) => void;
   quantities?: Record<number, number>;
   onQuantityChange?: (productId: number, quantity: number) => void;
+  canEdit?: boolean;
+  onEditProduct?: (product: ProductWithPrice) => void;
+  onManageSuppliers?: (product: ProductWithPrice) => void;
+  loadingProductId?: number | null;
 }
 
 const formatPrice = (n: number | string) =>
@@ -41,6 +45,10 @@ export const SupplierProductCatalog: React.FC<SupplierProductCatalogProps> = ({
   onToggleSelect,
   quantities,
   onQuantityChange,
+  canEdit = false,
+  onEditProduct,
+  onManageSuppliers,
+  loadingProductId = null,
 }) => {
   const filtered = useMemo(
     () => filterProductsBySearch(products, search),
@@ -175,6 +183,43 @@ export const SupplierProductCatalog: React.FC<SupplierProductCatalogProps> = ({
                       >
                         <Plus className="w-5 h-5" />
                       </button>
+                    )}
+
+                    {canEdit && (
+                      <div className="flex flex-col gap-1 flex-shrink-0">
+                        {onEditProduct && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditProduct(product);
+                            }}
+                            disabled={loadingProductId === product.id}
+                            className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50"
+                            title="Редактировать товар"
+                          >
+                            {loadingProductId === product.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Edit className="w-4 h-4" />
+                            )}
+                          </button>
+                        )}
+                        {onManageSuppliers && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onManageSuppliers(product);
+                            }}
+                            disabled={loadingProductId === product.id}
+                            className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50"
+                            title="Цены и поставщики"
+                          >
+                            <Users className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 </div>
