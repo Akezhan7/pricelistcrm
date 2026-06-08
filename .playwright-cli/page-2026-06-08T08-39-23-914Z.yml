@@ -1,0 +1,87 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - heading [level=1] [ref=e9]: Plastkrep CRM
+      - button [ref=e10] [cursor=pointer]:
+        - img [ref=e11]
+    - navigation [ref=e14]:
+      - paragraph [ref=e15]: Навигация
+      - list [ref=e16]:
+        - listitem [ref=e17]:
+          - button [ref=e18] [cursor=pointer]:
+            - img [ref=e19]
+            - generic [ref=e22]: Главная
+        - listitem [ref=e23]:
+          - button [ref=e24] [cursor=pointer]:
+            - img [ref=e25]
+            - generic [ref=e28]: Заявки
+        - listitem [ref=e29]:
+          - button [ref=e30] [cursor=pointer]:
+            - img [ref=e31]
+            - generic [ref=e35]: Товары
+        - listitem [ref=e36]:
+          - button [ref=e37] [cursor=pointer]:
+            - img [ref=e38]
+            - generic [ref=e43]: Поставщики
+        - listitem [ref=e44]:
+          - button [ref=e45] [cursor=pointer]:
+            - img [ref=e46]
+            - generic [ref=e49]: Прайс
+        - listitem [ref=e50]:
+          - button [ref=e51] [cursor=pointer]:
+            - img [ref=e52]
+            - generic [ref=e55]: Остатки на складе
+        - listitem [ref=e56]:
+          - button [ref=e57] [cursor=pointer]:
+            - img [ref=e58]
+            - generic [ref=e63]: Категории
+        - listitem [ref=e64]:
+          - button [ref=e65] [cursor=pointer]:
+            - img [ref=e66]
+            - generic [ref=e69]: Задания сборщиков
+        - listitem [ref=e70]:
+          - button [ref=e71] [cursor=pointer]:
+            - img [ref=e72]
+            - generic [ref=e77]: Приёмка товара
+        - listitem [ref=e78]:
+          - button [ref=e79] [cursor=pointer]:
+            - img [ref=e80]
+            - generic [ref=e82]: Карта Plastkrep
+      - paragraph [ref=e84]: Администрирование
+      - list [ref=e85]:
+        - listitem [ref=e86]:
+          - button [ref=e87] [cursor=pointer]:
+            - img [ref=e88]
+            - generic [ref=e93]: Пользователи
+    - button [ref=e96] [cursor=pointer]:
+      - img [ref=e98]
+      - generic [ref=e101]:
+        - paragraph [ref=e102]: Администратор
+        - paragraph [ref=e103]: Администратор
+  - main [ref=e104]:
+    - generic [ref=e105]:
+      - button "Открыть меню" [ref=e106] [cursor=pointer]:
+        - img [ref=e107]
+      - generic [ref=e108]:
+        - generic [ref=e109]: Plastkrep CRM
+        - heading "Поставщики" [level=1] [ref=e110]
+    - generic [ref=e114]:
+      - status "Загрузка" [ref=e115]
+      - paragraph [ref=e117]: Загрузка поставщиков...
+  - navigation "Основная навигация" [ref=e118]:
+    - generic [ref=e119]:
+      - button "Главная" [ref=e120] [cursor=pointer]:
+        - img [ref=e121]
+        - generic [ref=e124]: Главная
+      - button "Заявки" [ref=e125] [cursor=pointer]:
+        - img [ref=e126]
+        - generic [ref=e129]: Заявки
+      - button "Товары" [ref=e130] [cursor=pointer]:
+        - img [ref=e131]
+        - generic [ref=e135]: Товары
+      - button "Поставщики" [ref=e136] [cursor=pointer]:
+        - img [ref=e137]
+        - generic [ref=e142]: Поставщики
+      - button "Ещё — открыть меню" [ref=e143] [cursor=pointer]:
+        - img [ref=e144]
+        - generic [ref=e145]: Ещё

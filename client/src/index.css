@@ -2,34 +2,225 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: #f8fafc;
+:root {
+  --color-brand-yellow: #FBBF24;
+  --color-brand-yellow-hover: #EAB308;
+  --color-brand-yellow-dark: #D97706;
+  --color-brand-black: #111111;
+  --color-brand-white: #FFFFFF;
+  --color-accent-blue: #2563eb;
+  --color-surface-page: #FAFAFA;
+  --color-surface-base: #FFFFFF;
+  --color-surface-inset: #F4F4F5;
+  --color-surface-accent: #FFFBEB;
+  --color-border-subtle: #E8E8EC;
+  --color-text-muted: #6B7280;
+  --motion-fast: 150ms;
+  --motion-normal: 250ms;
+  --motion-easing: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    margin: 0;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+      Helvetica, Arial, sans-serif;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    color: var(--color-brand-black);
+    background-color: var(--color-surface-page);
+  }
+
+  @media (max-width: 767px) {
+    body {
+      font-size: 0.9375rem;
+    }
+  }
+
+  code {
+    font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+  }
+
+  h1 {
+    @apply text-page-title text-brand-black tracking-tight;
+  }
+
+  h2 {
+    @apply text-section-title text-brand-black;
+  }
+
+  h3 {
+    @apply text-card-title text-brand-black;
+  }
 }
 
-/* Кастомные стили для CRM */
-.card {
-  @apply bg-white rounded-lg shadow-md border border-gray-200;
+@layer components {
+  /* V2 border-first surfaces */
+  .card {
+    @apply bg-surface-base rounded-xl border border-border-subtle;
+    transition: box-shadow var(--motion-fast) var(--motion-easing),
+      transform var(--motion-fast) var(--motion-easing);
+  }
+
+  .card-elevated {
+    @apply card shadow-sm;
+  }
+
+  .card-interactive {
+    @apply card-elevated cursor-pointer;
+  }
+
+  .card-interactive:hover {
+    @apply shadow-md -translate-y-px;
+  }
+
+  .card-interactive:active {
+    @apply scale-[0.99] translate-y-0 shadow-sm;
+  }
+
+  .surface-inset {
+    @apply bg-surface-inset rounded-lg border border-transparent;
+  }
+
+  /* V2 buttons — minimal, border-first */
+  .btn-primary {
+    @apply inline-flex items-center justify-center
+      bg-brand-yellow hover:bg-brand-yellow-hover
+      text-brand-black font-semibold
+      py-2.5 px-4 rounded-lg
+      transition-colors duration-fast
+      active:scale-[0.98]
+      focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-yellow focus-visible:ring-offset-2;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center
+      bg-brand-white border border-border-subtle
+      text-brand-black font-medium
+      py-2.5 px-4 rounded-lg
+      hover:bg-surface-inset
+      transition-colors duration-fast
+      active:scale-[0.98]
+      focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-yellow focus-visible:ring-offset-2;
+  }
+
+  .btn-accent {
+    @apply btn-primary;
+  }
+
+  .btn-destructive {
+    @apply inline-flex items-center justify-center
+      bg-danger hover:bg-danger-dark
+      text-white font-semibold
+      py-2.5 px-4 rounded-lg
+      transition-colors duration-fast
+      active:scale-[0.98]
+      focus:outline-none focus-visible:ring-2 focus-visible:ring-danger/40 focus-visible:ring-offset-2;
+  }
+
+  .input-field {
+    @apply w-full px-3 py-2.5 text-body rounded-lg
+      bg-brand-white border border-border-input shadow-sm
+      text-brand-black placeholder:text-text-muted
+      transition-colors duration-fast hover:border-text-muted/60
+      focus:outline-none focus:border-brand-yellow focus:ring-2 focus:ring-brand-yellow/20
+      disabled:bg-surface-inset disabled:border-border-subtle disabled:text-text-muted disabled:shadow-none disabled:cursor-not-allowed;
+    min-height: 2.75rem;
+  }
+
+  .section-spacing {
+    @apply space-y-section;
+  }
+
+  .page-spacing {
+    @apply p-page;
+  }
 }
 
-.btn-primary {
-  @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+@layer utilities {
+  .typography-overline {
+    @apply uppercase tracking-wider text-text-muted font-semibold;
+    font-size: 0.6875rem;
+    line-height: 1rem;
+    letter-spacing: 0.08em;
+  }
+
+  .font-tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .animate-modal-in {
+    animation: modal-in var(--motion-normal) var(--motion-easing) forwards;
+  }
+
+  .animate-overlay-in {
+    animation: overlay-in 200ms ease-out forwards;
+  }
+
+  .animate-toast-in {
+    animation: toast-in 300ms var(--motion-easing) forwards;
+  }
 }
 
-.btn-secondary {
-  @apply bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
-.input-field {
-  @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent;
+@keyframes overlay-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.pb-safe {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom));
+}
+
+/* Mobile tab bar clearance (64px bar + safe area) */
+.pb-tab-bar {
+  padding-bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+}
+
+.bottom-above-tab-bar {
+  bottom: calc(4rem + env(safe-area-inset-bottom, 0px));
+}
+
+.pt-safe {
+  padding-top: max(0.5rem, env(safe-area-inset-top));
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }

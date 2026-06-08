@@ -1,0 +1,63 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - heading "Plastkrep CRM" [level=1] [ref=e9]
+    - navigation [ref=e10]:
+      - paragraph [ref=e11]: Навигация
+      - list [ref=e12]:
+        - listitem [ref=e13]:
+          - button "Главная" [ref=e14] [cursor=pointer]:
+            - img [ref=e15]
+            - generic [ref=e18]: Главная
+        - listitem [ref=e19]:
+          - button "Заявки" [ref=e20] [cursor=pointer]:
+            - img [ref=e21]
+            - generic [ref=e24]: Заявки
+        - listitem [ref=e25]:
+          - button "Товары" [ref=e26] [cursor=pointer]:
+            - img [ref=e27]
+            - generic [ref=e31]: Товары
+        - listitem [ref=e32]:
+          - button "Поставщики" [ref=e33] [cursor=pointer]:
+            - img [ref=e34]
+            - generic [ref=e39]: Поставщики
+        - listitem [ref=e40]:
+          - button "Прайс" [ref=e41] [cursor=pointer]:
+            - img [ref=e42]
+            - generic [ref=e45]: Прайс
+        - listitem [ref=e46]:
+          - button "Остатки на складе" [ref=e47] [cursor=pointer]:
+            - img [ref=e48]
+            - generic [ref=e51]: Остатки на складе
+        - listitem [ref=e52]:
+          - button "Категории" [ref=e53] [cursor=pointer]:
+            - img [ref=e54]
+            - generic [ref=e59]: Категории
+        - listitem [ref=e60]:
+          - button "Задания сборщиков" [ref=e61] [cursor=pointer]:
+            - img [ref=e62]
+            - generic [ref=e65]: Задания сборщиков
+        - listitem [ref=e66]:
+          - button "Приёмка товара" [ref=e67] [cursor=pointer]:
+            - img [ref=e68]
+            - generic [ref=e73]: Приёмка товара
+        - listitem [ref=e74]:
+          - button "Карта Plastkrep" [ref=e75] [cursor=pointer]:
+            - img [ref=e76]
+            - generic [ref=e78]: Карта Plastkrep
+      - paragraph [ref=e80]: Администрирование
+      - list [ref=e81]:
+        - listitem [ref=e82]:
+          - button "Пользователи" [ref=e83] [cursor=pointer]:
+            - img [ref=e84]
+            - generic [ref=e89]: Пользователи
+    - button "Администратор Администратор" [ref=e92] [cursor=pointer]:
+      - img [ref=e94]
+      - generic [ref=e97]:
+        - paragraph [ref=e98]: Администратор
+        - paragraph [ref=e99]: Администратор
+    - button "Свернуть меню" [ref=e100] [cursor=pointer]:
+      - img [ref=e101]
+  - main [ref=e103]:
+    - generic [ref=e106]:
+      - status "Загрузка" [ref=e107]
+      - paragraph [ref=e109]: Загрузка поставщика...

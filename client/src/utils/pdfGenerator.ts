@@ -2,18 +2,8 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import type { Order } from '../types';
 import type { ReconciliationReport } from '../services/suppliersApi';
+import { BRAND } from '../theme/tokens';
 import getImageUrl from './image';
-
-// Фирменные цвета: жёлтый, чёрный, белый, нейтральные тона
-const BRAND = {
-  yellow: '#FBBF24',
-  yellowDark: '#D97706',
-  black: '#111111',
-  white: '#FFFFFF',
-  textMuted: '#4B5563',
-  border: '#E5E7EB',
-  zebra: '#FAFAFA',
-} as const;
 
 /** Базовый контейнер PDF: на всю ширину A4, без внешней рамки */
 const initPdfContainer = (): HTMLDivElement => {

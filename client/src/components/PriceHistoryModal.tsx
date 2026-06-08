@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { X, TrendingUp, TrendingDown, Clock, User, FileText, Package } from 'lucide-react';
+import { TrendingUp, TrendingDown, Clock, User, FileText, Package } from 'lucide-react';
 import { PriceHistory, PriceHistoryResponse, PriceType } from '../types';
 import { getProductPriceHistory } from '../services/priceHistoryApi';
+import { Modal } from './ui/Modal';
+import { FormFooter } from './ui/FormFooter';
+import { Badge } from './ui/Badge';
+import { Alert } from './ui/Alert';
+import { FilterChip } from './ui/FilterChip';
+import { Pagination } from './ui/Pagination';
+import { Spinner } from './ui/Spinner';
+import { cn } from '../utils/cn';
 
 type PriceHistoryModalProps = {
   isOpen: boolean;
@@ -72,32 +80,24 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
     return type === 'costPrice' ? 'Себестоимость' : 'Цена продажи';
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">История цен</h2>
-            <p className="text-sm text-gray-500 mt-1">{productName}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="h-6 w-6" />
-          </button>
-        </div>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="История цен"
+      size="xl"
+      className="max-w-5xl"
+      footer={<FormFooter onCancel={onClose} cancelLabel="Закрыть" showSubmit={false} />}
+    >
+      <p className="text-sm text-text-muted -mt-2 mb-4">{productName}</p>
 
         {/* Stats */}
         {data && data.stats && (
-          <div className="p-6 border-b border-gray-200 bg-gray-50">
+          <div className="p-4 sm:p-5 mb-4 rounded-xl bg-surface-inset border border-border-subtle">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className="bg-white p-4 rounded-lg border border-gray-200">
-                <div className="text-sm text-gray-500 mb-1">Текущая себестоимость</div>
-                <div className="text-2xl font-bold text-gray-900">
+              <div className="bg-surface-base p-4 rounded-xl border border-border-subtle">
+                <div className="text-overline text-text-muted mb-1">Текущая себестоимость</div>
+                <div className="text-metric font-tabular text-brand-black">
                   {formatPrice(data.stats.currentCostPrice)} ₸
                 </div>
                 {data.stats.costPriceChangePercent && (
@@ -118,9 +118,9 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
                 )}
               </div>
 
-              <div className="bg-white p-4 rounded-lg border border-gray-200">
-                <div className="text-sm text-gray-500 mb-1">Текущая цена продажи</div>
-                <div className="text-2xl font-bold text-gray-900">
+              <div className="bg-surface-base p-4 rounded-xl border border-border-subtle">
+                <div className="text-overline text-text-muted mb-1">Текущая цена продажи</div>
+                <div className="text-metric font-tabular text-brand-black">
                   {formatPrice(data.stats.currentSellingPrice)} ₸
                 </div>
                 {data.stats.sellingPriceChangePercent && (
@@ -142,18 +142,18 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
               </div>
 
               {data.stats.firstCostPrice && (
-                <div className="bg-white p-4 rounded-lg border border-gray-200">
-                  <div className="text-sm text-gray-500 mb-1">Первая себестоимость</div>
-                  <div className="text-lg font-semibold text-gray-700">
+                <div className="bg-surface-base p-4 rounded-xl border border-border-subtle">
+                  <div className="text-overline text-text-muted mb-1">Первая себестоимость</div>
+                  <div className="text-price font-tabular text-brand-black">
                     {formatPrice(data.stats.firstCostPrice)} ₸
                   </div>
                 </div>
               )}
 
               {data.stats.firstSellingPrice && (
-                <div className="bg-white p-4 rounded-lg border border-gray-200">
-                  <div className="text-sm text-gray-500 mb-1">Первая цена продажи</div>
-                  <div className="text-lg font-semibold text-gray-700">
+                <div className="bg-surface-base p-4 rounded-xl border border-border-subtle">
+                  <div className="text-overline text-text-muted mb-1">Первая цена продажи</div>
+                  <div className="text-price font-tabular text-brand-black">
                     {formatPrice(data.stats.firstSellingPrice)} ₸
                   </div>
                 </div>
@@ -163,58 +163,40 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
         )}
 
         {/* Filters */}
-        <div className="p-4 border-b border-gray-200 bg-white">
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600">Тип цены:</span>
-            <button
-              onClick={() => setPriceTypeFilter('all')}
-              className={`px-3 py-1 rounded text-sm ${
-                priceTypeFilter === 'all'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Все
-            </button>
-            <button
-              onClick={() => setPriceTypeFilter('costPrice')}
-              className={`px-3 py-1 rounded text-sm ${
-                priceTypeFilter === 'costPrice'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Себестоимость
-            </button>
-            <button
-              onClick={() => setPriceTypeFilter('sellingPrice')}
-              className={`px-3 py-1 rounded text-sm ${
-                priceTypeFilter === 'sellingPrice'
-                  ? 'bg-blue-500 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              Цена продажи
-            </button>
-          </div>
+        <div className="mb-4 flex flex-wrap items-center gap-2">
+          <span className="text-caption font-medium text-text-muted">Тип цены:</span>
+          <FilterChip
+            active={priceTypeFilter === 'all'}
+            onClick={() => setPriceTypeFilter('all')}
+          >
+            Все
+          </FilterChip>
+          <FilterChip
+            active={priceTypeFilter === 'costPrice'}
+            onClick={() => setPriceTypeFilter('costPrice')}
+          >
+            Себестоимость
+          </FilterChip>
+          <FilterChip
+            active={priceTypeFilter === 'sellingPrice'}
+            onClick={() => setPriceTypeFilter('sellingPrice')}
+          >
+            Цена продажи
+          </FilterChip>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div>
           {loading && (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+              <Spinner size="lg" color="brand" useLucide />
             </div>
           )}
 
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">
-              {error}
-            </div>
-          )}
+          {error && <Alert variant="error">{error}</Alert>}
 
           {!loading && !error && data && data.history.length === 0 && (
-            <div className="text-center py-12 text-gray-500">
+            <div className="text-center py-12 text-text-muted">
               <Package className="h-16 w-16 mx-auto mb-4 opacity-30" />
               <p>История изменений цен пуста</p>
             </div>
@@ -229,27 +211,15 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
                 return (
                   <div
                     key={item.id}
-                    className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+                    className="bg-surface-base border border-border-subtle rounded-xl p-4 transition-colors duration-200 hover:bg-surface-inset/40"
                   >
                     <div className="flex items-start justify-between mb-3">
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span
-                            className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                              item.priceType === 'costPrice'
-                                ? 'bg-purple-100 text-purple-800'
-                                : 'bg-blue-100 text-blue-800'
-                            }`}
-                          >
+                          <Badge variant={item.priceType === 'costPrice' ? 'warning' : 'info'}>
                             {getPriceTypeLabel(item.priceType)}
-                          </span>
-                          <span
-                            className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
-                              isIncrease
-                                ? 'bg-red-100 text-red-800'
-                                : 'bg-green-100 text-green-800'
-                            }`}
-                          >
+                          </Badge>
+                          <Badge variant={isIncrease ? 'danger' : 'success'}>
                             {isIncrease ? (
                               <TrendingUp className="h-3 w-3 mr-1" />
                             ) : (
@@ -257,20 +227,20 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
                             )}
                             {isIncrease ? '+' : ''}
                             {percent.toFixed(2)}%
-                          </span>
+                          </Badge>
                         </div>
 
                         <div className="flex items-center gap-4 text-sm">
                           <div>
-                            <span className="text-gray-500">Старая цена:</span>
-                            <span className="ml-2 font-medium text-gray-700">
+                            <span className="text-text-muted">Старая цена:</span>
+                            <span className="ml-2 font-medium text-brand-black">
                               {formatPrice(item.oldPrice)} ₸
                             </span>
                           </div>
-                          <div className="text-gray-400">→</div>
+                          <div className="text-text-muted">→</div>
                           <div>
-                            <span className="text-gray-500">Новая цена:</span>
-                            <span className="ml-2 font-semibold text-gray-900">
+                            <span className="text-text-muted">Новая цена:</span>
+                            <span className="ml-2 font-semibold text-brand-black">
                               {formatPrice(item.newPrice)} ₸
                             </span>
                           </div>
@@ -279,9 +249,10 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
 
                       <div className="text-right">
                         <div
-                          className={`text-lg font-bold ${
-                            isIncrease ? 'text-red-600' : 'text-green-600'
-                          }`}
+                          className={cn(
+                            'text-price font-bold tabular-nums',
+                            isIncrease ? 'text-danger' : 'text-success'
+                          )}
                         >
                           {isIncrease ? '+' : ''}
                           {formatPrice(Math.abs(diff))} ₸
@@ -289,7 +260,7 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-6 text-xs text-gray-500 pt-3 border-t border-gray-100">
+                    <div className="flex items-center gap-6 text-xs text-text-muted pt-3 border-t border-border-subtle">
                       {item.changer && (
                         <div className="flex items-center gap-1">
                           <User className="h-3 w-3" />
@@ -311,7 +282,7 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
                     </div>
 
                     {item.changeReason && (
-                      <div className="mt-2 text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                      <div className="mt-2 text-sm text-text-muted bg-surface-inset p-2 rounded-lg">
                         <span className="font-medium">Причина:</span> {item.changeReason}
                       </div>
                     )}
@@ -321,30 +292,17 @@ export const PriceHistoryModal: React.FC<PriceHistoryModalProps> = ({
             </div>
           )}
 
-          {/* Pagination */}
-          {data && data.pagination && data.pagination.pages > 1 && (
-            <div className="flex items-center justify-center gap-2 mt-6 pt-6 border-t border-gray-200">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="px-4 py-2 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Назад
-              </button>
-              <span className="text-sm text-gray-600">
-                Страница {page} из {data.pagination.pages}
-              </span>
-              <button
-                onClick={() => setPage((p) => Math.min(data.pagination.pages, p + 1))}
-                disabled={page === data.pagination.pages}
-                className="px-4 py-2 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Вперёд
-              </button>
-            </div>
+          {data?.pagination && data.pagination.pages > 1 && (
+            <Pagination
+              className="mt-6 pt-6 border-t border-border-subtle"
+              currentPage={page}
+              totalPages={data.pagination.pages}
+              totalItems={data.pagination.total}
+              itemsPerPage={20}
+              onPageChange={setPage}
+            />
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };

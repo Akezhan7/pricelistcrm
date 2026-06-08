@@ -1,7 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
+import { TrendingUp, TrendingDown } from 'lucide-react';
 import { Order, UpdatePriceDto } from '../types';
 import { updateProductPricesFromOrder } from '../services/priceHistoryApi';
+import { Modal } from './ui/Modal';
+import { FormFooter } from './ui/FormFooter';
+import { Alert } from './ui/Alert';
+import { Input } from './ui/Input';
+import { Button } from './ui/Button';
+import { Card, CardBody } from './ui/Card';
+import { Badge } from './ui/Badge';
+import { formatPriceKZT } from '../utils/format';
 
 type UpdatePricesFromOrderModalProps = {
   isOpen: boolean;
@@ -37,7 +45,6 @@ export const UpdatePricesFromOrderModal: React.FC<UpdatePricesFromOrderModalProp
 
   useEffect(() => {
     if (isOpen && order && order.items) {
-      // Инициализация списка товаров для обновления
       const updates: PriceUpdate[] = order.items.map((item) => ({
         productId: item.productId,
         productName: item.product?.name || 'Товар',
@@ -80,7 +87,6 @@ export const UpdatePricesFromOrderModal: React.FC<UpdatePricesFromOrderModalProp
     e.preventDefault();
     if (!order) return;
 
-    // Фильтруем только те товары, где отмечено обновление
     const selectedUpdates = priceUpdates.filter(
       (item) => item.updateCostPrice || item.updateSellingPrice
     );
@@ -121,10 +127,6 @@ export const UpdatePricesFromOrderModal: React.FC<UpdatePricesFromOrderModalProp
     }
   };
 
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('ru-RU').format(price);
-  };
-
   const getPriceDiff = (current: number, newPrice: string) => {
     if (!newPrice) return null;
     const diff = parseFloat(newPrice) - current;
@@ -132,239 +134,195 @@ export const UpdatePricesFromOrderModal: React.FC<UpdatePricesFromOrderModalProp
     return { diff, percent };
   };
 
+  const selectedCount = priceUpdates.filter(
+    (p) => p.updateCostPrice || p.updateSellingPrice
+  ).length;
+
   if (!isOpen || !order) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">
-              Обновить базовые цены товаров
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">Заявка: {order.orderNumber}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="h-6 w-6" />
-          </button>
-        </div>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Обновить базовые цены товаров"
+      size="xl"
+      footer={
+        <FormFooter
+          onCancel={onClose}
+          submitLabel={loading ? 'Обновление...' : 'Обновить цены'}
+          submitLoading={loading}
+          submitDisabled={loading}
+          onSubmit={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
+          submitType="button"
+        />
+      }
+    >
+      <p className="text-caption text-text-muted mb-4">
+        Заявка: {order.orderNumber}
+        {selectedCount > 0 && (
+          <span className="ml-2">
+            · Выбрано: {selectedCount}
+          </span>
+        )}
+      </p>
 
-        {/* Content */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
-          <div className="p-6 space-y-4">
-            {error && (
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-2">
-                <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
-                <span className="text-sm text-red-700">{error}</span>
-              </div>
-            )}
+      <form id="update-prices-form" onSubmit={handleSubmit} className="space-y-6">
+        {error && <Alert variant="error">{error}</Alert>}
 
-            {/* Глобальная причина */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Причина обновления (применится ко всем товарам):
-              </label>
-              <input
-                type="text"
-                value={globalReason}
-                onChange={(e) => setGlobalReason(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="Например: Новый прайс от поставщика"
-              />
-            </div>
+        <Card variant="inset">
+          <CardBody>
+            <Input
+              label="Причина обновления (применится ко всем товарам)"
+              value={globalReason}
+              onChange={(e) => setGlobalReason(e.target.value)}
+              placeholder="Например: Новый прайс от поставщика"
+            />
+          </CardBody>
+        </Card>
 
-            {/* Список товаров */}
-            <div className="space-y-3">
-              {priceUpdates.map((item, index) => {
-                const costDiff = getPriceDiff(item.currentCostPrice, item.newCostPrice);
-                const sellingDiff = getPriceDiff(
-                  item.currentSellingPrice,
-                  item.newSellingPrice
-                );
+        <div className="space-y-3">
+          {priceUpdates.map((item, index) => {
+            const costDiff = getPriceDiff(item.currentCostPrice, item.newCostPrice);
+            const sellingDiff = getPriceDiff(
+              item.currentSellingPrice,
+              item.newSellingPrice
+            );
 
-                return (
-                  <div
-                    key={item.productId}
-                    className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <h3 className="font-semibold text-gray-900">{item.productName}</h3>
-                        <p className="text-sm text-gray-500">Артикул: {item.productArticle}</p>
+            return (
+              <Card key={item.productId} variant="elevated">
+                <CardBody className="space-y-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="text-card-title text-brand-black">{item.productName}</h3>
+                      <p className="text-caption text-text-muted mt-0.5">
+                        Артикул: {item.productArticle}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => handleApplyPriceFromOrder(index)}
+                      className="flex-shrink-0"
+                    >
+                      Применить цену из заявки
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <p className="text-label uppercase tracking-wider text-text-muted mb-1">
+                        Текущая себестоимость
+                      </p>
+                      <p className="text-price tabular-nums">{formatPriceKZT(item.currentCostPrice)}</p>
+                    </div>
+                    <div>
+                      <p className="text-label uppercase tracking-wider text-text-muted mb-1">
+                        Цена в заявке
+                      </p>
+                      <p className="text-price tabular-nums text-accent">{formatPriceKZT(item.priceAtPurchase)}</p>
+                    </div>
+                    <div>
+                      <p className="text-label uppercase tracking-wider text-text-muted mb-1">
+                        Текущая цена продажи
+                      </p>
+                      <p className="text-price tabular-nums">{formatPriceKZT(item.currentSellingPrice)}</p>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-border-subtle pt-4 space-y-4">
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={item.updateCostPrice}
+                        onChange={(e) =>
+                          handleUpdateField(index, 'updateCostPrice', e.target.checked)
+                        }
+                        className="mt-2.5 h-4 w-4 rounded border-border-subtle text-brand-yellow focus:ring-brand-yellow"
+                      />
+                      <div className="flex-1 space-y-2">
+                        <label className="text-label uppercase tracking-wider text-text-muted">
+                          Новая себестоимость
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={item.newCostPrice}
+                            onChange={(e) =>
+                              handleUpdateField(index, 'newCostPrice', e.target.value)
+                            }
+                            disabled={!item.updateCostPrice}
+                            placeholder={item.currentCostPrice.toString()}
+                            className="flex-1"
+                          />
+                          {costDiff && (
+                            <Badge
+                              variant={costDiff.diff >= 0 ? 'danger' : 'success'}
+                              className="flex items-center gap-1 flex-shrink-0"
+                            >
+                              {costDiff.diff >= 0 ? (
+                                <TrendingUp className="h-3.5 w-3.5" />
+                              ) : (
+                                <TrendingDown className="h-3.5 w-3.5" />
+                              )}
+                              {costDiff.diff >= 0 ? '+' : ''}
+                              {costDiff.percent.toFixed(1)}%
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleApplyPriceFromOrder(index)}
-                        className="px-3 py-1 text-sm bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors"
-                      >
-                        Применить цену из заявки
-                      </button>
                     </div>
 
-                    {/* Текущие цены */}
-                    <div className="grid grid-cols-3 gap-4 mb-3 text-sm">
-                      <div>
-                        <span className="text-gray-500">Текущая себестоимость:</span>
-                        <div className="font-semibold text-gray-900">
-                          {formatPrice(item.currentCostPrice)} ₸
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Цена в заявке:</span>
-                        <div className="font-semibold text-blue-600">
-                          {formatPrice(item.priceAtPurchase)} ₸
-                        </div>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Текущая цена продажи:</span>
-                        <div className="font-semibold text-gray-900">
-                          {formatPrice(item.currentSellingPrice)} ₸
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Обновление себестоимости */}
-                    <div className="border-t border-gray-100 pt-3 space-y-3">
-                      <div className="flex items-start gap-3">
-                        <input
-                          type="checkbox"
-                          checked={item.updateCostPrice}
-                          onChange={(e) =>
-                            handleUpdateField(index, 'updateCostPrice', e.target.checked)
-                          }
-                          className="mt-1 h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
-                        />
-                        <div className="flex-1">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Новая себестоимость
-                          </label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.newCostPrice}
-                              onChange={(e) =>
-                                handleUpdateField(index, 'newCostPrice', e.target.value)
-                              }
-                              disabled={!item.updateCostPrice}
-                              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-                              placeholder={item.currentCostPrice.toString()}
-                            />
-                            {costDiff && (
-                              <div
-                                className={`flex items-center gap-1 px-2 py-1 rounded text-sm font-medium ${
-                                  costDiff.diff >= 0
-                                    ? 'bg-red-100 text-red-700'
-                                    : 'bg-green-100 text-green-700'
-                                }`}
-                              >
-                                {costDiff.diff >= 0 ? (
-                                  <TrendingUp className="h-4 w-4" />
-                                ) : (
-                                  <TrendingDown className="h-4 w-4" />
-                                )}
-                                {costDiff.diff >= 0 ? '+' : ''}
-                                {costDiff.percent.toFixed(1)}%
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Обновление цены продажи */}
-                      <div className="flex items-start gap-3">
-                        <input
-                          type="checkbox"
-                          checked={item.updateSellingPrice}
-                          onChange={(e) =>
-                            handleUpdateField(index, 'updateSellingPrice', e.target.checked)
-                          }
-                          className="mt-1 h-4 w-4 text-blue-600 rounded focus:ring-blue-500"
-                        />
-                        <div className="flex-1">
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Новая цена продажи
-                          </label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              step="0.01"
-                              value={item.newSellingPrice}
-                              onChange={(e) =>
-                                handleUpdateField(index, 'newSellingPrice', e.target.value)
-                              }
-                              disabled={!item.updateSellingPrice}
-                              className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100"
-                              placeholder={item.currentSellingPrice.toString()}
-                            />
-                            {sellingDiff && (
-                              <div
-                                className={`flex items-center gap-1 px-2 py-1 rounded text-sm font-medium ${
-                                  sellingDiff.diff >= 0
-                                    ? 'bg-red-100 text-red-700'
-                                    : 'bg-green-100 text-green-700'
-                                }`}
-                              >
-                                {sellingDiff.diff >= 0 ? (
-                                  <TrendingUp className="h-4 w-4" />
-                                ) : (
-                                  <TrendingDown className="h-4 w-4" />
-                                )}
-                                {sellingDiff.diff >= 0 ? '+' : ''}
-                                {sellingDiff.percent.toFixed(1)}%
-                              </div>
-                            )}
-                          </div>
+                    <div className="flex items-start gap-3">
+                      <input
+                        type="checkbox"
+                        checked={item.updateSellingPrice}
+                        onChange={(e) =>
+                          handleUpdateField(index, 'updateSellingPrice', e.target.checked)
+                        }
+                        className="mt-2.5 h-4 w-4 rounded border-border-subtle text-brand-yellow focus:ring-brand-yellow"
+                      />
+                      <div className="flex-1 space-y-2">
+                        <label className="text-label uppercase tracking-wider text-text-muted">
+                          Новая цена продажи
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            value={item.newSellingPrice}
+                            onChange={(e) =>
+                              handleUpdateField(index, 'newSellingPrice', e.target.value)
+                            }
+                            disabled={!item.updateSellingPrice}
+                            placeholder={item.currentSellingPrice.toString()}
+                            className="flex-1"
+                          />
+                          {sellingDiff && (
+                            <Badge
+                              variant={sellingDiff.diff >= 0 ? 'danger' : 'success'}
+                              className="flex items-center gap-1 flex-shrink-0"
+                            >
+                              {sellingDiff.diff >= 0 ? (
+                                <TrendingUp className="h-3.5 w-3.5" />
+                              ) : (
+                                <TrendingDown className="h-3.5 w-3.5" />
+                              )}
+                              {sellingDiff.diff >= 0 ? '+' : ''}
+                              {sellingDiff.percent.toFixed(1)}%
+                            </Badge>
+                          )}
                         </div>
                       </div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="border-t border-gray-200 p-6 bg-gray-50">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-600">
-                Выбрано товаров:{' '}
-                {priceUpdates.filter((p) => p.updateCostPrice || p.updateSellingPrice).length}
-              </div>
-              <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Отмена
-                </button>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  {loading ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      <span>Обновление...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Save className="h-4 w-4" />
-                      <span>Обновить цены</span>
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </form>
-      </div>
-    </div>
+                </CardBody>
+              </Card>
+            );
+          })}
+        </div>
+      </form>
+    </Modal>
   );
 };

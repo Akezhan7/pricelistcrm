@@ -3,6 +3,7 @@ import { EditProductModal } from '../components/EditProductModal';
 import { ProductSuppliersModal } from '../components/ProductSuppliersModal';
 import productsApi from '../services/productsApi';
 import type { Product, ProductWithPrice } from '../types';
+import { toast } from '../context/ToastContext';
 
 interface UseProductEditorOptions {
   onUpdated?: () => void;
@@ -28,7 +29,7 @@ export function useProductEditor(options: UseProductEditorOptions = {}) {
         setEditingProduct(full);
       } catch (err) {
         console.error('Ошибка загрузки товара:', err);
-        alert('Не удалось загрузить данные товара');
+        toast.error('Не удалось загрузить данные товара');
       } finally {
         setLoadingProductId(null);
       }
@@ -44,7 +45,7 @@ export function useProductEditor(options: UseProductEditorOptions = {}) {
         setSuppliersProduct(full);
       } catch (err) {
         console.error('Ошибка загрузки товара:', err);
-        alert('Не удалось загрузить данные товара');
+        toast.error('Не удалось загрузить данные товара');
       } finally {
         setLoadingProductId(null);
       }

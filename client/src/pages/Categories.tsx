@@ -2,23 +2,37 @@ import React, { useState, useEffect } from 'react';
 import { Layout } from '../components/Layout';
 import { CategoryModal } from '../components/CategoryModal';
 import { DeleteConfirmModal } from '../components/DeleteConfirmModal';
-import { 
-  FolderTree, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  ChevronRight, 
+import {
+  FolderTree,
+  Plus,
+  Edit,
+  Trash2,
+  ChevronRight,
   ChevronDown,
   FolderOpen,
   Folder,
   RefreshCw,
   Eye,
-  EyeOff
+  EyeOff,
 } from 'lucide-react';
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardBody,
+  EmptyState,
+  IconButton,
+  PageHeader,
+  Spinner,
+} from '../components/ui';
 import categoryApi from '../services/categoryApi';
 import type { Category } from '../types';
+import { useToast } from '../context/ToastContext';
+import { cn } from '../utils/cn';
 
 export const Categories: React.FC = () => {
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
@@ -38,6 +52,7 @@ export const Categories: React.FC = () => {
       setCategories(data);
     } catch (error) {
       console.error('Ошибка загрузки категорий:', error);
+      toast.error('Не удалось загрузить категории');
     } finally {
       setLoading(false);
     }
@@ -73,8 +88,10 @@ export const Categories: React.FC = () => {
       await categoryApi.deleteCategory(deletingCategory.id);
       await loadCategories();
       setDeletingCategory(null);
+      toast.success('Категория удалена');
     } catch (error) {
       console.error('Ошибка удаления категории:', error);
+      toast.error('Не удалось удалить категорию');
     } finally {
       setIsDeleting(false);
     }
@@ -83,11 +100,13 @@ export const Categories: React.FC = () => {
   const handleToggleActive = async (category: Category) => {
     try {
       await categoryApi.updateCategory(category.id, {
-        isActive: !category.isActive
+        isActive: !category.isActive,
       });
       await loadCategories();
+      toast.success(category.isActive ? 'Категория деактивирована' : 'Категория активирована');
     } catch (error) {
       console.error('Ошибка изменения статуса категории:', error);
+      toast.error('Не удалось изменить статус категории');
     }
   };
 
@@ -98,7 +117,7 @@ export const Categories: React.FC = () => {
   const getFlatCategories = (cats: Category[]): Category[] => {
     if (!cats || !Array.isArray(cats)) return [];
     let result: Category[] = [];
-    cats.forEach(cat => {
+    cats.forEach((cat) => {
       result.push(cat);
       if (cat.subcategories && cat.subcategories.length > 0) {
         result = result.concat(getFlatCategories(cat.subcategories));
@@ -109,103 +128,82 @@ export const Categories: React.FC = () => {
 
   const flatCategories = getFlatCategories(categories);
 
-  const renderCategory = (category: Category, level: number = 0) => {
+  const renderCategoryRow = (category: Category, level: number = 0) => {
     const hasChildren = category.subcategories && category.subcategories.length > 0;
     const isExpanded = expandedCategories.has(category.id);
 
     return (
-      <div key={category.id} className="border-b border-gray-100 last:border-b-0">
-        <div 
-          className={`flex items-center justify-between p-3 hover:bg-gray-50 transition-colors ${
-            level > 0 ? 'ml-' + (level * 8) : ''
-          }`}
-          style={{ paddingLeft: `${level * 32 + 12}px` }}
+      <div key={category.id}>
+        <div
+          className={cn(
+            'group flex items-center justify-between gap-3 rounded-lg border border-border-subtle bg-brand-white p-3 transition-colors duration-150',
+            'hover:bg-surface-inset/60',
+            !category.isActive && 'opacity-70',
+            level > 0 && 'ml-3 border-l-[3px] border-l-brand-yellow/30'
+          )}
         >
-          <div className="flex items-center gap-3 flex-1">
-            {/* Кнопка раскрытия/сворачивания */}
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             {hasChildren ? (
-              <button
+              <IconButton
+                icon={isExpanded ? ChevronDown : ChevronRight}
+                title={isExpanded ? 'Свернуть' : 'Развернуть'}
+                size="sm"
                 onClick={() => handleToggleExpand(category.id)}
-                className="p-1 hover:bg-gray-200 rounded transition-colors"
-              >
-                {isExpanded ? (
-                  <ChevronDown className="h-4 w-4 text-gray-600" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 text-gray-600" />
-                )}
-              </button>
+              />
             ) : (
-              <div className="w-6" />
+              <div className="w-8 shrink-0" />
             )}
 
-            {/* Иконка папки */}
             {hasChildren ? (
               isExpanded ? (
-                <FolderOpen className="h-5 w-5 text-blue-500" />
+                <FolderOpen className="h-5 w-5 shrink-0 text-brand-yellow" />
               ) : (
-                <Folder className="h-5 w-5 text-gray-500" />
+                <Folder className="h-5 w-5 shrink-0 text-text-muted" />
               )
             ) : (
-              <Folder className="h-5 w-5 text-gray-400" />
+              <Folder className="h-5 w-5 shrink-0 text-text-muted" />
             )}
 
-            {/* Название категории */}
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <span className={`font-medium ${category.isActive ? 'text-gray-900' : 'text-gray-400'}`}>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className={cn(
+                    'text-body-medium',
+                    category.isActive ? 'text-brand-black' : 'text-text-muted'
+                  )}
+                >
                   {category.name}
                 </span>
-                {!category.isActive && (
-                  <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
-                    Неактивна
-                  </span>
-                )}
+                {!category.isActive && <Badge variant="outline">Неактивна</Badge>}
                 {category.productsCount !== undefined && category.productsCount > 0 && (
-                  <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded">
-                    {category.productsCount} товаров
-                  </span>
+                  <Badge variant="info">{category.productsCount} товаров</Badge>
                 )}
               </div>
               {category.description && (
-                <p className="text-sm text-gray-500 mt-0.5">{category.description}</p>
+                <p className="mt-0.5 truncate text-caption text-text-muted">{category.description}</p>
               )}
             </div>
           </div>
 
-          {/* Кнопки действий */}
-          <div className="flex items-center gap-1">
-            <button
-              onClick={() => handleToggleActive(category)}
-              className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+          <div className="flex shrink-0 items-center gap-0.5">
+            <IconButton
+              icon={category.isActive ? Eye : EyeOff}
               title={category.isActive ? 'Деактивировать' : 'Активировать'}
-            >
-              {category.isActive ? (
-                <Eye className="h-4 w-4" />
-              ) : (
-                <EyeOff className="h-4 w-4" />
-              )}
-            </button>
-            <button
-              onClick={() => handleEditCategory(category)}
-              className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
-              title="Редактировать"
-            >
-              <Edit className="h-4 w-4" />
-            </button>
-            <button
-              onClick={() => setDeletingCategory(category)}
-              className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+              onClick={() => handleToggleActive(category)}
+            />
+            <IconButton icon={Edit} title="Редактировать" onClick={() => handleEditCategory(category)} />
+            <IconButton
+              icon={Trash2}
               title="Удалить"
-            >
-              <Trash2 className="h-4 w-4" />
-            </button>
+              variant="danger"
+              onClick={() => setDeletingCategory(category)}
+            />
           </div>
         </div>
 
-        {/* Подкатегории */}
         {hasChildren && isExpanded && (
-          <div>
-            {category.subcategories!.map((subcat) => renderCategory(subcat, level + 1))}
+          <div className="mt-2 space-y-2 border-l border-border-subtle pl-3 ml-4">
+            {category.subcategories!.map((subcat) => renderCategoryRow(subcat, level + 1))}
           </div>
         )}
       </div>
@@ -215,8 +213,8 @@ export const Categories: React.FC = () => {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="flex h-64 items-center justify-center">
+          <Spinner size="lg" color="brand" useLucide />
         </div>
       </Layout>
     );
@@ -225,68 +223,57 @@ export const Categories: React.FC = () => {
   return (
     <Layout>
       <div className="space-y-6">
-        {/* Заголовок */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <FolderTree className="h-8 w-8 text-blue-600" />
-            <h1 className="text-2xl font-bold text-gray-900">Категории товаров</h1>
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={loadCategories}
-              className="btn-secondary flex items-center gap-2"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Обновить
-            </button>
-            <button
-              onClick={handleCreateCategory}
-              className="btn-primary flex items-center gap-2"
-            >
-              <Plus className="h-4 w-4" />
-              Создать категорию
-            </button>
-          </div>
-        </div>
+        <PageHeader
+          title="Категории товаров"
+          description="Дерево категорий для организации каталога"
+          icon={FolderTree}
+          actions={
+            <>
+              <Button variant="secondary" leftIcon={RefreshCw} onClick={loadCategories}>
+                Обновить
+              </Button>
+              <Button variant="primary" leftIcon={Plus} onClick={handleCreateCategory}>
+                Создать категорию
+              </Button>
+            </>
+          }
+        />
 
-        {/* Список категорий */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          {!categories || categories.length === 0 ? (
-            <div className="p-12 text-center">
-              <FolderTree className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 mb-4">Категории не созданы</p>
-              <button
-                onClick={handleCreateCategory}
-                className="btn-primary inline-flex items-center gap-2"
-              >
-                <Plus className="h-4 w-4" />
-                Создать первую категорию
-              </button>
-            </div>
-          ) : (
-            <div className="divide-y divide-gray-100">
-              {categories.map((category) => renderCategory(category))}
-            </div>
-          )}
-        </div>
-
-        {/* Подсказка */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex gap-3">
-            <FolderTree className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-blue-800">
-              <p className="font-medium mb-1">Советы по работе с категориями:</p>
-              <ul className="list-disc list-inside space-y-1 text-blue-700">
-                <li>Создавайте подкатегории выбрав родительскую категорию при создании</li>
-                <li>Используйте деактивацию вместо удаления, чтобы сохранить историю</li>
-                <li>Категории с товарами нельзя удалить - сначала переместите товары</li>
-              </ul>
-            </div>
+        {!categories || categories.length === 0 ? (
+          <Card>
+            <EmptyState
+              icon={FolderTree}
+              title="Категории не созданы"
+              description="Создайте первую категорию для организации товаров"
+              action={
+                <Button variant="primary" leftIcon={Plus} onClick={handleCreateCategory}>
+                  Создать первую категорию
+                </Button>
+              }
+              className="py-12"
+            />
+          </Card>
+        ) : (
+          <div className="space-y-3">
+            {categories.map((category) => (
+              <Card key={category.id} variant="elevated">
+                <CardBody className="p-4 md:p-5">
+                  {renderCategoryRow(category)}
+                </CardBody>
+              </Card>
+            ))}
           </div>
-        </div>
+        )}
+
+        <Alert variant="info" icon={FolderTree} title="Советы по работе с категориями:">
+          <ul className="list-inside list-disc space-y-1">
+            <li>Создавайте подкатегории, выбрав родительскую категорию при создании</li>
+            <li>Используйте деактивацию вместо удаления, чтобы сохранить историю</li>
+            <li>Категории с товарами нельзя удалить — сначала переместите товары</li>
+          </ul>
+        </Alert>
       </div>
 
-      {/* Модальное окно создания/редактирования */}
       <CategoryModal
         isOpen={isModalOpen}
         onClose={() => {
@@ -298,7 +285,6 @@ export const Categories: React.FC = () => {
         categories={flatCategories}
       />
 
-      {/* Модальное окно подтверждения удаления */}
       <DeleteConfirmModal
         isOpen={!!deletingCategory}
         onClose={() => setDeletingCategory(null)}

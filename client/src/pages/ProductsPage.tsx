@@ -5,7 +5,8 @@ import { useAuth } from '../context/AuthContext';
 import { useUI } from '../context/UIContext';
 import { Product } from '../types';
 import api from '../utils/api';
-import { RefreshCw } from 'lucide-react';
+import { Package, RefreshCw } from 'lucide-react';
+import { IconButton, Spinner } from '../components/ui';
 
 const API_LIST_LIMIT = 1000;
 
@@ -34,14 +35,15 @@ export const ProductsPage: React.FC = () => {
     fetchProducts();
   }, []);
 
+  const countLabel =
+    totalProducts === 1 ? 'позиция' : totalProducts < 5 ? 'позиции' : 'позиций';
+
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-full">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Загрузка товаров...</p>
-          </div>
+        <div className="flex flex-col items-center justify-center h-64 gap-4">
+          <Spinner size="lg" color="brand" />
+          <p className="text-text-muted">Загрузка товаров...</p>
         </div>
       </Layout>
     );
@@ -49,25 +51,59 @@ export const ProductsPage: React.FC = () => {
 
   return (
     <Layout searchQuery={searchQuery} onSearchChange={setSearchQuery} fullHeight>
-      <div className="h-full flex flex-col bg-white border border-gray-200 rounded-lg shadow-sm" style={{ minHeight: 0 }}>
-        <div className="p-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-          <h1 className="text-lg font-semibold text-gray-900">Товары ({totalProducts})</h1>
-          <button
-            onClick={fetchProducts}
-            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Обновить"
-          >
-            <RefreshCw className="h-4 w-4" />
-          </button>
+      <div className="w-full h-full flex flex-col min-h-0">
+        {/* Mobile sticky page header */}
+        <div className="md:hidden sticky top-0 z-10 -mx-4 px-4 py-3 mb-3 bg-surface-page/95 backdrop-blur-sm border-b border-border-subtle shrink-0">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-yellow/15">
+                <Package className="h-5 w-5 text-brand-yellow-dark" aria-hidden />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-section-title font-bold tracking-tight text-brand-black truncate">
+                  Товары
+                </h1>
+                <p className="text-caption text-text-muted mt-0.5">
+                  {totalProducts} {countLabel}
+                </p>
+              </div>
+            </div>
+            <IconButton
+              icon={RefreshCw}
+              title="Обновить"
+              size="md"
+              variant="ghost"
+              onClick={fetchProducts}
+            />
+          </div>
         </div>
-        <ProductList
-          products={products}
-          searchQuery={searchQuery}
-          selectedProduct={selectedProduct}
-          onSelectProduct={setSelectedProduct}
-          onRefresh={fetchProducts}
-          canEdit={user?.role === 'admin' || user?.role === 'purchase_manager'}
-        />
+
+        <div className="flex-1 min-h-0 flex flex-col bg-brand-white border border-border-subtle rounded-xl shadow-sm overflow-hidden">
+          <div className="hidden md:flex px-5 py-4 border-b border-border-subtle bg-surface-muted flex-row items-center justify-between gap-3 shrink-0">
+            <h1 className="text-h1 font-bold tracking-tight text-brand-black flex items-center gap-2">
+              <Package className="h-5 w-5 text-brand-yellow shrink-0" aria-hidden />
+              <span>Товары</span>
+              <span className="text-body font-normal text-text-muted tabular-nums">
+                ({totalProducts})
+              </span>
+            </h1>
+            <IconButton
+              icon={RefreshCw}
+              title="Обновить"
+              size="md"
+              variant="ghost"
+              onClick={fetchProducts}
+            />
+          </div>
+          <ProductList
+            products={products}
+            searchQuery={searchQuery}
+            selectedProduct={selectedProduct}
+            onSelectProduct={setSelectedProduct}
+            onRefresh={fetchProducts}
+            canEdit={user?.role === 'admin' || user?.role === 'purchase_manager'}
+          />
+        </div>
       </div>
     </Layout>
   );

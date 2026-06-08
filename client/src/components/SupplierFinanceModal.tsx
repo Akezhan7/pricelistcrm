@@ -1,7 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, CreditCard, MessageSquare, Paperclip, FileText } from 'lucide-react';
+import { Plus, CreditCard, MessageSquare, Paperclip, FileText, X } from 'lucide-react';
 import { createPayment, getPaymentsBySupplier, formatPaymentAmount, formatPaymentDate, getPaymentMethodIcon, getPaymentMethodColor, type CreatePaymentData, type SupplierPaymentData } from '../services/paymentsApi';
 import getImageUrl from '../utils/image';
+import { Modal } from './ui/Modal';
+import { FormFooter } from './ui/FormFooter';
+import { FormSection } from './ui/FormSection';
+import { Button } from './ui/Button';
+import { Input } from './ui/Input';
+import { Select } from './ui/Select';
+import { Textarea } from './ui/Textarea';
+import { Badge } from './ui/Badge';
+import { Spinner } from './ui/Spinner';
+import { toast } from '../context/ToastContext';
+import { cn } from '../utils/cn';
 
 interface SupplierFinanceModalProps {
   isOpen: boolean;
@@ -92,7 +103,7 @@ export const SupplierFinanceModal: React.FC<SupplierFinanceModalProps> = ({
     e.preventDefault();
     
     if (paymentForm.amount <= 0) {
-      alert('Введите сумму платежа');
+      toast.warning('Введите сумму платежа');
       return;
     }
 
@@ -121,135 +132,109 @@ export const SupplierFinanceModal: React.FC<SupplierFinanceModalProps> = ({
       onSuccess?.();
     } catch (error) {
       console.error('Ошибка создания платежа:', error);
-      alert('Ошибка при регистрации платежа');
+      toast.error('Ошибка при регистрации платежа');
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">
-            Финансы - {supplierName}
-          </h2>
-          <button
-            onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="h-6 w-6" />
-          </button>
-        </div>
-
-        {/* Content */}
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title={`Финансы — ${supplierName}`}
+      size="xl"
+      footer={<FormFooter onCancel={handleClose} cancelLabel="Закрыть" showSubmit={false} />}
+    >
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              <Spinner size="lg" color="brand" />
             </div>
           ) : supplierData ? (
             <div className="space-y-6">
               {/* Статистика */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <div className="text-2xl font-bold text-red-800">
+                <div className="bg-surface-inset border border-border-subtle rounded-xl p-4">
+                  <div className="text-metric font-tabular text-danger">
                     {formatPaymentAmount(supplierData.stats.totalDebt)}
                   </div>
-                  <div className="text-sm text-red-600">Общая задолженность</div>
+                  <div className="text-caption text-text-muted mt-1">Общая задолженность</div>
                 </div>
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                  <div className="text-2xl font-bold text-green-800">
+                <div className="bg-surface-inset border border-border-subtle rounded-xl p-4">
+                  <div className="text-metric font-tabular text-success">
                     {formatPaymentAmount(supplierData.stats.totalPaid)}
                   </div>
-                  <div className="text-sm text-green-600">Всего оплачено</div>
+                  <div className="text-caption text-text-muted mt-1">Всего оплачено</div>
                 </div>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="text-2xl font-bold text-blue-800">
+                <div className="bg-surface-inset border border-border-subtle rounded-xl p-4">
+                  <div className="text-metric font-tabular text-brand-black">
                     {supplierData.stats.unpaidOrdersCount}
                   </div>
-                  <div className="text-sm text-blue-600">Неоплаченных заявок</div>
+                  <div className="text-caption text-text-muted mt-1">Неоплаченных заявок</div>
                 </div>
               </div>
 
-              {/* Кнопка добавления платежа */}
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold">Неоплаченные заявки</h3>
-                <button
-                  onClick={() => setShowAddPayment(true)}
-                  className="btn-primary flex items-center gap-2"
-                >
-                  <Plus className="h-4 w-4" />
+              <div className="flex justify-between items-center gap-3">
+                <h3 className="text-section-title text-brand-black">Неоплаченные заявки</h3>
+                <Button type="button" onClick={() => setShowAddPayment(true)} leftIcon={Plus}>
                   Зарегистрировать платеж
-                </button>
+                </Button>
               </div>
 
-              {/* Форма добавления платежа */}
               {showAddPayment && (
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                  <h4 className="text-md font-semibold mb-4">Новый платеж</h4>
+                <FormSection title="Новый платеж">
                   <form onSubmit={handleSubmitPayment} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Сумма платежа *
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={paymentForm.amount || ''}
-                          onChange={(e) => setPaymentForm(prev => ({ ...prev, amount: parseFloat(e.target.value) || 0 }))}
-                          className="input-field"
-                          placeholder="Введите сумму"
-                          required
-                        />
-                        <div className="text-xs text-gray-500 mt-1">
-                          Доступно к оплате: {formatPaymentAmount(calculateTotalDebt())}
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Способ оплаты
-                        </label>
-                        <select
-                          value={paymentForm.paymentMethod}
-                          onChange={(e) => setPaymentForm(prev => ({ ...prev, paymentMethod: e.target.value as any }))}
-                          className="input-field"
-                        >
-                          <option value="Наличные">💵 Наличные</option>
-                          <option value="Перевод">🏦 Перевод</option>
-                          <option value="Карта">💳 Карта</option>
-                          <option value="Другое">💼 Другое</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Комментарий
-                      </label>
-                      <textarea
-                        value={paymentForm.comment}
-                        onChange={(e) => setPaymentForm(prev => ({ ...prev, comment: e.target.value }))}
-                        className="input-field"
-                        rows={3}
-                        placeholder="Дополнительная информация о платеже"
+                      <Input
+                        label="Сумма платежа"
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        value={paymentForm.amount || ''}
+                        onChange={(e) =>
+                          setPaymentForm((prev) => ({
+                            ...prev,
+                            amount: parseFloat(e.target.value) || 0,
+                          }))
+                        }
+                        placeholder="Введите сумму"
+                        required
+                        helperText={`Доступно к оплате: ${formatPaymentAmount(calculateTotalDebt())}`}
                       />
+                      <Select
+                        label="Способ оплаты"
+                        value={paymentForm.paymentMethod}
+                        onChange={(e) =>
+                          setPaymentForm((prev) => ({
+                            ...prev,
+                            paymentMethod: e.target.value as CreatePaymentData['paymentMethod'],
+                          }))
+                        }
+                      >
+                        <option value="Наличные">Наличные</option>
+                        <option value="Перевод">Перевод</option>
+                        <option value="Карта">Карта</option>
+                        <option value="Другое">Другое</option>
+                      </Select>
                     </div>
 
+                    <Textarea
+                      label="Комментарий"
+                      value={paymentForm.comment}
+                      onChange={(e) =>
+                        setPaymentForm((prev) => ({ ...prev, comment: e.target.value }))
+                      }
+                      rows={3}
+                      placeholder="Дополнительная информация о платеже"
+                      className="resize-none"
+                    />
+
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Чек (необязательно)
-                      </label>
-                      <div className="flex items-center gap-3">
-                        <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 border border-gray-300 rounded-lg bg-white hover:bg-gray-50 text-sm transition-colors">
-                          <Paperclip className="h-4 w-4 text-gray-500" />
-                          <span className="text-gray-700">
+                      <p className="text-caption font-medium text-brand-black mb-2">Чек (необязательно)</p>
+                      <div className="flex flex-wrap items-center gap-3">
+                        <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 border-2 border-dashed border-border-subtle rounded-xl bg-surface-base hover:border-brand-yellow text-sm transition-colors">
+                          <Paperclip className="h-4 w-4 text-text-muted" />
+                          <span className="text-brand-black">
                             {receiptFile ? 'Заменить файл' : 'Прикрепить чек'}
                           </span>
                           <input
@@ -260,13 +245,13 @@ export const SupplierFinanceModal: React.FC<SupplierFinanceModalProps> = ({
                           />
                         </label>
                         {receiptFile && (
-                          <div className="flex items-center gap-2 text-sm text-gray-700">
-                            <FileText className="h-4 w-4 text-yellow-600" />
+                          <div className="flex items-center gap-2 text-sm text-brand-black">
+                            <FileText className="h-4 w-4 text-brand-yellow" />
                             <span className="truncate max-w-[200px]">{receiptFile.name}</span>
                             <button
                               type="button"
                               onClick={() => setReceiptFile(null)}
-                              className="text-red-500 hover:text-red-700"
+                              className="text-danger hover:text-danger-dark"
                               title="Удалить файл"
                             >
                               <X className="h-4 w-4" />
@@ -274,32 +259,19 @@ export const SupplierFinanceModal: React.FC<SupplierFinanceModalProps> = ({
                           </div>
                         )}
                       </div>
-                      <p className="text-xs text-gray-500 mt-1">Изображение или PDF, до 5 МБ</p>
+                      <p className="text-xs text-text-muted mt-1">Изображение или PDF, до 5 МБ</p>
                     </div>
 
-                    <div className="flex justify-end space-x-3">
-                      <button
-                        type="button"
-                        onClick={() => setShowAddPayment(false)}
-                        className="btn-secondary"
-                      >
-                        Отмена
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={submitting}
-                        className="btn-primary flex items-center gap-2"
-                      >
-                        {submitting ? (
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                        ) : (
-                          <CreditCard className="h-4 w-4" />
-                        )}
-                        {submitting ? 'Обработка...' : 'Зарегистрировать'}
-                      </button>
-                    </div>
+                    <FormFooter
+                      onCancel={() => setShowAddPayment(false)}
+                      submitLabel={submitting ? 'Обработка...' : 'Зарегистрировать'}
+                      submitLoading={submitting}
+                      submitDisabled={submitting}
+                      showBorder={false}
+                      className="px-0 py-0"
+                    />
                   </form>
-                </div>
+                </FormSection>
               )}
 
               {/* Список неоплаченных заявок */}
@@ -312,44 +284,47 @@ export const SupplierFinanceModal: React.FC<SupplierFinanceModalProps> = ({
                     return (
                       <div
                         key={order.id}
-                        className={`border rounded-lg p-4 cursor-pointer transition-all ${
-                          isSelected 
-                            ? 'border-blue-500 bg-blue-50' 
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
+                        className={cn(
+                          'border rounded-xl p-4 transition-all',
+                          showAddPayment && 'cursor-pointer',
+                          isSelected
+                            ? 'border-brand-yellow bg-surface-accent'
+                            : 'border-border-subtle hover:border-brand-yellow/40'
+                        )}
                         onClick={() => showAddPayment && handleOrderSelection(order.id)}
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-3">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
                             {showAddPayment && (
                               <input
                                 type="checkbox"
                                 checked={isSelected}
                                 onChange={() => handleOrderSelection(order.id)}
-                                className="rounded border-gray-300"
+                                className="rounded border-border-subtle text-brand-yellow focus:ring-brand-yellow"
                               />
                             )}
-                            <div>
-                              <div className="font-medium text-gray-900">{order.orderNumber}</div>
-                              <div className="text-sm text-gray-500">
+                            <div className="min-w-0">
+                              <div className="font-medium text-brand-black">{order.orderNumber}</div>
+                              <div className="text-sm text-text-muted">
                                 {formatPaymentDate(order.createdAt)}
                               </div>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <div className="font-medium text-gray-900">
+                          <div className="text-right flex-shrink-0">
+                            <div className="font-medium text-brand-black font-tabular">
                               {formatPaymentAmount(remaining)}
                             </div>
-                            <div className="text-sm text-gray-500">
+                            <div className="text-sm text-text-muted font-tabular">
                               из {formatPaymentAmount(order.totalAmount)}
                             </div>
-                            <div className={`text-xs px-2 py-1 rounded-full inline-block mt-1 ${
-                              order.paymentStatus === 'Не оплачено' 
-                                ? 'bg-red-100 text-red-800'
-                                : 'bg-yellow-100 text-yellow-800'
-                            }`}>
+                            <Badge
+                              variant={
+                                order.paymentStatus === 'Не оплачено' ? 'danger' : 'warning'
+                              }
+                              className="mt-1"
+                            >
                               {order.paymentStatus}
-                            </div>
+                            </Badge>
                           </div>
                         </div>
                       </div>
@@ -357,29 +332,29 @@ export const SupplierFinanceModal: React.FC<SupplierFinanceModalProps> = ({
                   })}
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <CreditCard className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                <div className="text-center py-8 text-text-muted">
+                  <CreditCard className="h-12 w-12 mx-auto mb-3 text-text-muted/40" />
                   <p>Все заявки оплачены</p>
                 </div>
               )}
 
               {/* История платежей */}
               <div className="border-t pt-6">
-                <h3 className="text-lg font-semibold mb-4">История платежей</h3>
+                <h3 className="text-section-title text-brand-black mb-4">История платежей</h3>
                 {supplierData.payments.length > 0 ? (
                   <div className="space-y-3">
                     {supplierData.payments.slice(0, 10).map((payment) => (
-                      <div key={payment.id} className="border border-gray-200 rounded-lg p-4">
+                      <div key={payment.id} className="border border-border-subtle rounded-xl p-4 bg-surface-base">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center space-x-3">
                             <div className="text-2xl">
                               {getPaymentMethodIcon(payment.paymentMethod)}
                             </div>
                             <div>
-                              <div className="font-medium text-gray-900">
+                              <div className="font-medium text-brand-black font-tabular">
                                 {formatPaymentAmount(payment.amount)}
                               </div>
-                              <div className="text-sm text-gray-500">
+                              <div className="text-sm text-text-muted">
                                 {formatPaymentDate(payment.paymentDate)}
                               </div>
                             </div>
@@ -389,14 +364,14 @@ export const SupplierFinanceModal: React.FC<SupplierFinanceModalProps> = ({
                               {payment.paymentMethod}
                             </div>
                             {payment.creator && (
-                              <div className="text-xs text-gray-500 mt-1">
+                              <div className="text-xs text-text-muted mt-1">
                                 {payment.creator.name}
                               </div>
                             )}
                           </div>
                         </div>
                         {payment.comment && (
-                          <div className="mt-2 text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                          <div className="mt-2 text-sm text-text-muted bg-surface-inset p-2 rounded-lg">
                             {payment.comment}
                           </div>
                         )}
@@ -406,7 +381,7 @@ export const SupplierFinanceModal: React.FC<SupplierFinanceModalProps> = ({
                               href={getImageUrl(payment.receiptUrl) || '#'}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-2 text-sm text-yellow-700 hover:text-yellow-800 bg-yellow-50 border border-yellow-200 px-2 py-1 rounded"
+                              className="inline-flex items-center gap-2 rounded-lg border border-brand-yellow/30 bg-surface-accent px-2 py-1 text-sm text-brand-black hover:bg-brand-yellow/10"
                             >
                               <FileText className="h-4 w-4" />
                               Открыть чек
@@ -417,24 +392,22 @@ export const SupplierFinanceModal: React.FC<SupplierFinanceModalProps> = ({
                     ))}
                     {supplierData.payments.length > 10 && (
                       <div className="text-center">
-                        <button className="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                        <Button variant="ghost" size="sm" className="text-accent-blue">
                           Показать еще ({supplierData.payments.length - 10})
-                        </button>
+                        </Button>
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="text-center py-8 text-gray-500">
-                    <MessageSquare className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+                  <div className="text-center py-8 text-text-muted">
+                    <MessageSquare className="h-12 w-12 mx-auto mb-3 text-text-muted/40" />
                     <p>Платежи пока не регистрировались</p>
                   </div>
                 )}
               </div>
             </div>
           ) : null}
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 };
 

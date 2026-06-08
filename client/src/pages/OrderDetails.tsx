@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -11,8 +11,6 @@ import {
   Warehouse,
   Edit,
   Trash2,
-  Loader2,
-  AlertCircle,
   User,
   FileText,
   CreditCard,
@@ -21,22 +19,86 @@ import {
   Send,
   CheckCircle,
   UserPlus,
-  ClipboardCheck
+  ClipboardCheck,
+  MoreVertical,
 } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import ordersApi from '../services/ordersApi';
 import ChangeOrderStatusModal from '../components/ChangeOrderStatusModal';
 import PaymentModal from '../components/PaymentModal';
 import { UpdatePricesFromOrderModal } from '../components/UpdatePricesFromOrderModal';
 import EditOrderModal from '../components/EditOrderModal';
 import { generateOrderPDF } from '../utils/pdfGenerator';
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  ConfirmDialog,
+  ErrorState,
+  Spinner,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from '../components/ui';
+import type { ButtonVariant } from '../components/ui';
+import {
+  deliveryStatusColors,
+  getOrderStatusColor,
+  getPaymentStatusColor,
+  orderStatusColors,
+} from '../theme/statusColors';
+import { formatPriceKZT } from '../utils/format';
+import { cn } from '../utils/cn';
 import type { Order, OrderStatus } from '../types';
+
+type HeaderAction = {
+  key: string;
+  label: string;
+  icon: LucideIcon;
+  onClick: () => void;
+  variant?: ButtonVariant;
+  className?: string;
+  loading?: boolean;
+  disabled?: boolean;
+  primary?: boolean;
+};
+
+const resolveStatusBadgeClass = (status: string): string => {
+  if (status in orderStatusColors) {
+    return getOrderStatusColor(status as OrderStatus);
+  }
+  return deliveryStatusColors[status] ?? getOrderStatusColor('Создана');
+};
+
+interface FinanceStatProps {
+  label: string;
+  value: string;
+  valueClassName?: string;
+}
+
+const FinanceStat: React.FC<FinanceStatProps> = ({ label, value, valueClassName }) => (
+  <div className="rounded-xl border border-border-subtle bg-surface-inset p-4">
+    <p className="text-caption font-medium text-text-muted">{label}</p>
+    <p className={cn('mt-1 text-h2 font-bold tabular-nums tracking-tight', valueClassName ?? 'text-brand-black')}>
+      {value}
+    </p>
+  </div>
+);
 
 const OrderDetails: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const toast = useToast();
 
   const canEditOrders = user?.role === 'admin' || user?.role === 'purchase_manager';
   const canDeleteOrders = user?.role === 'admin';
@@ -59,6 +121,10 @@ const OrderDetails: React.FC = () => {
   const [showCollectorAssign, setShowCollectorAssign] = useState(false);
   const [collectors, setCollectors] = useState<any[]>([]);
   const [selectedCollectorId, setSelectedCollectorId] = useState<number | null>(null);
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const actionsMenuRef = useRef<HTMLDivElement>(null);
 
   const loadOrder = useCallback(async () => {
     try {
@@ -66,8 +132,7 @@ const OrderDetails: React.FC = () => {
       setError(null);
       const data = await ordersApi.getOrderById(Number(id));
       setOrder(data);
-      
-      // Загружаем историю платежей
+
       try {
         const paymentsData = await ordersApi.getOrderPayments(Number(id));
         setPayments(paymentsData.payments || []);
@@ -88,40 +153,33 @@ const OrderDetails: React.FC = () => {
     }
   }, [id, loadOrder]);
 
-  const getStatusColor = (status: OrderStatus) => {
-    const colors: Record<string, string> = {
-      'Создана': 'bg-gray-100 text-gray-800 border-gray-200',
-      'Отправлена поставщику': 'bg-blue-100 text-blue-800 border-blue-200',
-      'Частично подтверждена': 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      'Подтверждена': 'bg-green-100 text-green-800 border-green-200',
-      'В сборе': 'bg-purple-100 text-purple-800 border-purple-200',
-      'Забрана': 'bg-indigo-100 text-indigo-800 border-indigo-200',
-      'Принята на складе': 'bg-teal-100 text-teal-800 border-teal-200',
-      'Закрыта': 'bg-gray-200 text-gray-600 border-gray-300',
-      'В работе': 'bg-blue-100 text-blue-800 border-blue-200',
-      'На точке': 'bg-yellow-100 text-yellow-800 border-yellow-200',
-      'В пути': 'bg-purple-100 text-purple-800 border-purple-200',
-      'На складе': 'bg-green-100 text-green-800 border-green-200'
+  useEffect(() => {
+    if (!showActionsMenu) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (actionsMenuRef.current && !actionsMenuRef.current.contains(event.target as Node)) {
+        setShowActionsMenu(false);
+      }
     };
-    return colors[status] || 'bg-gray-100 text-gray-800 border-gray-200';
-  };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showActionsMenu]);
 
-  const getStatusIcon = (status: OrderStatus) => {
+  const getStatusIcon = (status: OrderStatus | string) => {
     const icons: Record<string, React.ReactNode> = {
-      'Создана': <FileText className="w-5 h-5" />,
-      'Отправлена поставщику': <Send className="w-5 h-5" />,
-      'Частично подтверждена': <ClipboardCheck className="w-5 h-5" />,
-      'Подтверждена': <CheckCircle className="w-5 h-5" />,
-      'В сборе': <UserPlus className="w-5 h-5" />,
-      'Забрана': <Truck className="w-5 h-5" />,
-      'Принята на складе': <Warehouse className="w-5 h-5" />,
-      'Закрыта': <Package className="w-5 h-5" />,
-      'В работе': <Package className="w-5 h-5" />,
-      'На точке': <MapPin className="w-5 h-5" />,
-      'В пути': <Truck className="w-5 h-5" />,
-      'На складе': <Warehouse className="w-5 h-5" />
+      'Создана': <FileText className="w-4 h-4" />,
+      'Отправлена поставщику': <Send className="w-4 h-4" />,
+      'Частично подтверждена': <ClipboardCheck className="w-4 h-4" />,
+      'Подтверждена': <CheckCircle className="w-4 h-4" />,
+      'В сборе': <UserPlus className="w-4 h-4" />,
+      'Забрана': <Truck className="w-4 h-4" />,
+      'Принята на складе': <Warehouse className="w-4 h-4" />,
+      'Закрыта': <Package className="w-4 h-4" />,
+      'В работе': <Package className="w-4 h-4" />,
+      'На точке': <MapPin className="w-4 h-4" />,
+      'В пути': <Truck className="w-4 h-4" />,
+      'На складе': <Warehouse className="w-4 h-4" />,
     };
-    return icons[status] || <Package className="w-5 h-5" />;
+    return icons[status] || <Package className="w-4 h-4" />;
   };
 
   const calculatePaymentProgress = () => {
@@ -131,19 +189,19 @@ const OrderDetails: React.FC = () => {
     return total > 0 ? (paid / total) * 100 : 0;
   };
 
-  const handleDelete = async () => {
+  const handleDeleteConfirm = async () => {
     if (!order) return;
-    
-    if (!window.confirm(`Вы уверены, что хотите удалить заявку ${order.orderNumber}?`)) {
-      return;
-    }
 
     try {
+      setDeleteLoading(true);
       await ordersApi.deleteOrder(order.id);
-      alert('Заявка успешно удалена');
+      toast.success('Заявка успешно удалена');
       navigate('/orders');
     } catch (err: any) {
-      alert(`Ошибка удаления: ${err.message}`);
+      toast.error(`Ошибка удаления: ${err.message}`);
+      setShowDeleteConfirm(false);
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -153,14 +211,17 @@ const OrderDetails: React.FC = () => {
     try {
       setPaymentLoading(true);
       const response = await ordersApi.updateOrderPayment(order.id, amount, comment);
-      
+
       await loadOrder();
-      
-      alert(`Оплата успешно зарегистрирована! ${response.payment.statusChanged ? `Статус изменен на "${response.payment.newStatus}"` : ''}`);
+
+      const statusNote = response.payment.statusChanged
+        ? ` Статус изменен на «${response.payment.newStatus}».`
+        : '';
+      toast.success(`Оплата успешно зарегистрирована!${statusNote}`);
       setShowPaymentModal(false);
     } catch (error: any) {
       console.error('Ошибка регистрации оплаты:', error);
-      alert(error.message || 'Ошибка при регистрации оплаты');
+      toast.error(error.message || 'Ошибка при регистрации оплаты');
     } finally {
       setPaymentLoading(false);
     }
@@ -168,18 +229,18 @@ const OrderDetails: React.FC = () => {
 
   const handleDownloadPDF = async () => {
     if (!order) return;
-    
+
     try {
       await generateOrderPDF(order);
     } catch (error: any) {
       console.error('Ошибка генерации PDF:', error);
-      alert('Ошибка при создании PDF документа');
+      toast.error('Ошибка при создании PDF документа');
     }
   };
 
   const handleSendToWhatsApp = async () => {
     if (!order || !order.supplier?.whatsapp) {
-      alert('У поставщика не указан номер WhatsApp');
+      toast.warning('У поставщика не указан номер WhatsApp');
       return;
     }
 
@@ -189,7 +250,7 @@ const OrderDetails: React.FC = () => {
       window.open(response.deepLink, '_blank');
     } catch (error: any) {
       console.error('Ошибка генерации WhatsApp сообщения:', error);
-      alert('Ошибка при создании WhatsApp сообщения');
+      toast.error('Ошибка при создании WhatsApp сообщения');
     } finally {
       setWhatsappLoading(false);
     }
@@ -203,14 +264,14 @@ const OrderDetails: React.FC = () => {
         const items = Object.entries(confirmationItems).map(([productId, quantity]) => ({
           productId: parseInt(productId),
           confirmedQuantity: quantity,
-          isAvailable: true
+          isAvailable: true,
         }));
 
         await ordersApi.partialConfirm(order.id, { items });
-        alert('Заявка частично подтверждена поставщиком');
+        toast.success('Заявка частично подтверждена поставщиком');
       } else {
         await ordersApi.confirmOrder(order.id);
-        alert('Заявка полностью подтверждена поставщиком');
+        toast.success('Заявка полностью подтверждена поставщиком');
       }
 
       setShowConfirmationForm(false);
@@ -218,25 +279,25 @@ const OrderDetails: React.FC = () => {
       loadOrder();
     } catch (error: any) {
       console.error('Ошибка подтверждения заявки:', error);
-      alert('Ошибка при подтверждении заявки');
+      toast.error('Ошибка при подтверждении заявки');
     }
   };
 
   const handleAssignCollector = async () => {
     if (!order || !selectedCollectorId) {
-      alert('Выберите сборщика');
+      toast.warning('Выберите сборщика');
       return;
     }
 
     try {
       await ordersApi.assignCollector(order.id, { collectorId: selectedCollectorId });
-      alert('Сборщик успешно назначен');
+      toast.success('Сборщик успешно назначен');
       setShowCollectorAssign(false);
       setSelectedCollectorId(null);
       loadOrder();
     } catch (error: any) {
       console.error('Ошибка назначения сборщика:', error);
-      alert('Ошибка при назначении сборщика');
+      toast.error('Ошибка при назначении сборщика');
     }
   };
 
@@ -257,11 +318,146 @@ const OrderDetails: React.FC = () => {
     }
   }, [showCollectorAssign]);
 
+  const headerActions = useMemo((): HeaderAction[] => {
+    if (!order) return [];
+
+    const actions: HeaderAction[] = [];
+
+    if (canEditOrders && order.status === 'Создана' && order.supplier?.whatsapp) {
+      actions.push({
+        key: 'whatsapp',
+        label: 'WhatsApp',
+        icon: Send,
+        onClick: handleSendToWhatsApp,
+        variant: 'secondary',
+        className: 'border-green-600/30 text-green-700 hover:bg-green-50',
+        loading: whatsappLoading,
+        primary: true,
+      });
+    }
+
+    if (
+      canEditOrders &&
+      ['Создана', 'Отправлена поставщику', 'Частично подтверждена', 'Подтверждена'].includes(order.status)
+    ) {
+      actions.push({
+        key: 'edit',
+        label: 'Редактировать',
+        icon: Edit,
+        onClick: () => setShowEditOrderModal(true),
+        variant: 'primary',
+        primary: true,
+      });
+    }
+
+    if (canConfirmOrders && order.status === 'Отправлена поставщику') {
+      actions.push({
+        key: 'confirm',
+        label: 'Подтверждено',
+        icon: CheckCircle,
+        onClick: () => handleConfirmOrder(false),
+        variant: 'primary',
+        primary: true,
+      });
+      actions.push({
+        key: 'partial',
+        label: 'Частично',
+        icon: ClipboardCheck,
+        onClick: () => setShowConfirmationForm(!showConfirmationForm),
+        variant: 'outline',
+      });
+    }
+
+    if (canManagePayments && order.paymentStatus !== 'Оплачено') {
+      actions.push({
+        key: 'payment',
+        label: 'Зарегистрировать оплату',
+        icon: CreditCard,
+        onClick: () => setShowPaymentModal(true),
+        variant: 'primary',
+        primary: true,
+      });
+    }
+
+    if (canDeleteOrders && order.status === 'Создана') {
+      actions.push({
+        key: 'delete',
+        label: 'Удалить',
+        icon: Trash2,
+        onClick: () => setShowDeleteConfirm(true),
+        variant: 'destructive',
+      });
+    }
+
+    if (canAssignCollector && ['Подтверждена', 'Частично подтверждена'].includes(order.status)) {
+      actions.push({
+        key: 'collector',
+        label: 'Назначить сборщика',
+        icon: UserPlus,
+        onClick: () => setShowCollectorAssign(!showCollectorAssign),
+        variant: 'outline',
+      });
+    }
+
+    if (canEditOrders && !['Закрыта'].includes(order.status)) {
+      actions.push({
+        key: 'status',
+        label: 'Изменить статус',
+        icon: Package,
+        onClick: () => setShowChangeStatusModal(true),
+        variant: 'secondary',
+      });
+    }
+
+    actions.push({
+      key: 'pdf',
+      label: 'Скачать PDF',
+      icon: Download,
+      onClick: handleDownloadPDF,
+      variant: 'outline',
+    });
+
+    return actions;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    order,
+    canEditOrders,
+    canDeleteOrders,
+    canManagePayments,
+    canConfirmOrders,
+    canAssignCollector,
+    whatsappLoading,
+    showConfirmationForm,
+    showCollectorAssign,
+  ]);
+
+  const primaryActions = headerActions.filter((a) => a.primary);
+  const secondaryActions = headerActions.filter((a) => !a.primary);
+
+  const renderActionButton = (action: HeaderAction, fullWidth = false) => (
+    <Button
+      key={action.key}
+      size="sm"
+      variant={action.variant ?? 'secondary'}
+      leftIcon={action.icon}
+      onClick={() => {
+        action.onClick();
+        setShowActionsMenu(false);
+      }}
+      loading={action.loading}
+      disabled={action.disabled}
+      fullWidth={fullWidth}
+      className={action.className}
+    >
+      {action.label}
+    </Button>
+  );
+
   if (loading) {
     return (
       <Layout>
         <div className="flex items-center justify-center h-96">
-          <Loader2 className="w-12 h-12 animate-spin text-blue-600" />
+          <Spinner size="lg" color="brand" useLucide />
         </div>
       </Layout>
     );
@@ -270,33 +466,28 @@ const OrderDetails: React.FC = () => {
   if (error || !order) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-96">
-          <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center">
-            <AlertCircle className="w-16 h-16 text-red-600 mx-auto mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Ошибка</h2>
-            <p className="text-gray-600 mb-6">{error || 'Заявка не найдена'}</p>
-            <button
-              onClick={() => navigate('/orders')}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
-            >
-              Вернуться к списку
-            </button>
-          </div>
-        </div>
+        <Card className="max-w-md mx-auto mt-12">
+          <CardBody className="py-10">
+            <ErrorState
+              message={error || 'Заявка не найдена'}
+              onRetry={() => navigate('/orders')}
+              retryLabel="Вернуться к списку"
+            />
+          </CardBody>
+        </Card>
       </Layout>
     );
   }
 
   return (
     <Layout>
-      {/* Модальное окно смены статуса */}
       {order && (
         <ChangeOrderStatusModal
           isOpen={showChangeStatusModal}
           onClose={() => setShowChangeStatusModal(false)}
           onSuccess={() => {
             loadOrder();
-            alert('Статус успешно изменен!');
+            toast.success('Статус успешно изменен!');
           }}
           orderId={order.id}
           currentStatus={order.status}
@@ -304,7 +495,6 @@ const OrderDetails: React.FC = () => {
         />
       )}
 
-      {/* Модальное окно оплаты */}
       {order && (
         <PaymentModal
           isOpen={showPaymentModal}
@@ -315,299 +505,259 @@ const OrderDetails: React.FC = () => {
         />
       )}
 
-      {/* Шапка */}
-      <div className="mb-6">
-        <button
-          onClick={() => navigate('/orders')}
-          className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors"
-        >
-          <ArrowLeft className="w-5 h-5" />
-          Вернуться к списку заявок
-        </button>
+      {order && (
+        <ConfirmDialog
+          isOpen={showDeleteConfirm}
+          title="Удалить заявку"
+          message={`Вы уверены, что хотите удалить заявку ${order.orderNumber}?`}
+          confirmLabel="Удалить"
+          cancelLabel="Отмена"
+          variant="danger"
+          loading={deleteLoading}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setShowDeleteConfirm(false)}
+        />
+      )}
 
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-4 mb-2">
-                <h1 className="text-3xl font-bold text-gray-900">
-                  Заявка {order.orderNumber}
-                </h1>
-                <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border ${getStatusColor(order.status)}`}>
-                  {getStatusIcon(order.status)}
-                  {order.status}
-                </span>
-              </div>
-              
-              <div className="flex items-center gap-4 text-sm text-gray-600">
-                <div className="flex items-center gap-1">
-                  <Calendar className="w-4 h-4" />
-                  {new Date(order.createdAt).toLocaleDateString('ru-RU', {
-                    day: 'numeric',
-                    month: 'long',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
+      <div className="pb-24 md:pb-0 space-y-5 lg:space-y-6">
+        {/* Sticky hero header — Orders V7 pattern */}
+        <div className="sticky top-0 z-10 -mx-4 px-4 pt-1 pb-4 md:static md:mx-0 md:px-0 md:pt-0 md:pb-0 bg-surface-page/95 backdrop-blur-sm border-b border-border-subtle md:border-0 space-y-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            leftIcon={ArrowLeft}
+            onClick={() => navigate('/orders')}
+            className="px-0 hover:bg-transparent text-text-muted hover:text-brand-black"
+          >
+            Вернуться к списку заявок
+          </Button>
+
+          <Card className="shadow-none hover:shadow-none overflow-hidden">
+            <CardBody className="p-0">
+              <div className="p-4 sm:p-5 space-y-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h1 className="text-h1 font-bold tracking-tight text-brand-black sm:text-display">
+                        {order.orderNumber}
+                      </h1>
+                      {order.type === 'return' && (
+                        <Badge variant="warning">Возврат</Badge>
+                      )}
+                    </div>
+                    <p className="mt-1 truncate text-body-medium text-brand-black">
+                      {order.supplier?.name}
+                    </p>
+                    <div className="mt-2 flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4 text-caption text-text-muted">
+                      <div className="flex items-center gap-1.5">
+                        <Calendar className="w-4 h-4 flex-shrink-0" aria-hidden />
+                        {new Date(order.createdAt).toLocaleDateString('ru-RU', {
+                          day: 'numeric',
+                          month: 'long',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <User className="w-4 h-4 flex-shrink-0" aria-hidden />
+                        {order.creator?.name}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 shrink-0">
+                    <Badge
+                      statusClass={resolveStatusBadgeClass(order.status)}
+                      className="gap-1.5 px-3 py-1.5 text-sm font-medium"
+                    >
+                      {getStatusIcon(order.status)}
+                      {order.status}
+                    </Badge>
+                    <Badge statusClass={getPaymentStatusColor(order.paymentStatus)}>
+                      {order.paymentStatus}
+                    </Badge>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <User className="w-4 h-4" />
-                  {order.creator?.name}
+
+                <div className="rounded-card border border-border-subtle bg-surface-inset p-4">
+                  <div className="flex flex-wrap items-end justify-between gap-4">
+                    <div>
+                      <p className="text-caption font-medium text-text-muted">Сумма заявки</p>
+                      <p className="mt-0.5 text-h2 font-bold tabular-nums tracking-tight text-brand-black">
+                        {formatPriceKZT(order.totalAmount)}
+                      </p>
+                      {Number(order.paidAmount) > 0 && (
+                        <p className="mt-0.5 text-caption text-text-muted">
+                          Оплачено: {formatPriceKZT(order.paidAmount)}
+                        </p>
+                      )}
+                    </div>
+                    <div className="hidden md:flex flex-wrap items-center justify-end gap-2">
+                      {headerActions.map((action) => renderActionButton(action))}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            {/* Кнопки действий */}
-            <div className="flex items-center gap-2 flex-wrap">
-              {/* WhatsApp — пока заявка ещё не отправлена поставщику */}
-              {canEditOrders && order.status === 'Создана' && order.supplier?.whatsapp && (
-                <button
-                  onClick={handleSendToWhatsApp}
-                  disabled={whatsappLoading}
-                  className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50"
-                >
-                  <Send className="w-4 h-4" />
-                  {whatsappLoading ? 'Загрузка...' : 'WhatsApp'}
-                </button>
-              )}
-
-              {/* Редактирование заявки разрешено до подтверждения включительно */}
-              {canEditOrders &&
-                ['Создана', 'Отправлена поставщику', 'Частично подтверждена', 'Подтверждена'].includes(order.status) && (
-                  <button
-                    onClick={() => setShowEditOrderModal(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-                  >
-                    <Edit className="w-4 h-4" />
-                    Редактировать
-                  </button>
-                )}
-
-              {canDeleteOrders && order.status === 'Создана' && (
-                <button
-                  onClick={handleDelete}
-                  className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
-                >
-                  <Trash2 className="w-4 h-4" />
-                  Удалить
-                </button>
-              )}
-
-              {canConfirmOrders && order.status === 'Отправлена поставщику' && (
-                <>
-                  <button
-                    onClick={() => handleConfirmOrder(false)}
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
-                  >
-                    <CheckCircle className="w-4 h-4" />
-                    Подтверждено
-                  </button>
-                  <button
-                    onClick={() => setShowConfirmationForm(!showConfirmationForm)}
-                    className="flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors"
-                  >
-                    <ClipboardCheck className="w-4 h-4" />
-                    Частично
-                  </button>
-                </>
-              )}
-
-              {canAssignCollector && ['Подтверждена', 'Частично подтверждена'].includes(order.status) && (
-                <button
-                  onClick={() => setShowCollectorAssign(!showCollectorAssign)}
-                  className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors"
-                >
-                  <UserPlus className="w-4 h-4" />
-                  Назначить сборщика
-                </button>
-              )}
-
-              {/* Общие кнопки */}
-              {canEditOrders && !['Закрыта'].includes(order.status) && (
-                <button
-                  onClick={() => setShowChangeStatusModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
-                >
-                  <Package className="w-4 h-4" />
-                  Изменить статус
-                </button>
-              )}
-              
-              {canManagePayments && order.paymentStatus !== 'Оплачено' && (
-                <button
-                  onClick={() => setShowPaymentModal(true)}
-                  className="flex items-center gap-2 px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors"
-                >
-                  <CreditCard className="w-4 h-4" />
-                  Зарегистрировать оплату
-                </button>
-              )}
-
-              <button
-                onClick={handleDownloadPDF}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                Скачать PDF
-              </button>
-            </div>
-          </div>
+            </CardBody>
+          </Card>
         </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-6">
         {/* Основная информация */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-5 lg:space-y-6">
           {/* Информация о поставщике */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Поставщик</h2>
-            <div className="space-y-3">
+          <Card className="shadow-none hover:shadow-none">
+            <CardHeader>
+              <h2 className="text-section-title font-semibold text-brand-black">Поставщик</h2>
+            </CardHeader>
+            <CardBody className="space-y-4">
               <div>
-                <p className="text-sm text-gray-600">Название</p>
-                <p className="text-lg font-medium text-gray-900">{order.supplier?.name}</p>
+                <p className="text-caption text-text-muted">Название</p>
+                <p className="text-body-medium font-medium text-brand-black">{order.supplier?.name}</p>
               </div>
               {order.supplier?.address && (
                 <div>
-                  <p className="text-sm text-gray-600">Адрес</p>
-                  <p className="text-gray-900">{order.supplier.address}</p>
+                  <p className="text-caption text-text-muted">Адрес</p>
+                  <p className="text-body text-brand-black">{order.supplier.address}</p>
                 </div>
               )}
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-2">
                 {order.supplier?.phone && (
-                  <a
-                    href={`tel:${order.supplier.phone}`}
-                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    leftIcon={Phone}
+                    onClick={() => window.open(`tel:${order.supplier?.phone}`, '_self')}
                   >
-                    <Phone className="w-4 h-4" />
                     Позвонить
-                  </a>
+                  </Button>
                 )}
                 {order.supplier?.whatsapp && (
-                  <a
-                    href={`https://wa.me/${order.supplier.whatsapp.replace(/\D/g, '')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    leftIcon={MessageCircle}
+                    className="border-green-600/30 text-green-700 hover:bg-green-50"
+                    onClick={() =>
+                      window.open(
+                        `https://wa.me/${order.supplier?.whatsapp?.replace(/\D/g, '')}`,
+                        '_blank'
+                      )
+                    }
                   >
-                    <MessageCircle className="w-4 h-4" />
                     WhatsApp
-                  </a>
+                  </Button>
                 )}
               </div>
-            </div>
-          </div>
+            </CardBody>
+          </Card>
 
           {/* Товары в заявке */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900">Товары</h2>
-              <button
+          <Card className="shadow-none hover:shadow-none overflow-hidden">
+            <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h2 className="text-section-title font-semibold text-brand-black">Товары</h2>
+              <Button
+                variant="outline"
+                size="sm"
+                leftIcon={Download}
                 onClick={handleDownloadPDF}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shadow-sm"
                 title="Скачать заявку в PDF"
               >
-                <Download className="w-4 h-4" />
                 Скачать PDF
-              </button>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Товар
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Количество
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Цена
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">
-                      Сумма
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
+              </Button>
+            </CardHeader>
+            <CardBody className="p-0 sm:px-0">
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableHeaderCell>Товар</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Количество</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Цена</TableHeaderCell>
+                    <TableHeaderCell className="text-right">Сумма</TableHeaderCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
                   {order.items?.map((item) => (
-                    <tr key={item.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <div className="flex items-start gap-2">
-                          <div className="flex-1">
-                            <div className="font-medium text-gray-900">{item.product?.name}</div>
-                            <div className="text-sm text-gray-500">{item.product?.article}</div>
-                            {item.variation && (
-                              <div className="mt-1 inline-flex items-center px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs font-medium">
-                                <span className="mr-1">🔹</span>
-                                {item.variation.name}: <span className="font-semibold ml-1">{item.variation.value}</span>
-                                {item.variation.sku && (
-                                  <span className="text-blue-600 ml-2 opacity-75">({item.variation.sku})</span>
-                                )}
-                              </div>
+                    <TableRow key={item.id}>
+                      <TableCell className="whitespace-normal min-w-[12rem]">
+                        <div className="font-medium text-brand-black">{item.product?.name}</div>
+                        <div className="text-sm text-text-muted">{item.product?.article}</div>
+                        {item.variation && (
+                          <Badge variant="info" className="mt-1.5 gap-1">
+                            {item.variation.name}: <span className="font-semibold">{item.variation.value}</span>
+                            {item.variation.sku && (
+                              <span className="opacity-75">({item.variation.sku})</span>
                             )}
-                            {item.notes && (
-                              <div className="text-sm text-gray-600 mt-1 italic">📝 {item.notes}</div>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-900 font-medium">
+                          </Badge>
+                        )}
+                        {item.notes && (
+                          <div className="text-sm text-text-muted mt-1 italic">{item.notes}</div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right font-medium text-brand-black">
                         {item.quantity}
-                      </td>
-                      <td className="px-4 py-3 text-right text-gray-900">
-                        {Number(item.priceAtPurchase).toLocaleString('ru-RU')} ₸
-                      </td>
-                      <td className="px-4 py-3 text-right font-semibold text-gray-900">
-                        {Number(item.totalPrice).toLocaleString('ru-RU')} ₸
-                      </td>
-                    </tr>
+                      </TableCell>
+                      <TableCell className="text-right text-brand-black">
+                        {formatPriceKZT(item.priceAtPurchase)}
+                      </TableCell>
+                      <TableCell className="text-right font-semibold text-brand-black">
+                        {formatPriceKZT(item.totalPrice)}
+                      </TableCell>
+                    </TableRow>
                   ))}
-                </tbody>
-                <tfoot className="bg-gray-50 border-t-2 border-gray-300">
+                </TableBody>
+                <tfoot className="bg-surface-inset border-t-2 border-border-subtle">
                   <tr>
-                    <td colSpan={3} className="px-4 py-3 text-right font-bold text-gray-900">
+                    <td colSpan={3} className="px-6 py-4 text-right font-bold text-brand-black">
                       Итого:
                     </td>
-                    <td className="px-4 py-3 text-right font-bold text-xl text-blue-600">
-                      {Number(order.totalAmount).toLocaleString('ru-RU')} ₸
+                    <td className="px-6 py-4 text-right font-bold text-xl text-accent">
+                      {formatPriceKZT(order.totalAmount)}
                     </td>
                   </tr>
                 </tfoot>
-              </table>
-            </div>
-          </div>
+              </Table>
+            </CardBody>
+          </Card>
 
           {/* Форма частичного подтверждения */}
           {showConfirmationForm && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg shadow p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Частичное подтверждение</h3>
-              <p className="text-sm text-gray-600 mb-4">
+            <Alert variant="warning" title="Частичное подтверждение">
+              <p className="mb-4">
                 Укажите фактическое количество по каждой позиции, которое подтвердил поставщик
               </p>
-              
+
               <div className="space-y-3">
                 {order.items?.map((item) => {
                   if (!item.product) return null;
                   const productId = item.product.id;
                   const confirmedQty = confirmationItems[productId] ?? item.quantity;
-                  
+
                   return (
-                    <div key={item.id} className="flex items-center justify-between p-3 bg-white rounded border">
-                      <div className="flex-1">
-                        <div className="font-medium text-gray-900">{item.product.internalName || item.product.name}</div>
-                        <div className="text-sm text-gray-500">Запрошено: {item.quantity} шт</div>
+                    <div
+                      key={item.id}
+                      className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 bg-brand-white rounded-card border border-border"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-brand-black">
+                          {item.product.internalName || item.product.name}
+                        </div>
+                        <div className="text-sm text-text-muted">Запрошено: {item.quantity} шт</div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <label className="text-sm text-gray-600">Подтверждено:</label>
+                        <label className="text-sm text-text-muted whitespace-nowrap">Подтверждено:</label>
                         <input
                           type="number"
                           min="0"
                           max={item.quantity}
                           value={confirmedQty}
-                          onChange={(e) => setConfirmationItems(prev => ({
-                            ...prev,
-                            [productId]: parseInt(e.target.value) || 0
-                          }))}
-                          className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-yellow-500 focus:border-transparent"
+                          onChange={(e) =>
+                            setConfirmationItems((prev) => ({
+                              ...prev,
+                              [productId]: parseInt(e.target.value) || 0,
+                            }))
+                          }
+                          className="w-20 px-3 py-2 border border-border rounded-card text-center focus:ring-2 focus:ring-brand-yellow focus:border-transparent"
                         />
                       </div>
                     </div>
@@ -615,39 +765,45 @@ const OrderDetails: React.FC = () => {
                 })}
               </div>
 
-              <div className="flex justify-end gap-3 mt-4">
-                <button
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end mt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => {
                     setShowConfirmationForm(false);
                     setConfirmationItems({});
                   }}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Отмена
-                </button>
-                <button
+                </Button>
+                <Button
+                  size="sm"
                   onClick={() => handleConfirmOrder(true)}
-                  className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors"
+                  className="bg-warning hover:bg-brand-yellow-dark text-white"
                 >
                   Подтвердить частично
-                </button>
+                </Button>
               </div>
-            </div>
+            </Alert>
           )}
 
           {/* Форма назначения сборщика */}
           {showCollectorAssign && (
-            <div className="bg-indigo-50 border border-indigo-200 rounded-lg shadow p-6">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Назначить сборщика</h3>
-              <p className="text-sm text-gray-600 mb-4">
+            <Alert variant="info" title="Назначить сборщика">
+              <p className="mb-4">
                 Выберите сотрудника, который будет забирать товар у поставщика
               </p>
 
               <div className="space-y-2 mb-4">
-                {collectors.map(collector => (
+                {collectors.map((collector) => (
                   <label
                     key={collector.id}
-                    className="flex items-center p-3 bg-white border rounded-lg cursor-pointer hover:bg-indigo-50 transition-colors"
+                    className={cn(
+                      'flex items-center p-3 bg-brand-white border border-border rounded-card cursor-pointer transition-colors',
+                      selectedCollectorId === collector.id
+                        ? 'border-accent bg-info-light/30'
+                        : 'hover:bg-surface-inset'
+                    )}
                   >
                     <input
                       type="radio"
@@ -655,228 +811,303 @@ const OrderDetails: React.FC = () => {
                       value={collector.id}
                       checked={selectedCollectorId === collector.id}
                       onChange={() => setSelectedCollectorId(collector.id)}
-                      className="w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                      className="w-4 h-4 text-accent focus:ring-accent"
                     />
-                    <span className="ml-3 text-gray-900 font-medium">{collector.name}</span>
+                    <span className="ml-3 text-brand-black font-medium">{collector.name}</span>
                   </label>
                 ))}
               </div>
 
-              <div className="flex justify-end gap-3">
-                <button
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={() => {
                     setShowCollectorAssign(false);
                     setSelectedCollectorId(null);
                   }}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Отмена
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="accent"
+                  size="sm"
                   onClick={handleAssignCollector}
                   disabled={!selectedCollectorId}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors disabled:opacity-50"
                 >
                   Назначить
-                </button>
+                </Button>
               </div>
-            </div>
+            </Alert>
           )}
 
           {/* История статусов */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">История изменений</h2>
-            <div className="space-y-4">
+          <Card className="shadow-none hover:shadow-none">
+            <CardHeader>
+              <h2 className="text-section-title font-semibold text-brand-black">История изменений</h2>
+            </CardHeader>
+            <CardBody className="space-y-4">
               {order.statusHistory?.map((history, index) => (
                 <div key={history.id} className="flex gap-4">
                   <div className="flex-shrink-0">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                      index === 0 ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-600'
-                    }`}>
+                    <div
+                      className={cn(
+                        'w-10 h-10 rounded-full flex items-center justify-center',
+                        index === 0 ? 'bg-brand-yellow/20 text-brand-yellow-dark' : 'bg-surface-inset text-text-muted'
+                      )}
+                    >
                       {getStatusIcon(history.newStatus)}
                     </div>
                   </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
                       {history.oldStatus && (
                         <>
-                          <span className="text-sm text-gray-600">{history.oldStatus}</span>
-                          <span className="text-gray-400">→</span>
+                          <Badge statusClass={resolveStatusBadgeClass(history.oldStatus)} className="text-xs">
+                            {history.oldStatus}
+                          </Badge>
+                          <span className="text-text-muted">→</span>
                         </>
                       )}
-                      <span className="text-sm font-medium text-gray-900">{history.newStatus}</span>
+                      <Badge statusClass={resolveStatusBadgeClass(history.newStatus)} className="text-xs">
+                        {history.newStatus}
+                      </Badge>
                     </div>
-                    <div className="text-sm text-gray-600">
+                    <div className="text-sm text-text-muted">
                       {history.changer?.name} • {new Date(history.changedAt).toLocaleString('ru-RU')}
                     </div>
                     {history.comment && (
-                      <div className="text-sm text-gray-700 mt-1 bg-gray-50 p-2 rounded">
+                      <div className="text-sm text-brand-black mt-2 bg-surface-inset p-3 rounded-xl border border-border-subtle">
                         {history.comment}
                       </div>
                     )}
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
+            </CardBody>
+          </Card>
 
           {/* История платежей */}
           {payments.length > 0 && (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4">История платежей</h2>
-              <div className="space-y-3">
+            <Card className="shadow-none hover:shadow-none">
+              <CardHeader>
+                <h2 className="text-section-title font-semibold text-brand-black">История платежей</h2>
+              </CardHeader>
+              <CardBody className="space-y-3">
                 {payments.map((payment: any) => (
-                  <div key={payment.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
-                    <div className="p-2 bg-green-100 rounded-lg flex-shrink-0">
-                      <DollarSign className="w-5 h-5 text-green-600" />
+                  <div
+                    key={payment.id}
+                    className="flex items-start gap-3 p-4 bg-surface-inset rounded-xl border border-border-subtle"
+                  >
+                    <div className="p-2 bg-success-light rounded-card flex-shrink-0">
+                      <DollarSign className="w-5 h-5 text-success" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-lg font-bold text-green-600">
-                          {Number(payment.amount).toLocaleString('ru-RU')} ₸
+                      <div className="flex flex-wrap items-center justify-between gap-2 mb-1">
+                        <span className="text-lg font-bold text-success">
+                          {formatPriceKZT(payment.amount)}
                         </span>
                         {payment.paymentMethod && (
-                          <span className="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded">
-                            {payment.paymentMethod}
-                          </span>
+                          <Badge variant="info">{payment.paymentMethod}</Badge>
                         )}
                       </div>
-                      <div className="text-sm text-gray-600">
+                      <div className="text-sm text-text-muted">
                         {payment.creator?.name} • {new Date(payment.createdAt).toLocaleString('ru-RU')}
                       </div>
                       {payment.notes && (
-                        <div className="text-sm text-gray-700 mt-1 bg-white p-2 rounded">
+                        <div className="text-sm text-brand-black mt-2 bg-brand-white p-2 rounded-card border border-border">
                           {payment.notes}
                         </div>
                       )}
                     </div>
                   </div>
                 ))}
-              </div>
-            </div>
+              </CardBody>
+            </Card>
           )}
         </div>
 
         {/* Боковая панель */}
-        <div className="space-y-6">
+        <div className="space-y-5 lg:space-y-6">
           {/* Финансы */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Финансы</h2>
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Общая сумма</p>
-                <p className="text-2xl font-bold text-gray-900">
-                  {Number(order.totalAmount).toLocaleString('ru-RU')} ₸
-                </p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Оплачено</p>
-                <p className="text-xl font-semibold text-green-600">
-                  {Number(order.paidAmount).toLocaleString('ru-RU')} ₸
-                </p>
-              </div>
-              
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Остаток</p>
-                <p className="text-xl font-semibold text-red-600">
-                  {(Number(order.totalAmount) - Number(order.paidAmount)).toLocaleString('ru-RU')} ₸
-                </p>
+          <Card className="border-border bg-surface-inset shadow-none hover:shadow-none">
+            <CardHeader inset>
+              <h2 className="text-section-title font-semibold text-brand-black">Финансы</h2>
+            </CardHeader>
+            <CardBody className="space-y-4">
+              <div className="grid grid-cols-1 gap-3">
+                <FinanceStat
+                  label="Общая сумма"
+                  value={formatPriceKZT(order.totalAmount)}
+                />
+                <FinanceStat
+                  label="Оплачено"
+                  value={formatPriceKZT(order.paidAmount)}
+                  valueClassName="text-success-dark"
+                />
+                <FinanceStat
+                  label="Остаток"
+                  value={formatPriceKZT(Number(order.totalAmount) - Number(order.paidAmount))}
+                  valueClassName="text-danger-dark"
+                />
               </div>
 
-              <div>
-                <p className="text-sm text-gray-600 mb-2">Прогресс оплаты</p>
-                <div className="w-full bg-gray-200 rounded-full h-3">
+              <div className="rounded-xl border border-border-subtle bg-surface-inset p-4">
+                <p className="text-caption font-medium text-text-muted mb-2">Прогресс оплаты</p>
+                <div className="w-full bg-brand-white rounded-full h-2.5 overflow-hidden border border-border-subtle">
                   <div
-                    className="bg-green-600 h-3 rounded-full transition-all"
+                    className="bg-success h-full rounded-full transition-all duration-fast"
                     style={{ width: `${calculatePaymentProgress()}%` }}
                   />
                 </div>
-                <p className="text-xs text-gray-600 mt-1 text-right">
+                <p className="text-caption text-text-muted mt-1.5 text-right tabular-nums">
                   {calculatePaymentProgress().toFixed(0)}%
                 </p>
               </div>
 
-              <div className={`text-center py-2 px-4 rounded-lg font-medium ${
-                order.paymentStatus === 'Оплачено'
-                  ? 'bg-green-100 text-green-800'
-                  : order.paymentStatus === 'Частично оплачено'
-                  ? 'bg-orange-100 text-orange-800'
-                  : 'bg-red-100 text-red-800'
-              }`}>
+              <Badge
+                statusClass={getPaymentStatusColor(order.paymentStatus)}
+                className="w-full justify-center py-2 text-sm font-medium"
+              >
                 {order.paymentStatus}
-              </div>
-            </div>
-          </div>
+              </Badge>
+            </CardBody>
+          </Card>
 
           {/* Доставка */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Доставка</h2>
-            <div className="space-y-3">
+          <Card className="shadow-none hover:shadow-none">
+            <CardHeader>
+              <h2 className="text-section-title font-semibold text-brand-black">Доставка</h2>
+            </CardHeader>
+            <CardBody className="space-y-4">
               <div className="flex items-start gap-2">
-                <MapPin className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
+                <MapPin className="w-5 h-5 text-text-muted flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm text-gray-600">Место доставки</p>
-                  <p className="font-medium text-gray-900">{order.deliveryLocation}</p>
+                  <p className="text-sm text-text-muted">Место доставки</p>
+                  <p className="font-medium text-brand-black">{order.deliveryLocation}</p>
                 </div>
               </div>
-              
+
               {order.expectedDeliveryDate && (
                 <div className="flex items-start gap-2">
-                  <Calendar className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
+                  <Calendar className="w-5 h-5 text-text-muted flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm text-gray-600">Ожидаемая дата</p>
-                    <p className="font-medium text-gray-900">
+                    <p className="text-sm text-text-muted">Ожидаемая дата</p>
+                    <p className="font-medium text-brand-black">
                       {new Date(order.expectedDeliveryDate).toLocaleDateString('ru-RU', {
                         day: 'numeric',
                         month: 'long',
-                        year: 'numeric'
+                        year: 'numeric',
                       })}
                     </p>
                   </div>
                 </div>
               )}
-            </div>
-          </div>
+            </CardBody>
+          </Card>
 
           {/* Комментарии */}
           {order.notes && (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                Комментарии
-              </h2>
-              <p className="text-gray-700 whitespace-pre-wrap">{order.notes}</p>
-            </div>
+            <Card className="shadow-none hover:shadow-none">
+              <CardHeader>
+                <h2 className="text-section-title font-semibold text-brand-black flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-text-muted" />
+                  Комментарии
+                </h2>
+              </CardHeader>
+              <CardBody>
+                <p className="text-brand-black whitespace-pre-wrap leading-relaxed">{order.notes}</p>
+              </CardBody>
+            </Card>
           )}
         </div>
-
-        {/* Модальное окно обновления цен товаров */}
-        {order && (
-          <>
-            <UpdatePricesFromOrderModal
-              isOpen={showUpdatePricesModal}
-              onClose={() => setShowUpdatePricesModal(false)}
-              onSuccess={() => {
-                setShowUpdatePricesModal(false);
-                alert('Цены товаров успешно обновлены!');
-              }}
-              order={order}
-            />
-
-            {/* Модальное окно редактирования заявки */}
-            <EditOrderModal
-              isOpen={showEditOrderModal}
-              onClose={() => setShowEditOrderModal(false)}
-              onSuccess={() => {
-                loadOrder();
-                alert('Заявка успешно обновлена!');
-              }}
-              order={order}
-            />
-          </>
-        )}
       </div>
+
+      {/* Mobile bottom action bar */}
+      {headerActions.length > 0 && (
+        <div className="md:hidden fixed inset-x-0 bottom-0 z-40 border-t border-border-subtle bg-brand-white/95 backdrop-blur-md pb-safe shadow-[0_-4px_20px_rgba(0,0,0,0.08)]">
+          <div className="flex items-center gap-2 p-3 max-w-lg mx-auto">
+            {(primaryActions.length > 0 ? primaryActions : headerActions).slice(0, 2).map((action) => (
+              <Button
+                key={action.key}
+                size="md"
+                variant={action.variant ?? 'primary'}
+                leftIcon={action.icon}
+                onClick={action.onClick}
+                loading={action.loading}
+                disabled={action.disabled}
+                fullWidth
+                className={cn('flex-1 min-h-11', action.className)}
+              >
+                <span className="truncate">{action.label}</span>
+              </Button>
+            ))}
+            {(secondaryActions.length > 0 || primaryActions.length > 2) && (
+              <div className="relative shrink-0" ref={actionsMenuRef}>
+                <Button
+                  variant="outline"
+                  size="md"
+                  leftIcon={MoreVertical}
+                  onClick={() => setShowActionsMenu((prev) => !prev)}
+                  aria-expanded={showActionsMenu}
+                  aria-haspopup="menu"
+                  className="min-h-11 min-w-11 px-3"
+                >
+                  <span className="sr-only">Ещё действия</span>
+                </Button>
+                {showActionsMenu && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 bottom-full z-50 mb-2 min-w-[14rem] max-h-[60vh] overflow-y-auto rounded-xl border border-border-subtle bg-brand-white py-1 shadow-card"
+                  >
+                    {[...primaryActions.slice(2), ...secondaryActions].map((action) => (
+                      <button
+                        key={action.key}
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          action.onClick();
+                          setShowActionsMenu(false);
+                        }}
+                        disabled={action.disabled || action.loading}
+                        className="flex w-full items-center gap-2 px-4 py-3 min-h-11 text-sm text-brand-black hover:bg-surface-inset disabled:opacity-50 transition-colors duration-200 text-left"
+                      >
+                        <action.icon className="w-4 h-4 flex-shrink-0 text-text-muted" />
+                        {action.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      </div>
+
+      {order && (
+        <>
+          <UpdatePricesFromOrderModal
+            isOpen={showUpdatePricesModal}
+            onClose={() => setShowUpdatePricesModal(false)}
+            onSuccess={() => {
+              setShowUpdatePricesModal(false);
+              toast.success('Цены товаров успешно обновлены!');
+            }}
+            order={order}
+          />
+
+          <EditOrderModal
+            isOpen={showEditOrderModal}
+            onClose={() => setShowEditOrderModal(false)}
+            onSuccess={() => {
+              loadOrder();
+              toast.success('Заявка успешно обновлена!');
+            }}
+            order={order}
+          />
+        </>
+      )}
     </Layout>
   );
 };

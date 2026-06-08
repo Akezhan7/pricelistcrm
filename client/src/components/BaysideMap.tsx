@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MapPin, Grid3x3, Map, Eye, EyeOff, Search, ZoomIn, ZoomOut, ArrowLeft, Users, Package2, X } from 'lucide-react';
+import { Button, Card, CardBody, EmptyState, IconButton, Input, PageHeader, Spinner } from './ui';
+import { cn } from '../utils/cn';
 import { Supplier, Sector, Row } from '../types';
 import { sectorsApi } from '../services/sectorsApi';
 import { rowsApi } from '../services/rowsApi';
@@ -282,38 +284,46 @@ export const BaysideMap: React.FC<BaysideMapProps> = ({ suppliers }) => {
         return (
           <div
             key={sector}
-            className={`card p-6 cursor-pointer transition-all duration-200 hover:shadow-lg ${
-              isSelected ? 'ring-2 ring-blue-500 shadow-lg' : ''
-            }`}
+            role="button"
+            tabIndex={0}
             onClick={() => setSelectedSector(isSelected ? null : sector)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setSelectedSector(isSelected ? null : sector);
+              }
+            }}
+            className="rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-brand-yellow focus-visible:ring-offset-2"
           >
-            <div className="flex items-center gap-3 mb-4">
-              <div className={`h-12 w-12 ${config.color} rounded-lg flex items-center justify-center text-white text-xl`}>
+          <Card variant="interactive" selected={isSelected}>
+            <CardBody>
+            <div className="mb-4 flex items-center gap-3">
+              <div className={`flex h-12 w-12 items-center justify-center rounded-lg text-xl text-white ${config.color}`}>
                 {config.icon}
               </div>
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">{config.name}</h3>
-                <p className="text-xs text-gray-500">{config.description}</p>
-                <p className="text-sm text-gray-600 font-medium">{totalCount} поставщиков</p>
+                <h3 className="text-card-title text-brand-black">{config.name}</h3>
+                <p className="text-caption text-text-muted">{config.description}</p>
+                <p className="text-body-medium text-brand-black">{totalCount} поставщиков</p>
               </div>
             </div>
 
-            <div className={`space-y-3 transition-all duration-200 ${isSelected ? 'max-h-96 overflow-y-auto' : 'max-h-32 overflow-hidden'}`}>
+            <div className={cn('space-y-3 transition-all duration-fast', isSelected ? 'max-h-96 overflow-y-auto' : 'max-h-32 overflow-hidden')}>
               {Object.keys(rows).map((rowKey) => (
                 <div key={rowKey} className="mb-2">
-                  <div className="text-sm font-medium text-gray-800 mb-1">Ряд: {rowKey}</div>
+                  <div className="mb-1 text-body-medium text-brand-black">Ряд: {rowKey}</div>
                   <div className="space-y-2">
                     {Object.keys(rows[rowKey]).map((containerKey) => (
-                      <div key={containerKey} className="p-2 bg-gray-50 rounded-lg border">
-                        <div className="text-xs text-gray-600 font-medium mb-2">Контейнер: {containerKey}</div>
+                      <div key={containerKey} className="rounded-lg border border-border-subtle bg-surface-inset p-2">
+                        <div className="mb-2 text-caption font-medium text-text-muted">Контейнер: {containerKey}</div>
                         <div className="space-y-2">
                           {rows[rowKey][containerKey].map((supplier) => (
-                            <div key={supplier.id} className="p-2 bg-white rounded shadow-sm">
-                              <div className="flex items-center gap-2 mb-1">
-                                <MapPin className="h-4 w-4 text-gray-400" />
-                                <span className="text-sm font-medium text-gray-900">{supplier.name}</span>
+                            <div key={supplier.id} className="rounded-lg border border-border-subtle bg-brand-white p-2">
+                              <div className="mb-1 flex items-center gap-2">
+                                <MapPin className="h-4 w-4 text-text-muted" />
+                                <span className="text-body-medium text-brand-black">{supplier.name}</span>
                               </div>
-                              <p className="text-xs text-gray-600 mb-1">{supplier.address}</p>
+                              <p className="mb-1 text-caption text-text-muted">{supplier.address}</p>
                               {showImages && supplier.containerImage && (
                                 <img
                                   src={getImageUrl(supplier.containerImage) || undefined}
@@ -335,6 +345,8 @@ export const BaysideMap: React.FC<BaysideMapProps> = ({ suppliers }) => {
                 </div>
               ))}
             </div>
+            </CardBody>
+          </Card>
           </div>
         );
       })}
@@ -347,91 +359,89 @@ export const BaysideMap: React.FC<BaysideMapProps> = ({ suppliers }) => {
     return (
       <div className="space-y-4">
         {/* Панель поиска и управления */}
-        <div className="bg-white rounded-lg shadow-sm border p-4">
-          <div className="flex flex-wrap items-center gap-4">
-            {/* Поиск */}
-            <div className="flex-1 min-w-64">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Поиск по секторам, рядам, поставщикам..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+        <Card variant="elevated" className="shadow-md">
+          <CardBody className="p-4">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="min-w-64 flex-1">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+                  <Input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Поиск по секторам, рядам, поставщикам..."
+                    className="pl-10 pr-10"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-brand-black"
+                      aria-label="Очистить поиск"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
                 {searchQuery && (
-                  <button
-                    onClick={() => setSearchQuery('')}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+                  <p className="mt-2 text-caption text-text-muted">
+                    Найдено: {highlightedItems.sectors.length} секторов, {highlightedItems.rows.length} рядов, {highlightedItems.suppliers.length} поставщиков
+                  </p>
                 )}
               </div>
-              {searchQuery && (
-                <div className="mt-2 text-sm text-gray-600">
-                  Найдено: {highlightedItems.sectors.length} секторов, {highlightedItems.rows.length} рядов, {highlightedItems.suppliers.length} поставщиков
-                </div>
-              )}
+
+              <div className="flex flex-wrap items-center gap-2">
+                {viewState.mode !== 'overview' && (
+                  <Button variant="secondary" size="sm" leftIcon={ArrowLeft} onClick={handleBackToOverview}>
+                    Обзор
+                  </Button>
+                )}
+                {viewState.selectedSector && (
+                  <span className="inline-flex items-center gap-2 rounded-lg border border-border-subtle bg-surface-accent px-3 py-2 text-caption font-medium text-brand-black">
+                    <span
+                      className="h-4 w-4 rounded"
+                      style={{ backgroundColor: viewState.selectedSector.color }}
+                      aria-hidden
+                    />
+                    {viewState.selectedSector.name}
+                  </span>
+                )}
+                {viewState.selectedRow && (
+                  <span className="inline-flex items-center gap-2 rounded-lg border border-border-subtle bg-surface-inset px-3 py-2 text-caption font-medium text-brand-black">
+                    <Package2 className="h-4 w-4 text-text-muted" />
+                    {viewState.selectedRow.name}
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1 rounded-lg border border-border-subtle bg-surface-inset p-1">
+                <IconButton
+                  icon={ZoomOut}
+                  title="Уменьшить"
+                  size="sm"
+                  onClick={() => handleZoom(-0.2)}
+                  disabled={viewState.zoom <= 0.5}
+                />
+                <span className="min-w-12 text-center text-caption tabular-nums text-brand-black">
+                  {Math.round(viewState.zoom * 100)}%
+                </span>
+                <IconButton
+                  icon={ZoomIn}
+                  title="Увеличить"
+                  size="sm"
+                  onClick={() => handleZoom(0.2)}
+                  disabled={viewState.zoom >= 3}
+                />
+              </div>
             </div>
-            
-            {/* Навигация по уровням */}
-            <div className="flex items-center gap-2">
-              {viewState.mode !== 'overview' && (
-                <button
-                  onClick={handleBackToOverview}
-                  className="flex items-center gap-2 px-3 py-2 text-sm bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Обзор
-                </button>
-              )}
-              {viewState.selectedSector && (
-                <div className="flex items-center gap-2 px-3 py-2 text-sm bg-blue-100 text-blue-800 rounded-lg">
-                  <div
-                    className="w-4 h-4 rounded"
-                    style={{ backgroundColor: viewState.selectedSector.color }}
-                  ></div>
-                  {viewState.selectedSector.name}
-                </div>
-              )}
-              {viewState.selectedRow && (
-                <div className="flex items-center gap-2 px-3 py-2 text-sm bg-green-100 text-green-800 rounded-lg">
-                  <Package2 className="h-4 w-4" />
-                  {viewState.selectedRow.name}
-                </div>
-              )}
-            </div>
-            
-            {/* Управление масштабом */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => handleZoom(-0.2)}
-                disabled={viewState.zoom <= 0.5}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ZoomOut className="h-4 w-4" />
-              </button>
-              <span className="text-sm text-gray-600 min-w-12 text-center">
-                {Math.round(viewState.zoom * 100)}%
-              </span>
-              <button
-                onClick={() => handleZoom(0.2)}
-                disabled={viewState.zoom >= 3}
-                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ZoomIn className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </div>
+          </CardBody>
+        </Card>
 
         {/* Интерактивная карта */}
-        <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+        <Card variant="elevated" className="overflow-hidden shadow-md">
           <div
             ref={mapRef}
-            className="relative bg-gradient-to-br from-blue-50 to-green-50 cursor-move"
+            className="relative cursor-move bg-gradient-to-br from-surface-inset to-surface-page"
             style={{ 
               minHeight: '700px',
               transform: `scale(${viewState.zoom}) translate(${viewState.panX}px, ${viewState.panY}px)`,
@@ -445,11 +455,11 @@ export const BaysideMap: React.FC<BaysideMapProps> = ({ suppliers }) => {
             {/* Координатная сетка */}
             <div className="absolute inset-0 opacity-10">
               {Array.from({length: 21}, (_, i) => (
-                <div key={`v-${i}`} className="absolute border-l border-gray-400" 
+                <div key={`v-${i}`} className="absolute border-l border-border-subtle" 
                      style={{left: `${i * 5}%`, height: '100%'}} />
               ))}
               {Array.from({length: 16}, (_, i) => (
-                <div key={`h-${i}`} className="absolute border-t border-gray-400" 
+                <div key={`h-${i}`} className="absolute border-t border-border-subtle" 
                      style={{top: `${i * 6.25}%`, width: '100%'}} />
               ))}
             </div>
@@ -460,9 +470,11 @@ export const BaysideMap: React.FC<BaysideMapProps> = ({ suppliers }) => {
               return (
                 <div
                   key={sector.id}
-                  className={`absolute rounded-lg border-2 cursor-pointer transition-all duration-300 ${
-                    isHighlighted ? 'ring-4 ring-yellow-400 ring-opacity-75 z-20' : ''
-                  } hover:scale-105 hover:shadow-lg`}
+                  className={cn(
+                    'absolute z-10 cursor-pointer rounded-lg border-2 transition-all duration-150',
+                    isHighlighted ? 'z-20 ring-2 ring-brand-yellow ring-offset-2' : '',
+                    'hover:shadow-md'
+                  )}
                   style={{
                     backgroundColor: sector.color + '40',
                     borderColor: sector.color,
@@ -485,9 +497,9 @@ export const BaysideMap: React.FC<BaysideMapProps> = ({ suppliers }) => {
                     >
                       {sector.icon || '📦'}
                     </div>
-                    <div className="text-sm font-semibold text-gray-900">{sector.name}</div>
-                    <div className="text-xs text-gray-600">{sector.productType}</div>
-                    <div className="text-xs text-gray-500 mt-1">
+                    <div className="text-body-medium font-semibold text-brand-black">{sector.name}</div>
+                    <div className="text-caption text-text-muted">{sector.productType}</div>
+                    <div className="mt-1 text-caption text-text-muted">
                       {sector.rowsCount || 0} рядов
                     </div>
                   </div>
@@ -510,9 +522,11 @@ export const BaysideMap: React.FC<BaysideMapProps> = ({ suppliers }) => {
                       return (
                         <div
                           key={row.id}
-                          className={`bg-white rounded-lg border-2 p-4 cursor-pointer transition-all duration-300 ${
-                            isHighlighted ? 'ring-4 ring-yellow-400 ring-opacity-75 z-20' : ''
-                          } hover:shadow-lg hover:scale-105`}
+                          className={cn(
+                            'cursor-pointer rounded-lg border-2 bg-brand-white p-4 transition-all duration-150',
+                            isHighlighted ? 'z-20 ring-2 ring-brand-yellow ring-offset-2' : '',
+                            'hover:shadow-md'
+                          )}
                           style={{
                             borderColor: viewState.selectedSector!.color,
                           }}
@@ -528,19 +542,19 @@ export const BaysideMap: React.FC<BaysideMapProps> = ({ suppliers }) => {
                             >
                               {row.code}
                             </div>
-                            <div className="text-sm font-medium text-gray-900">{row.name}</div>
-                            <div className="text-xs text-gray-600 mt-1">
+                            <div className="text-body-medium text-brand-black">{row.name}</div>
+                            <div className="mt-1 text-caption text-text-muted">
                               {row.occupiedSpaces}/{row.totalSpaces} мест
                             </div>
                             {row.totalSpaces > 0 && (
                               <div className="mt-2">
-                                <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div className="h-2 w-full rounded-full bg-surface-inset">
                                   <div
-                                    className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                                    className="h-2 rounded-full bg-brand-yellow transition-all duration-150"
                                     style={{ width: `${Math.min(100, occupancyPercent)}%` }}
                                   ></div>
                                 </div>
-                                <div className="text-xs text-gray-500 mt-1">
+                                <div className="mt-1 text-caption tabular-nums text-text-muted">
                                   {Math.round(occupancyPercent)}%
                                 </div>
                               </div>
@@ -566,16 +580,18 @@ export const BaysideMap: React.FC<BaysideMapProps> = ({ suppliers }) => {
                       return (
                         <div
                           key={supplier.id}
-                          className={`bg-white rounded-lg border p-4 transition-all duration-300 ${
-                            isHighlighted ? 'ring-4 ring-yellow-400 ring-opacity-75 z-20' : ''
-                          } hover:shadow-lg`}
+                          className={cn(
+                            'rounded-lg border border-border-subtle bg-brand-white p-4 transition-all duration-150',
+                            isHighlighted ? 'z-20 ring-2 ring-brand-yellow ring-offset-2' : '',
+                            'hover:shadow-md'
+                          )}
                         >
-                          <div className="flex items-center gap-3 mb-3">
-                            <MapPin className="h-5 w-5 text-gray-400" />
+                          <div className="mb-3 flex items-center gap-3">
+                            <MapPin className="h-5 w-5 shrink-0 text-text-muted" />
                             <div>
-                              <div className="font-medium text-gray-900">{supplier.name}</div>
-                              <div className="text-xs text-gray-600">{supplier.address}</div>
-                              <div className="text-xs text-gray-600">{supplier.phone}</div>
+                              <div className="text-body-medium text-brand-black">{supplier.name}</div>
+                              <div className="text-caption text-text-muted">{supplier.address}</div>
+                              <div className="text-caption text-text-muted">{supplier.phone}</div>
                             </div>
                           </div>
                           
@@ -593,8 +609,8 @@ export const BaysideMap: React.FC<BaysideMapProps> = ({ suppliers }) => {
                           )}
                           
                           {supplier.debt > 0 && (
-                            <div className="mt-2 text-xs text-red-600">
-                              Долг: {supplier.debt} руб.
+                            <div className="mt-2 text-caption text-danger-dark">
+                              Долг: {supplier.debt} ₸
                             </div>
                           )}
                         </div>
@@ -603,116 +619,115 @@ export const BaysideMap: React.FC<BaysideMapProps> = ({ suppliers }) => {
                   }
                 </div>
                 {suppliers.filter(supplier => supplier.rowId === viewState.selectedRow!.id).length === 0 && (
-                  <div className="text-center py-12">
-                    <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">
-                      Нет поставщиков в этом ряду
-                    </h3>
-                    <p className="text-gray-600">
-                      В ряду "{viewState.selectedRow.name}" пока не размещено ни одного поставщика
-                    </p>
-                  </div>
+                  <EmptyState
+                    icon={Users}
+                    title="Нет поставщиков в этом ряду"
+                    description={`В ряду «${viewState.selectedRow.name}» пока не размещено ни одного поставщика`}
+                    className="py-12"
+                  />
                 )}
               </div>
             )}
             
             {/* Сообщение для пустого состояния */}
             {viewState.mode === 'overview' && sectors.length === 0 && !loading && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center bg-white rounded-lg p-8 shadow-lg">
-                  <div className="text-6xl mb-4">🏗️</div>
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                    Сектора не созданы
-                  </h3>
-                  <p className="text-gray-600">
-                    Создайте сектора и ряды для организации<br />
-                    складского пространства Bayside
-                  </p>
-                </div>
+              <div className="absolute inset-0 flex items-center justify-center p-6">
+                <EmptyState
+                  title="Сектора не созданы"
+                  description="Создайте сектора и ряды для организации складского пространства Plastkrep"
+                  className="max-w-sm rounded-xl border border-border-subtle bg-brand-white p-8 shadow-md"
+                />
               </div>
             )}
             
             {/* Загрузка */}
             {loading && (
-              <div className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-75">
+              <div className="absolute inset-0 flex items-center justify-center bg-brand-white/80 backdrop-blur-sm">
                 <div className="text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Загрузка карты...</p>
+                  <Spinner size="lg" color="brand" useLucide className="mx-auto mb-4" />
+                  <p className="text-body text-text-muted">Загрузка карты...</p>
                 </div>
               </div>
             )}
           </div>
-        </div>
+        </Card>
         
         {/* Статус-бар */}
-        <div className="bg-white rounded-lg shadow-sm border p-3">
-          <div className="flex justify-between items-center text-sm text-gray-600">
-            <div className="flex gap-6">
-              <span>Режим: {
-                viewState.mode === 'overview' ? 'Обзор секторов' :
-                viewState.mode === 'sector' ? `Сектор "${viewState.selectedSector?.name}"` :
-                viewState.mode === 'row' ? `Ряд "${viewState.selectedRow?.name}"` :
-                'Неизвестно'
-              }</span>
-              <span>Масштаб: {Math.round(viewState.zoom * 100)}%</span>
+        <Card variant="inset" className="shadow-none">
+          <CardBody className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap gap-4 text-caption text-text-muted">
+              <span>
+                Режим:{' '}
+                <span className="text-brand-black">
+                  {viewState.mode === 'overview'
+                    ? 'Обзор секторов'
+                    : viewState.mode === 'sector'
+                      ? `Сектор «${viewState.selectedSector?.name}»`
+                      : viewState.mode === 'row'
+                        ? `Ряд «${viewState.selectedRow?.name}»`
+                        : 'Неизвестно'}
+                </span>
+              </span>
+              <span>
+                Масштаб:{' '}
+                <span className="tabular-nums text-brand-black">{Math.round(viewState.zoom * 100)}%</span>
+              </span>
             </div>
-            
             {viewState.zoom > 1 && (
-              <div className="text-xs text-gray-500">
-                Перетаскивайте карту для навигации
-              </div>
+              <p className="text-overline text-text-muted">Перетаскивайте карту для навигации</p>
             )}
-          </div>
-        </div>
+          </CardBody>
+        </Card>
       </div>
     );
   };
 
+  const statItems = [
+    { label: 'Всего поставщиков', value: suppliers.length },
+    { label: 'С позициями', value: suppliers.filter((s) => s.mapPosition).length },
+    { label: 'С фотографиями', value: suppliers.filter((s) => s.containerImage).length },
+    { label: 'Секторов', value: sectors.length },
+  ];
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Карта Bayside</h1>
-              <p className="text-gray-600">Расположение контейнеров поставщиков по секторам</p>
-            </div>
-            
-            {/* Переключатели режима просмотра */}
-            <div className="flex items-center gap-4">
+    <div className="space-y-6">
+        <div className="space-y-4">
+          <PageHeader
+            title="Карта Plastkrep"
+            description="Расположение контейнеров поставщиков по секторам"
+            icon={Map}
+            actions={
+            <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setShowImages(!showImages)}
-                  className={`p-2 rounded-lg transition-colors ${
-                    showImages 
-                      ? 'bg-blue-100 text-blue-600 hover:bg-blue-200' 
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
+                <IconButton
+                  icon={showImages ? Eye : EyeOff}
                   title={showImages ? 'Скрыть фотографии' : 'Показать фотографии'}
-                >
-                  {showImages ? <Eye className="h-5 w-5" /> : <EyeOff className="h-5 w-5" />}
-                </button>
-                <span className="text-sm text-gray-600">Фото</span>
+                  variant={showImages ? 'default' : 'ghost'}
+                  onClick={() => setShowImages(!showImages)}
+                />
+                <span className="text-caption text-text-muted">Фото</span>
               </div>
-              
-              <div className="flex bg-white rounded-lg p-1 shadow-sm border">
+
+              <div className="flex w-full rounded-xl border border-border-subtle bg-surface-inset p-1 sm:w-auto">
                 <button
+                  type="button"
                   onClick={() => setViewMode('sectors')}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-2 rounded-lg px-3 py-2 text-caption font-medium transition-colors duration-200 sm:text-body ${
                     viewMode === 'sectors'
-                      ? 'bg-blue-500 text-white shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                      ? 'bg-brand-yellow text-brand-black shadow-sm'
+                      : 'text-text-muted hover:bg-brand-white hover:text-brand-black'
                   }`}
                 >
                   <Grid3x3 className="h-4 w-4" />
                   Сектора
                 </button>
                 <button
+                  type="button"
                   onClick={() => setViewMode('map')}
-                  className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-2 rounded-lg px-3 py-2 text-caption font-medium transition-colors duration-200 sm:text-body ${
                     viewMode === 'map'
-                      ? 'bg-blue-500 text-white shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                      ? 'bg-brand-yellow text-brand-black shadow-sm'
+                      : 'text-text-muted hover:bg-brand-white hover:text-brand-black'
                   }`}
                 >
                   <Map className="h-4 w-4" />
@@ -720,42 +735,35 @@ export const BaysideMap: React.FC<BaysideMapProps> = ({ suppliers }) => {
                 </button>
               </div>
             </div>
-          </div>
-          
-          {/* Статистика */}
-          <div className="mt-4 flex gap-4 text-sm">
-            <div className="bg-white px-3 py-2 rounded-lg shadow-sm border">
-              Всего поставщиков: <span className="font-semibold">{suppliers.length}</span>
-            </div>
-            <div className="bg-white px-3 py-2 rounded-lg shadow-sm border">
-              С позициями: <span className="font-semibold">{suppliers.filter(s => s.mapPosition).length}</span>
-            </div>
-            <div className="bg-white px-3 py-2 rounded-lg shadow-sm border">
-              С фотографиями: <span className="font-semibold">{suppliers.filter(s => s.containerImage).length}</span>
-            </div>
-            <div className="bg-white px-3 py-2 rounded-lg shadow-sm border">
-              Секторов: <span className="font-semibold">{sectors.length}</span>
-            </div>
+            }
+          />
+
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {statItems.map(({ label, value }) => (
+              <div
+                key={label}
+                className="rounded-xl border border-border-subtle bg-brand-white px-4 py-3"
+              >
+                <p className="text-caption font-medium text-text-muted">{label}</p>
+                <p className="mt-0.5 text-h2 font-bold tabular-nums tracking-tight text-brand-black">
+                  {value}
+                </p>
+              </div>
+            ))}
           </div>
         </div>
 
         {/* Ошибки */}
         {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-800">{error}</p>
-            <button
-              onClick={() => setError(null)}
-              className="mt-2 text-sm text-red-600 hover:text-red-800 underline"
-            >
+          <div className="rounded-xl border border-danger/30 bg-danger-light p-4">
+            <p className="text-body text-danger-dark">{error}</p>
+            <Button variant="ghost" size="sm" onClick={() => setError(null)} className="mt-2 text-danger-dark">
               Закрыть
-            </button>
+            </Button>
           </div>
         )}
 
-        {/* Основной контент в зависимости от режима */}
         {viewMode === 'sectors' ? renderSectorView() : renderInteractiveMapView()}
-        
-      </div>
     </div>
   );
 };

@@ -1,8 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { X, Send, Image as ImageIcon } from 'lucide-react';
+import { Image as ImageIcon } from 'lucide-react';
 import { Product, Supplier } from '../types';
 import suppliersApi from '../services/suppliersApi';
 import getImageUrl from '../utils/image';
+import { toast } from '../context/ToastContext';
+import { Modal } from './ui/Modal';
+import { FormFooter } from './ui/FormFooter';
+import { Textarea } from './ui/Textarea';
+import { FormField } from './ui/FormField';
+import { Alert } from './ui/Alert';
+import { Spinner } from './ui/Spinner';
 
 interface SendProductImageModalProps {
   isOpen: boolean;
@@ -15,7 +22,7 @@ export const SendProductImageModal: React.FC<SendProductImageModalProps> = ({
   isOpen,
   onClose,
   product,
-  onSend
+  onSend,
 }) => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState<number | null>(null);
@@ -25,8 +32,7 @@ export const SendProductImageModal: React.FC<SendProductImageModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       loadSuppliers();
-      
-      // Формируем начальное сообщение
+
       const defaultMessage = `${product.internalName || product.name}\n\nАртикул: ${product.article || 'нет'}\n\nЦена: ${product.costPrice?.toLocaleString() || '—'} ₸`;
       setMessage(defaultMessage);
     }
@@ -36,12 +42,11 @@ export const SendProductImageModal: React.FC<SendProductImageModalProps> = ({
     try {
       setLoading(true);
       const data = await suppliersApi.getAllSuppliers();
-      // Фильтруем только поставщиков с WhatsApp
       const suppliersWithWhatsApp = data.filter((s: Supplier) => s.whatsapp);
       setSuppliers(suppliersWithWhatsApp);
     } catch (error) {
       console.error('Ошибка загрузки поставщиков:', error);
-      alert('Не удалось загрузить список поставщиков');
+      toast.error('Не удалось загрузить список поставщиков');
     } finally {
       setLoading(false);
     }
@@ -49,170 +54,125 @@ export const SendProductImageModal: React.FC<SendProductImageModalProps> = ({
 
   const handleSend = () => {
     if (!selectedSupplierId) {
-      alert('Выберите поставщика');
+      toast.warning('Выберите поставщика');
       return;
     }
 
-    const selectedSupplier = suppliers.find(s => s.id === selectedSupplierId);
+    const selectedSupplier = suppliers.find((s) => s.id === selectedSupplierId);
     if (!selectedSupplier || !selectedSupplier.whatsapp) {
-      alert('У выбранного поставщика нет WhatsApp');
+      toast.warning('У выбранного поставщика нет WhatsApp');
       return;
     }
 
-    // Формируем текст сообщения
     let fullMessage = message;
 
-    // Публичная ссылка на API (/uploads), без авторизации
     const imageUrl = getImageUrl(product.image);
     if (imageUrl) {
       fullMessage += `\n\nФото: ${imageUrl}`;
     }
 
-    // Очищаем номер телефона от спецсимволов
     const cleanPhone = selectedSupplier.whatsapp.replace(/\D/g, '');
-
-    // Кодируем текст для URL
     const encodedMessage = encodeURIComponent(fullMessage);
-
-    // Формируем WhatsApp deep link
     const whatsappLink = `https://wa.me/${cleanPhone}?text=${encodedMessage}`;
 
-    // Открываем WhatsApp в новой вкладке
     window.open(whatsappLink, '_blank');
 
-    // Вызываем callback если нужно
     if (onSend) {
       onSend();
     }
 
-    // Закрываем модалку
     onClose();
   };
 
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-        {/* Заголовок */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900 flex items-center">
-            <Send className="w-6 h-6 mr-2 text-green-600" />
-            Отправить фото поставщику
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
-        </div>
-
-        {/* Содержимое */}
-        <div className="p-6 space-y-6">
-          {/* Информация о товаре */}
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="flex items-start gap-4">
-              {product.image ? (
-                <img
-                  src={getImageUrl(product.image) || undefined}
-                  alt={product.name}
-                  className="w-24 h-24 object-cover rounded-lg border border-gray-200"
-                />
-              ) : (
-                <div className="w-24 h-24 bg-gray-200 rounded-lg flex items-center justify-center">
-                  <ImageIcon className="w-8 h-8 text-gray-400" />
-                </div>
-              )}
-              <div className="flex-1">
-                <h3 className="font-semibold text-gray-900 mb-1">
-                  {product.internalName || product.name}
-                </h3>
-                <p className="text-sm text-gray-600">Артикул: {product.article || 'нет'}</p>
-                <p className="text-sm text-gray-600">
-                  Цена: {product.costPrice?.toLocaleString() || '—'} ₸
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Выбор поставщика */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Выберите поставщика
-            </label>
-            {loading ? (
-              <div className="text-center text-gray-600 py-4">Загрузка...</div>
-            ) : suppliers.length === 0 ? (
-              <div className="text-center text-gray-600 py-4">
-                Нет поставщиков с WhatsApp
-              </div>
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Отправить фото поставщику"
+      size="lg"
+      footer={
+        <FormFooter
+          onCancel={onClose}
+          submitLabel="Отправить в WhatsApp"
+          submitDisabled={!selectedSupplierId || loading}
+          onSubmit={handleSend}
+          submitType="button"
+        />
+      }
+    >
+      <div className="space-y-5">
+        <div className="bg-surface-inset rounded-xl p-4 border border-border-subtle">
+          <div className="flex items-start gap-4">
+            {product.image ? (
+              <img
+                src={getImageUrl(product.image) || undefined}
+                alt={product.name}
+                className="w-24 h-24 object-cover rounded-xl border border-border-subtle"
+              />
             ) : (
-              <div className="space-y-2 max-h-64 overflow-y-auto border border-gray-200 rounded-lg p-2">
-                {suppliers.map(supplier => (
-                  <label
-                    key={supplier.id}
-                    className="flex items-center p-3 bg-white border rounded-lg cursor-pointer hover:bg-green-50 transition-colors"
-                  >
-                    <input
-                      type="radio"
-                      name="supplier"
-                      value={supplier.id}
-                      checked={selectedSupplierId === supplier.id}
-                      onChange={() => setSelectedSupplierId(supplier.id)}
-                      className="w-4 h-4 text-green-600 focus:ring-green-500"
-                    />
-                    <div className="ml-3 flex-1">
-                      <div className="font-medium text-gray-900">{supplier.name}</div>
-                      <div className="text-sm text-gray-500">{supplier.whatsapp}</div>
-                    </div>
-                  </label>
-                ))}
+              <div className="w-24 h-24 bg-surface-base rounded-xl flex items-center justify-center border border-border-subtle">
+                <ImageIcon className="w-8 h-8 text-text-muted" />
               </div>
             )}
-          </div>
-
-          {/* Текст сообщения */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Сообщение (можно отредактировать)
-            </label>
-            <textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={6}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-              placeholder="Введите текст сообщения..."
-            />
-          </div>
-
-          {!product.image && (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-              <p className="text-sm text-yellow-800">
-                ⚠️ У товара нет загруженного изображения. Будет отправлен только текст.
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-brand-black mb-1 truncate">
+                {product.internalName || product.name}
+              </h3>
+              <p className="text-sm text-text-muted">Артикул: {product.article || 'нет'}</p>
+              <p className="text-sm text-text-muted">
+                Цена: {product.costPrice?.toLocaleString() || '—'} ₸
               </p>
             </div>
-          )}
+          </div>
         </div>
 
-        {/* Кнопки */}
-        <div className="flex justify-end gap-3 p-6 border-t border-gray-200 bg-gray-50">
-          <button
-            onClick={onClose}
-            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors"
-          >
-            Отмена
-          </button>
-          <button
-            onClick={handleSend}
-            disabled={!selectedSupplierId || loading}
-            className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-          >
-            <Send className="w-4 h-4" />
-            Отправить в WhatsApp
-          </button>
-        </div>
+        <FormField label="Выберите поставщика">
+          {loading ? (
+            <div className="flex items-center justify-center py-4">
+              <Spinner size="md" color="brand" useLucide />
+            </div>
+          ) : suppliers.length === 0 ? (
+            <div className="text-center text-text-muted py-4">Нет поставщиков с WhatsApp</div>
+          ) : (
+            <div className="space-y-2 max-h-64 overflow-y-auto border border-border-subtle rounded-xl p-2 bg-surface-base">
+              {suppliers.map((supplier) => (
+                <label
+                  key={supplier.id}
+                  className="flex items-center p-3 bg-surface-base border border-border-subtle rounded-lg cursor-pointer hover:bg-surface-accent transition-colors"
+                >
+                  <input
+                    type="radio"
+                    name="supplier"
+                    value={supplier.id}
+                    checked={selectedSupplierId === supplier.id}
+                    onChange={() => setSelectedSupplierId(supplier.id)}
+                    className="w-4 h-4 text-brand-yellow focus:ring-brand-yellow"
+                  />
+                  <div className="ml-3 flex-1 min-w-0">
+                    <div className="font-medium text-brand-black truncate">{supplier.name}</div>
+                    <div className="text-sm text-text-muted">{supplier.whatsapp}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          )}
+        </FormField>
+
+        <Textarea
+          label="Сообщение (можно отредактировать)"
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
+          rows={6}
+          placeholder="Введите текст сообщения..."
+          className="resize-none"
+        />
+
+        {!product.image && (
+          <Alert variant="warning">
+            У товара нет загруженного изображения. Будет отправлен только текст.
+          </Alert>
+        )}
       </div>
-    </div>
+    </Modal>
   );
 };

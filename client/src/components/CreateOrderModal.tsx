@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import { X, Plus, Trash2, Loader2, AlertCircle, Package, PlusCircle, Undo2 } from 'lucide-react';
+import { Package } from 'lucide-react';
 import ordersApi from '../services/ordersApi';
 import suppliersApi from '../services/suppliersApi';
 import api from '../utils/api';
@@ -12,6 +12,15 @@ import {
 import { useSupplierProducts } from '../hooks/useSupplierProducts';
 import { SupplierProductCatalog } from './SupplierProductCatalog';
 import { draftLinesToForm, useOrderDraft } from '../context/OrderDraftContext';
+import { Modal } from './ui/Modal';
+import { FormFooter } from './ui/FormFooter';
+import { Alert } from './ui/Alert';
+import { Spinner } from './ui/Spinner';
+import { Input } from './ui/Input';
+import { Select } from './ui/Select';
+import { Textarea } from './ui/Textarea';
+import { OrderLineItemsEditor } from './forms/OrderLineItemsEditor';
+import { formatPriceKZT } from '../utils/format';
 
 export type { CreateOrderInitialItem } from '../utils/orderItems';
 
@@ -227,15 +236,6 @@ const CreateOrderModal: React.FC = () => {
 
     if (!variation) return;
 
-    const alreadyExists = items.some(
-      (item) => item.productId === sourceItem.productId && item.productVariationId === variationId
-    );
-
-    if (alreadyExists) {
-      alert('Эта вариация уже добавлена в заявку');
-      return;
-    }
-
     const newItem: OrderLineForm = {
       productId: sourceItem.productId,
       product: sourceItem.product,
@@ -312,91 +312,82 @@ const CreateOrderModal: React.FC = () => {
     closeModal();
   };
 
-  if (!isModalOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            {isReturn && <Undo2 className="w-6 h-6 text-yellow-600" />}
-            {isReturn ? 'Оформить возврат' : 'Создать новую заявку'}
-          </h2>
-          <button
-            onClick={handleClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="w-6 h-6" />
-          </button>
+    <Modal
+      isOpen={isModalOpen}
+      onClose={handleClose}
+      title={isReturn ? 'Оформить возврат' : 'Создать новую заявку'}
+      size="xl"
+      footer={
+        !loadingData ? (
+          <FormFooter
+            onCancel={handleClose}
+            submitLabel={
+              loading
+                ? isReturn
+                  ? 'Оформление...'
+                  : 'Создание...'
+                : isReturn
+                  ? 'Оформить возврат'
+                  : 'Создать заявку'
+            }
+            submitLoading={loading}
+            submitDisabled={loading || loadingData}
+            onSubmit={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
+            submitType="button"
+            submitVariant={isReturn ? 'primary' : 'accent'}
+          />
+        ) : undefined
+      }
+    >
+      {loadingData ? (
+        <div className="flex justify-center items-center py-12">
+          <Spinner size="lg" />
         </div>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {error && <Alert variant="error">{error}</Alert>}
 
-        <div className="flex-1 overflow-y-auto p-6">
-          {loadingData ? (
-            <div className="flex justify-center items-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Select
+              label="Поставщик"
+              required
+              value={supplierId || ''}
+              onChange={(e) => handleSupplierChange(e.target.value)}
+            >
+              <option value="">Выберите поставщика</option>
+              {suppliers.map((supplier) => (
+                <option key={supplier.id} value={supplier.id}>
+                  {supplier.name} - {supplier.phone}
+                </option>
+              ))}
+            </Select>
+
+            <Input
+              label="Ожидаемая дата поставки"
+              type="date"
+              value={expectedDeliveryDate}
+              onChange={(e) => setExpectedDeliveryDate(e.target.value)}
+            />
+
+            <div className="md:col-span-2">
+              <Input
+                label="Место доставки"
+                type="text"
+                value={deliveryLocation}
+                onChange={(e) => setDeliveryLocation(e.target.value)}
+                placeholder="Точка Байсад"
+              />
             </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-                  <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-red-800">{error}</p>
-                </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Поставщик <span className="text-red-500">*</span>
-                  </label>
-                  <select
-                    value={supplierId || ''}
-                    onChange={(e) => handleSupplierChange(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    required
-                  >
-                    <option value="">Выберите поставщика</option>
-                    {suppliers.map((supplier) => (
-                      <option key={supplier.id} value={supplier.id}>
-                        {supplier.name} - {supplier.phone}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Ожидаемая дата поставки
-                  </label>
-                  <input
-                    type="date"
-                    value={expectedDeliveryDate}
-                    onChange={(e) => setExpectedDeliveryDate(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Место доставки
-                  </label>
-                  <input
-                    type="text"
-                    value={deliveryLocation}
-                    onChange={(e) => setDeliveryLocation(e.target.value)}
-                    placeholder="Точка Байсад"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
+          </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Товары поставщика <span className="text-red-500">*</span>
-                </label>
+                <p className="text-overline text-text-muted tracking-wider mb-3">
+                  Товары поставщика <span className="text-danger">*</span>
+                </p>
 
                 {!supplierId ? (
-                  <div className="text-center py-8 text-gray-500 border border-dashed border-gray-300 rounded-lg">
+                  <div className="text-center py-8 text-text-muted border-2 border-dashed border-border-subtle rounded-xl bg-surface-inset">
                     <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
                     <p>Сначала выберите поставщика</p>
                     <p className="text-sm mt-1">Здесь появятся его товары</p>
@@ -415,235 +406,52 @@ const CreateOrderModal: React.FC = () => {
                 )}
 
                 <div className="mt-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <p className="text-overline text-text-muted tracking-wider mb-3">
                     Добавлено в {isReturn ? 'возврат' : 'заявку'}
-                  </label>
+                  </p>
 
-                  {items.length > 0 ? (
-                    <div className="space-y-3">
-                      {items.map((item, index) => (
-                        <div
-                          key={item.uniqueKey || index}
-                          className="bg-gray-50 p-4 rounded-lg border border-gray-200"
-                        >
-                          <div className="flex items-start gap-4">
-                            <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-3">
-                              <div className="md:col-span-4">
-                                <label className="block text-xs font-medium text-gray-700 mb-1">
-                                  Товар
-                                </label>
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <div className="text-sm font-medium text-gray-900">
-                                      {item.product?.name}
-                                    </div>
-                                    <div className="text-xs text-gray-500">
-                                      {item.product?.article}
-                                    </div>
-                                  </div>
-                                  {item.product?.variations && item.product.variations.length > 0 && (
-                                    <div className="relative group">
-                                      <button
-                                        type="button"
-                                        className="px-3 py-1 text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1"
-                                        onClick={() => {
-                                          const dropdown = document.getElementById(
-                                            `variations-dropdown-${index}`
-                                          );
-                                          dropdown?.classList.toggle('hidden');
-                                        }}
-                                      >
-                                        <PlusCircle className="w-3 h-3" />
-                                        Добавить вариацию
-                                      </button>
-                                      <div
-                                        id={`variations-dropdown-${index}`}
-                                        className="hidden absolute right-0 mt-1 w-64 bg-white border border-gray-300 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto"
-                                      >
-                                        {item.product.variations
-                                          .filter((v) => v.isActive)
-                                          .map((variation) => (
-                                            <button
-                                              key={variation.id}
-                                              type="button"
-                                              onClick={() => {
-                                                handleAddVariationAsNewItem(index, variation.id);
-                                                document
-                                                  .getElementById(`variations-dropdown-${index}`)
-                                                  ?.classList.add('hidden');
-                                              }}
-                                              className="w-full px-3 py-2 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-0"
-                                            >
-                                              <div className="text-sm font-medium text-gray-900">
-                                                {variation.name}: {variation.value}
-                                              </div>
-                                              <div className="text-xs text-gray-600">
-                                                {Number(variation.price).toLocaleString('ru-RU')} ₸
-                                                {variation.sku && (
-                                                  <span className="text-gray-400 ml-1">
-                                                    ({variation.sku})
-                                                  </span>
-                                                )}
-                                              </div>
-                                            </button>
-                                          ))}
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-
-                              {item.selectedVariation && (
-                                <div className="md:col-span-4 bg-blue-50 p-2 rounded-lg">
-                                  <div className="text-xs font-medium text-blue-900">
-                                    Вариация: {item.selectedVariation.name} -{' '}
-                                    {item.selectedVariation.value}
-                                    {item.selectedVariation.sku && (
-                                      <span className="text-blue-700 ml-1">
-                                        ({item.selectedVariation.sku})
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">
-                                  Количество
-                                </label>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  value={item.quantity}
-                                  onChange={(e) =>
-                                    handleUpdateQuantity(index, Number(e.target.value))
-                                  }
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                                />
-                              </div>
-
-                              <div>
-                                <label className="block text-xs font-medium text-gray-700 mb-1">
-                                  Цена (₸)
-                                </label>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={item.priceAtPurchase}
-                                  onChange={(e) =>
-                                    handleUpdatePrice(index, Number(e.target.value))
-                                  }
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                                />
-                              </div>
-
-                              <div className="md:col-span-2">
-                                <label className="block text-xs font-medium text-gray-700 mb-1">
-                                  Заметки
-                                </label>
-                                <input
-                                  type="text"
-                                  value={item.notes || ''}
-                                  onChange={(e) => handleUpdateNotes(index, e.target.value)}
-                                  placeholder="Дополнительная информация..."
-                                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
-                                />
-                              </div>
-
-                              <div className="md:col-span-4">
-                                <div className="text-right text-sm font-medium text-gray-900">
-                                  Итого:{' '}
-                                  {(item.quantity * item.priceAtPurchase).toLocaleString('ru-RU')}{' '}
-                                  ₸
-                                </div>
-                              </div>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveItem(index)}
-                              className="text-red-600 hover:text-red-800 transition-colors p-2"
-                            >
-                              <Trash2 className="w-5 h-5" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-6 text-gray-500 border border-dashed border-gray-200 rounded-lg text-sm">
-                      <p>Нажмите «+» у товара в списке выше</p>
-                    </div>
-                  )}
+                  <OrderLineItemsEditor
+                    items={items}
+                    mode="create"
+                    onUpdateQuantity={handleUpdateQuantity}
+                    onUpdatePrice={handleUpdatePrice}
+                    onUpdateNotes={handleUpdateNotes}
+                    onRemoveItem={handleRemoveItem}
+                    onAddVariation={handleAddVariationAsNewItem}
+                    isVariationTaken={(productId, variationId) =>
+                      items.some(
+                        (item) =>
+                          item.productId === productId && item.productVariationId === variationId
+                      )
+                    }
+                  />
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Комментарии
-                </label>
-                <textarea
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={3}
-                  placeholder="Дополнительная информация о заявке..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
+          <Textarea
+            label="Комментарии"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            placeholder="Дополнительная информация о заявке..."
+            className="resize-none"
+          />
 
-              {items.length > 0 && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg font-medium text-gray-900">
-                      Общая сумма {isReturn ? 'возврата' : 'заявки'}:
-                    </span>
-                    <span className="text-2xl font-bold text-blue-600">
-                      {calculateTotal().toLocaleString('ru-RU')} ₸
-                    </span>
-                  </div>
-                </div>
-              )}
-            </form>
+          {items.length > 0 && (
+            <div className="bg-surface-inset border border-border-subtle rounded-xl p-4">
+              <div className="flex justify-between items-center gap-4">
+                <span className="text-body-medium text-brand-black">
+                  Общая сумма {isReturn ? 'возврата' : 'заявки'}:
+                </span>
+                <span className="text-metric font-tabular text-brand-black">
+                  {formatPriceKZT(calculateTotal())}
+                </span>
+              </div>
+            </div>
           )}
-        </div>
-
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
-          <button
-            type="button"
-            onClick={handleClose}
-            disabled={loading}
-            className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
-          >
-            Отмена
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={loading || loadingData}
-            className={`px-6 py-2 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 ${
-              isReturn ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-blue-600 hover:bg-blue-700'
-            }`}
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-5 h-5 animate-spin" />
-                {isReturn ? 'Оформление...' : 'Создание...'}
-              </>
-            ) : isReturn ? (
-              <>
-                <Undo2 className="w-5 h-5" />
-                Оформить возврат
-              </>
-            ) : (
-              <>
-                <Plus className="w-5 h-5" />
-                Создать заявку
-              </>
-            )}
-          </button>
-        </div>
-      </div>
-    </div>
+        </form>
+      )}
+    </Modal>
   );
 };
 

@@ -1,13 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  FileText, 
-  Plus, 
-  Search, 
-  ChevronLeft,
-  ChevronRight,
-  Loader2,
-  AlertCircle,
+import {
+  FileText,
+  Plus,
+  Search,
   Package,
   Truck,
   Warehouse,
@@ -17,23 +13,117 @@ import {
   CheckCircle,
   AlertTriangle,
   Archive,
-  Undo2
+  Undo2,
+  ChevronRight,
 } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
 import ordersApi from '../services/ordersApi';
 import PaymentModal from '../components/PaymentModal';
 import { useOrderDraft } from '../context/OrderDraftContext';
+import {
+  Badge,
+  Button,
+  Card,
+  CardBody,
+  EmptyState,
+  ErrorState,
+  IconButton,
+  Input,
+  Pagination,
+  Spinner,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from '../components/ui';
+import { getOrderStatusColor, getPaymentStatusColor } from '../theme/statusColors';
+import { formatPriceKZT } from '../utils/format';
+import { cn } from '../utils/cn';
+import { toast } from '../context/ToastContext';
 import type { Order, OrderFilters, OrderStats, OrderStatus, OrderType, PaymentStatus } from '../types';
+
+interface StatCardProps {
+  label: string;
+  value: number;
+  active?: boolean;
+  onClick: () => void;
+}
+
+const StatCard: React.FC<StatCardProps> = ({ label, value, active, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={cn(
+      'w-full min-w-[8.5rem] snap-start shrink-0 md:min-w-0 rounded-card border bg-brand-white p-4 text-left transition-colors duration-200',
+      'hover:shadow-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-yellow focus-visible:ring-offset-2',
+      active
+        ? 'border-brand-yellow/40 border-l-[3px] border-l-brand-yellow bg-brand-yellow/10'
+        : 'border-border hover:border-gray-300'
+    )}
+  >
+    <p className="text-caption font-medium text-text-muted">{label}</p>
+    <p className="mt-1 text-h2 font-bold tabular-nums tracking-tight text-brand-black">{value}</p>
+  </button>
+);
+
+interface FilterChipProps {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+  className?: string;
+}
+
+const FilterChip: React.FC<FilterChipProps> = ({ active, onClick, children, className }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={cn(
+      'inline-flex min-h-9 items-center gap-1.5 rounded-pill border px-3.5 py-2 text-caption font-medium transition-colors duration-200',
+      active
+        ? 'border-brand-yellow/40 bg-brand-yellow/10 text-brand-black'
+        : 'border-border bg-brand-white text-text-muted hover:bg-surface-muted hover:text-brand-black',
+      className
+    )}
+  >
+    {children}
+  </button>
+);
+
+const STATUS_STATS: { status: OrderStatus; label: string; key: keyof OrderStats }[] = [
+  { status: 'Создана', label: 'Созданы', key: 'created' },
+  { status: 'Отправлена поставщику', label: 'Отправлены', key: 'sentToSupplier' },
+  { status: 'Подтверждена', label: 'Подтверждены', key: 'confirmed' },
+  { status: 'В сборе', label: 'В сборе', key: 'inCollection' },
+  { status: 'Забрана', label: 'Забраны', key: 'collected' },
+  { status: 'Доставка', label: 'Доставка', key: 'delivery' },
+  { status: 'Принята на складе', label: 'Приняты', key: 'received' },
+  { status: 'Закрыта', label: 'Закрыты', key: 'closed' },
+];
+
+const PAYMENT_FILTERS: { value?: PaymentStatus; label: string }[] = [
+  { value: undefined, label: 'Все' },
+  { value: 'Не оплачено', label: 'Не оплачено' },
+  { value: 'Частично оплачено', label: 'Частично' },
+  { value: 'Оплачено', label: 'Оплачено' },
+];
+
+const TYPE_FILTERS: { value?: OrderType; label: string; icon?: React.ReactNode }[] = [
+  { value: undefined, label: 'Все типы' },
+  { value: 'purchase', label: 'Заявки', icon: <FileText className="h-3.5 w-3.5" /> },
+  { value: 'return', label: 'Возвраты', icon: <Undo2 className="h-3.5 w-3.5" /> },
+];
 
 const Orders: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { openModal } = useOrderDraft();
-  
+
   const canCreateOrders = user?.role === 'admin' || user?.role === 'purchase_manager';
   const canManagePayments = user?.role === 'admin' || user?.role === 'accountant' || user?.role === 'purchase_manager';
-  
+
   const [orders, setOrders] = useState<Order[]>([]);
   const [stats, setStats] = useState<OrderStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -41,20 +131,20 @@ const Orders: React.FC = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
-  
+
   const [filters, setFilters] = useState<OrderFilters>({
     page: 1,
     limit: 20,
     status: undefined,
     paymentStatus: undefined,
-    search: ''
+    search: '',
   });
-  
+
   const [pagination, setPagination] = useState({
     total: 0,
     page: 1,
     pages: 1,
-    limit: 20
+    limit: 20,
   });
 
   const loadOrders = async () => {
@@ -79,15 +169,15 @@ const Orders: React.FC = () => {
   }, [filters]);
 
   const handleStatusFilter = (status?: OrderStatus) => {
-    setFilters(prev => ({ ...prev, status, page: 1 }));
+    setFilters((prev) => ({ ...prev, status, page: 1 }));
   };
 
   const handlePaymentStatusFilter = (paymentStatus?: PaymentStatus) => {
-    setFilters(prev => ({ ...prev, paymentStatus, page: 1 }));
+    setFilters((prev) => ({ ...prev, paymentStatus, page: 1 }));
   };
 
   const handleTypeFilter = (type?: OrderType) => {
-    setFilters(prev => ({ ...prev, type, page: 1 }));
+    setFilters((prev) => ({ ...prev, type, page: 1 }));
   };
 
   const openCreateModal = (type: OrderType) => {
@@ -96,7 +186,7 @@ const Orders: React.FC = () => {
       returnPath: '/orders',
       onSuccess: () => {
         loadOrders();
-        alert(type === 'return' ? 'Возврат успешно оформлен!' : 'Заявка успешно создана!');
+        toast.success(type === 'return' ? 'Возврат успешно оформлен!' : 'Заявка успешно создана!');
       },
     });
   };
@@ -107,7 +197,7 @@ const Orders: React.FC = () => {
   };
 
   const handlePageChange = (newPage: number) => {
-    setFilters(prev => ({ ...prev, page: newPage }));
+    setFilters((prev) => ({ ...prev, page: newPage }));
   };
 
   const handlePaymentClick = (e: React.MouseEvent, order: Order) => {
@@ -122,66 +212,53 @@ const Orders: React.FC = () => {
     try {
       setPaymentLoading(true);
       const response = await ordersApi.updateOrderPayment(selectedOrder.id, amount, comment);
-      
-      setOrders(prev => prev.map(order => 
-        order.id === selectedOrder.id 
-          ? response.order 
-          : order
-      ));
+
+      setOrders((prev) =>
+        prev.map((order) => (order.id === selectedOrder.id ? response.order : order))
+      );
 
       loadOrders();
 
-      alert(`Оплата успешно зарегистрирована! ${response.payment.statusChanged ? `Статус изменен на "${response.payment.newStatus}"` : ''}`);
+      const statusNote = response.payment.statusChanged
+        ? ` Статус изменен на «${response.payment.newStatus}».`
+        : '';
+      toast.success(`Оплата успешно зарегистрирована!${statusNote}`);
     } catch (error: any) {
       console.error('Ошибка регистрации оплаты:', error);
-      alert(error.message || 'Ошибка при регистрации оплаты');
+      toast.error(error.message || 'Ошибка при регистрации оплаты');
     } finally {
       setPaymentLoading(false);
     }
   };
 
-  const getStatusColor = (status: OrderStatus) => {
-    const colors: Record<OrderStatus, string> = {
-      'Создана': 'bg-gray-100 text-gray-800',
-      'Отправлена поставщику': 'bg-blue-100 text-blue-800',
-      'Частично подтверждена': 'bg-yellow-100 text-yellow-800',
-      'Подтверждена': 'bg-green-100 text-green-800',
-      'Доставка': 'bg-orange-100 text-orange-800',
-      'В сборе': 'bg-purple-100 text-purple-800',
-      'Забрана': 'bg-indigo-100 text-indigo-800',
-      'Принята на складе': 'bg-teal-100 text-teal-800',
-      'Закрыта': 'bg-gray-200 text-gray-600'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
-  };
-
-  const getPaymentStatusColor = (status: PaymentStatus) => {
-    const colors = {
-      'Не оплачено': 'bg-red-100 text-red-800',
-      'Частично оплачено': 'bg-orange-100 text-orange-800',
-      'Оплачено': 'bg-green-100 text-green-800'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
-  };
-
   const getStatusIcon = (status: OrderStatus) => {
     const icons: Record<OrderStatus, React.ReactElement> = {
-      'Создана': <FileText className="w-4 h-4" />,
-      'Отправлена поставщику': <Send className="w-4 h-4" />,
-      'Частично подтверждена': <AlertTriangle className="w-4 h-4" />,
-      'Подтверждена': <CheckCircle className="w-4 h-4" />,
-      'Доставка': <Truck className="w-4 h-4" />,
-      'В сборе': <Package className="w-4 h-4" />,
-      'Забрана': <Truck className="w-4 h-4" />,
-      'Принята на складе': <Warehouse className="w-4 h-4" />,
-      'Закрыта': <Archive className="w-4 h-4" />
+      'Создана': <FileText className="h-3.5 w-3.5" />,
+      'Отправлена поставщику': <Send className="h-3.5 w-3.5" />,
+      'Частично подтверждена': <AlertTriangle className="h-3.5 w-3.5" />,
+      'Подтверждена': <CheckCircle className="h-3.5 w-3.5" />,
+      'Доставка': <Truck className="h-3.5 w-3.5" />,
+      'В сборе': <Package className="h-3.5 w-3.5" />,
+      'Забрана': <Truck className="h-3.5 w-3.5" />,
+      'Принята на складе': <Warehouse className="h-3.5 w-3.5" />,
+      'Закрыта': <Archive className="h-3.5 w-3.5" />,
     };
     return icons[status];
   };
 
+  const hasActiveFilters = Boolean(
+    filters.status || filters.paymentStatus || filters.type || filters.search
+  );
+
+  const formatOrderDate = (date: string) =>
+    new Date(date).toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    });
+
   return (
     <Layout>
-      {/* Модальное окно оплаты */}
       {selectedOrder && (
         <PaymentModal
           isOpen={showPaymentModal}
@@ -195,470 +272,475 @@ const Orders: React.FC = () => {
         />
       )}
 
-      {/* Заголовок */}
-      <div className="mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-              <FileText className="w-8 h-8" />
-              Заявки
-            </h1>
-            <p className="text-gray-600 mt-1">Управление заявками на поставку товаров</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={loadOrders}
-              className="bg-white hover:bg-gray-50 text-gray-700 px-4 py-3 rounded-lg flex items-center gap-2 transition-colors border border-gray-300"
-              title="Обновить список"
-            >
-              <RefreshCw className="w-5 h-5" />
-            </button>
-            {canCreateOrders && (
-              <>
-                <button
-                  onClick={() => openCreateModal('return')}
-                  className="bg-black hover:bg-gray-800 text-white px-5 py-3 rounded-lg flex items-center gap-2 transition-colors"
-                  title="Оформить возврат поставщику"
-                >
-                  <Undo2 className="w-5 h-5" />
-                  Возврат
-                </button>
-                <button
-                  onClick={() => openCreateModal('purchase')}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg flex items-center gap-2 transition-colors"
-                >
-                  <Plus className="w-5 h-5" />
-                  Создать заявку
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Статистика */}
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-6">
-          <div 
-            className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-gray-400"
-            onClick={() => handleStatusFilter('Создана')}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500 uppercase">Созданы</p>
-                <p className="text-2xl font-bold text-gray-600">{stats.created || 0}</p>
-              </div>
-              <FileText className="w-6 h-6 text-gray-400" />
+      <div className="space-y-6">
+        {/* Sticky header + filters (mobile) */}
+        <div className="sticky top-0 z-10 -mx-4 px-4 pt-1 pb-4 md:static md:mx-0 md:px-0 md:pt-0 md:pb-0 bg-surface-page/95 backdrop-blur-sm border-b border-border-subtle md:border-0 space-y-4 md:space-y-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h1 className="text-h1 font-bold tracking-tight text-brand-black sm:text-display">
+                Заявки
+              </h1>
+              <p className="mt-1 text-body text-text-muted hidden sm:block">
+                Управление заявками на поставку товаров
+              </p>
             </div>
-          </div>
-          
-          <div 
-            className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-blue-400"
-            onClick={() => handleStatusFilter('Отправлена поставщику')}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500 uppercase">Отправлены</p>
-                <p className="text-2xl font-bold text-blue-600">{stats.sentToSupplier || 0}</p>
-              </div>
-              <Send className="w-6 h-6 text-blue-400" />
-            </div>
-          </div>
-          
-          <div 
-            className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-green-400"
-            onClick={() => handleStatusFilter('Подтверждена')}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500 uppercase">Подтверждены</p>
-                <p className="text-2xl font-bold text-green-600">{stats.confirmed || 0}</p>
-              </div>
-              <CheckCircle className="w-6 h-6 text-green-400" />
-            </div>
-          </div>
-          
-          <div 
-            className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-purple-400"
-            onClick={() => handleStatusFilter('В сборе')}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500 uppercase">В сборе</p>
-                <p className="text-2xl font-bold text-purple-600">{stats.inCollection || 0}</p>
-              </div>
-              <Package className="w-6 h-6 text-purple-400" />
-            </div>
-          </div>
-          
-          <div
-            className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-indigo-400"
-            onClick={() => handleStatusFilter('Забрана')}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500 uppercase">Забраны</p>
-                <p className="text-2xl font-bold text-indigo-600">{stats.collected || 0}</p>
-              </div>
-              <Truck className="w-6 h-6 text-indigo-400" />
-            </div>
-          </div>
-
-          <div
-            className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-orange-400"
-            onClick={() => handleStatusFilter('Доставка')}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500 uppercase">Доставка</p>
-                <p className="text-2xl font-bold text-orange-600">{stats.delivery || 0}</p>
-              </div>
-              <Truck className="w-6 h-6 text-orange-400" />
-            </div>
-          </div>
-
-          <div
-            className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-teal-400"
-            onClick={() => handleStatusFilter('Принята на складе')}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500 uppercase">Приняты</p>
-                <p className="text-2xl font-bold text-teal-600">{stats.received || 0}</p>
-              </div>
-              <Warehouse className="w-6 h-6 text-teal-400" />
-            </div>
-          </div>
-
-          <div 
-            className="bg-white p-4 rounded-lg shadow cursor-pointer hover:shadow-md transition-shadow border-l-4 border-gray-300"
-            onClick={() => handleStatusFilter('Закрыта')}
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-gray-500 uppercase">Закрыты</p>
-                <p className="text-2xl font-bold text-gray-500">{stats.closed || 0}</p>
-              </div>
-              <Archive className="w-6 h-6 text-gray-400" />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Финансовая сводка */}
-      {stats && (
-        <div className="bg-white p-4 rounded-lg shadow mb-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-6">
-              <div>
-                <span className="text-sm text-gray-500">Общая сумма:</span>
-                <span className="ml-2 text-lg font-semibold text-gray-900">
-                  {parseFloat(stats.totalAmount).toLocaleString('ru-RU')} ₸
-                </span>
-              </div>
-              <div>
-                <span className="text-sm text-gray-500">Оплачено:</span>
-                <span className="ml-2 text-lg font-semibold text-green-600">
-                  {parseFloat(stats.totalPaid).toLocaleString('ru-RU')} ₸
-                </span>
-              </div>
-              <div>
-                <span className="text-sm text-gray-500">Задолженность:</span>
-                <span className={`ml-2 text-lg font-semibold ${parseFloat(stats.totalDebt) > 0 ? 'text-red-600' : 'text-gray-600'}`}>
-                  {parseFloat(stats.totalDebt).toLocaleString('ru-RU')} ₸
-                </span>
-              </div>
-            </div>
-            <div className="flex items-center gap-4 text-sm text-gray-500">
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-yellow-400"></span>
-                Ожидают: {stats.pending || 0}
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-blue-400"></span>
-                В работе: {stats.inProgress || 0}
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-green-400"></span>
-                Завершены: {stats.completed || 0}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Поиск и фильтры */}
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
-        <form onSubmit={handleSearch} className="flex gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-            <input
-              type="text"
-              placeholder="Поиск по номеру заявки..."
-              value={filters.search || ''}
-              onChange={(e) => setFilters(prev => ({ ...prev, search: e.target.value }))}
-              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-          
-          <button
-            type="submit"
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
-          >
-            Искать
-          </button>
-          
-          {(filters.status || filters.paymentStatus || filters.type || filters.search) && (
-            <button
-              type="button"
-              onClick={() => setFilters({ page: 1, limit: 20 })}
-              className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-6 py-2 rounded-lg transition-colors"
-            >
-              Сбросить
-            </button>
-          )}
-        </form>
-
-        {/* Быстрые фильтры по статусу оплаты */}
-        <div className="flex gap-2 mt-4">
-          <button
-            onClick={() => handlePaymentStatusFilter(undefined)}
-            className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-              !filters.paymentStatus ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            Все
-          </button>
-          <button
-            onClick={() => handlePaymentStatusFilter('Не оплачено')}
-            className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-              filters.paymentStatus === 'Не оплачено' ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            Не оплачено
-          </button>
-          <button
-            onClick={() => handlePaymentStatusFilter('Частично оплачено')}
-            className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-              filters.paymentStatus === 'Частично оплачено' ? 'bg-orange-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            Частично оплачено
-          </button>
-          <button
-            onClick={() => handlePaymentStatusFilter('Оплачено')}
-            className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-              filters.paymentStatus === 'Оплачено' ? 'bg-green-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-            }`}
-          >
-            Оплачено
-          </button>
-        </div>
-
-        {/* Фильтры по типу документа */}
-        <div className="flex gap-2 mt-3 items-center">
-          <span className="text-xs text-gray-500 uppercase tracking-wide mr-1">Тип:</span>
-          <button
-            onClick={() => handleTypeFilter(undefined)}
-            className={`px-3 py-1.5 rounded-lg text-xs transition-colors ${
-              !filters.type ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Все
-          </button>
-          <button
-            onClick={() => handleTypeFilter('purchase')}
-            className={`px-3 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1 ${
-              filters.type === 'purchase' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <FileText className="w-3 h-3" />
-            Заявки
-          </button>
-          <button
-            onClick={() => handleTypeFilter('return')}
-            className={`px-3 py-1.5 rounded-lg text-xs transition-colors flex items-center gap-1 ${
-              filters.type === 'return' ? 'bg-yellow-500 text-black' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            <Undo2 className="w-3 h-3" />
-            Возвраты
-          </button>
-        </div>
-      </div>
-
-      {/* Таблица заявок */}
-      <div className="bg-white rounded-lg shadow overflow-hidden">
-        {loading ? (
-          <div className="flex justify-center items-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-          </div>
-        ) : error ? (
-          <div className="flex flex-col items-center justify-center py-12 text-red-600">
-            <AlertCircle className="w-12 h-12 mb-2" />
-            <p>{error}</p>
-            <button
-              onClick={loadOrders}
-              className="mt-4 text-blue-600 hover:text-blue-800"
-            >
-              Попробовать снова
-            </button>
-          </div>
-        ) : orders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-            <FileText className="w-12 h-12 mb-2" />
-            <p>Заявки не найдены</p>
-          </div>
-        ) : (
-          <>
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Номер
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Поставщик
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Дата создания
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Сумма
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Статус
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Оплата
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Действия
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {orders.map((order) => (
-                  <tr
-                    key={order.id}
-                    onClick={() => navigate(`/orders/${order.id}`)}
-                    className="hover:bg-gray-50 cursor-pointer transition-colors"
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <IconButton
+                icon={RefreshCw}
+                title="Обновить список"
+                variant="default"
+                size="md"
+                onClick={loadOrders}
+              />
+              {canCreateOrders && (
+                <>
+                  <Button
+                    variant="secondary"
+                    size="md"
+                    leftIcon={Undo2}
+                    onClick={() => openCreateModal('return')}
                   >
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gray-900">{order.orderNumber}</span>
-                        {order.type === 'return' && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase bg-yellow-100 text-yellow-800 border border-yellow-300" title="Возвратная накладная">
-                            <Undo2 className="w-3 h-3" />
-                            Возврат
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">{order.supplier?.name}</div>
-                      <div className="text-sm text-gray-500">{order.supplier?.phone}</div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {new Date(order.createdAt).toLocaleDateString('ru-RU')}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {Number(order.totalAmount).toLocaleString('ru-RU')} ₸
-                      </div>
-                      {Number(order.paidAmount) > 0 && (
-                        <div className="text-xs text-gray-500">
-                          оплачено: {Number(order.paidAmount).toLocaleString('ru-RU')} ₸
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
-                        {getStatusIcon(order.status)}
-                        {order.status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${getPaymentStatusColor(order.paymentStatus)}`}>
-                        {order.paymentStatus}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center space-x-2">
-        {canManagePayments && order.paymentStatus !== 'Оплачено' && (
-                          <button
-                            onClick={(e) => handlePaymentClick(e, order)}
-                            className="inline-flex items-center px-3 py-1 border border-transparent text-xs leading-4 font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
-                            title="Зарегистрировать оплату"
-                          >
-                            <CreditCard className="w-3 h-3 mr-1" />
-                            Оплатить
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    Возврат
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="md"
+                    leftIcon={Plus}
+                    onClick={() => openCreateModal('purchase')}
+                  >
+                    Новая заявка
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
 
-            {/* Пагинация */}
-            {pagination.pages > 1 && (
-              <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-                <div className="flex-1 flex justify-between sm:hidden">
-                  <button
-                    onClick={() => handlePageChange(pagination.page - 1)}
-                    disabled={pagination.page === 1}
-                    className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Назад
-                  </button>
-                  <button
-                    onClick={() => handlePageChange(pagination.page + 1)}
-                    disabled={pagination.page === pagination.pages}
-                    className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Вперед
-                  </button>
+          <Card className="shadow-none hover:shadow-none md:hidden">
+            <CardBody className="space-y-3 p-4">
+              <form onSubmit={handleSearch} className="flex flex-col gap-3">
+                <div className="relative flex-1">
+                  <Search
+                    className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted"
+                    aria-hidden
+                  />
+                  <Input
+                    type="text"
+                    placeholder="Поиск по номеру заявки..."
+                    value={filters.search || ''}
+                    onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+                    className="bg-surface-inset pl-10"
+                  />
                 </div>
-                <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                <div className="flex gap-2">
+                  <Button type="submit" variant="primary" size="md" className="flex-1">
+                    Искать
+                  </Button>
+                  {hasActiveFilters && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="md"
+                      onClick={() => setFilters({ page: 1, limit: 20 })}
+                    >
+                      Сбросить
+                    </Button>
+                  )}
+                </div>
+              </form>
+
+              <div className="space-y-3">
+                <div>
+                  <p className="mb-2 text-label font-medium text-text-muted">Статус оплаты</p>
+                  <div className="flex gap-2 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-0.5 -mx-1 px-1">
+                    {PAYMENT_FILTERS.map(({ value, label }) => (
+                      <FilterChip
+                        key={label}
+                        active={filters.paymentStatus === value}
+                        onClick={() => handlePaymentStatusFilter(value)}
+                        className="snap-start shrink-0"
+                      >
+                        {label}
+                      </FilterChip>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <p className="mb-2 text-label font-medium text-text-muted">Тип документа</p>
+                  <div className="flex gap-2 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-0.5 -mx-1 px-1">
+                    {TYPE_FILTERS.map(({ value, label, icon }) => (
+                      <FilterChip
+                        key={label}
+                        active={filters.type === value}
+                        onClick={() => handleTypeFilter(value)}
+                        className="snap-start shrink-0"
+                      >
+                        {icon}
+                        {label}
+                      </FilterChip>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {stats && (
+                <div>
+                  <p className="mb-2 text-label font-medium text-text-muted">Статус заявки</p>
+                  <div className="flex gap-2 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-0.5 -mx-1 px-1">
+                    {STATUS_STATS.map(({ status, label, key }) => (
+                      <StatCard
+                        key={status}
+                        label={label}
+                        value={Number(stats[key] ?? 0)}
+                        active={filters.status === status}
+                        onClick={() => handleStatusFilter(status)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </CardBody>
+          </Card>
+        </div>
+
+        {/* Status stat cards (desktop) */}
+        {stats && (
+          <div className="hidden md:grid md:grid-cols-4 md:gap-4 lg:grid-cols-8">
+            {STATUS_STATS.map(({ status, label, key }) => (
+              <StatCard
+                key={status}
+                label={label}
+                value={Number(stats[key] ?? 0)}
+                active={filters.status === status}
+                onClick={() => handleStatusFilter(status)}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Financial summary */}
+        {stats && (
+          <Card className="border-border bg-surface-inset shadow-none hover:shadow-none">
+            <CardBody className="p-4 sm:p-5">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-wrap gap-x-8 gap-y-3">
                   <div>
-                    <p className="text-sm text-gray-700">
-                      Показано <span className="font-medium">{(pagination.page - 1) * pagination.limit + 1}</span> до{' '}
-                      <span className="font-medium">
-                        {Math.min(pagination.page * pagination.limit, pagination.total)}
-                      </span>{' '}
-                      из <span className="font-medium">{pagination.total}</span> результатов
+                    <p className="text-caption font-medium text-text-muted">Общая сумма</p>
+                    <p className="mt-0.5 text-h3 font-semibold tabular-nums text-brand-black">
+                      {formatPriceKZT(stats.totalAmount)}
                     </p>
                   </div>
                   <div>
-                    <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                      <button
-                        onClick={() => handlePageChange(pagination.page - 1)}
-                        disabled={pagination.page === 1}
-                        className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <ChevronLeft className="h-5 w-5" />
-                      </button>
-                      <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
-                        Страница {pagination.page} из {pagination.pages}
-                      </span>
-                      <button
-                        onClick={() => handlePageChange(pagination.page + 1)}
-                        disabled={pagination.page === pagination.pages}
-                        className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <ChevronRight className="h-5 w-5" />
-                      </button>
-                    </nav>
+                    <p className="text-caption font-medium text-text-muted">Оплачено</p>
+                    <p className="mt-0.5 text-h3 font-semibold tabular-nums text-brand-black">
+                      {formatPriceKZT(stats.totalPaid)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-caption font-medium text-text-muted">Задолженность</p>
+                    <p
+                      className={cn(
+                        'mt-0.5 text-h3 font-semibold tabular-nums',
+                        parseFloat(stats.totalDebt) > 0 ? 'text-danger' : 'text-brand-black'
+                      )}
+                    >
+                      {formatPriceKZT(stats.totalDebt)}
+                    </p>
                   </div>
                 </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="outline">Ожидают: {stats.pending || 0}</Badge>
+                  <Badge variant="outline">В работе: {stats.inProgress || 0}</Badge>
+                  <Badge variant="outline">Завершены: {stats.completed || 0}</Badge>
+                </div>
               </div>
-            )}
-          </>
+            </CardBody>
+          </Card>
         )}
+
+        {/* Search & filters (desktop) */}
+        <Card className="hidden md:block shadow-none hover:shadow-none">
+          <CardBody className="space-y-4 p-4 sm:p-5">
+            <form onSubmit={handleSearch} className="flex flex-col gap-3 sm:flex-row">
+              <div className="relative flex-1">
+                <Search
+                  className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted"
+                  aria-hidden
+                />
+                <Input
+                  type="text"
+                  placeholder="Поиск по номеру заявки..."
+                  value={filters.search || ''}
+                  onChange={(e) => setFilters((prev) => ({ ...prev, search: e.target.value }))}
+                  className="bg-surface-inset pl-10"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button type="submit" variant="primary" size="md" className="flex-1 sm:flex-none">
+                  Искать
+                </Button>
+                {hasActiveFilters && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="md"
+                    onClick={() => setFilters({ page: 1, limit: 20 })}
+                  >
+                    Сбросить
+                  </Button>
+                )}
+              </div>
+            </form>
+
+            <div className="space-y-3">
+              <div>
+                <p className="mb-2 text-label font-medium text-text-muted">Статус оплаты</p>
+                <div className="flex flex-wrap gap-2">
+                  {PAYMENT_FILTERS.map(({ value, label }) => (
+                    <FilterChip
+                      key={label}
+                      active={filters.paymentStatus === value}
+                      onClick={() => handlePaymentStatusFilter(value)}
+                    >
+                      {label}
+                    </FilterChip>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-label font-medium text-text-muted">Тип документа</p>
+                <div className="flex flex-wrap gap-2">
+                  {TYPE_FILTERS.map(({ value, label, icon }) => (
+                    <FilterChip
+                      key={label}
+                      active={filters.type === value}
+                      onClick={() => handleTypeFilter(value)}
+                    >
+                      {icon}
+                      {label}
+                    </FilterChip>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
+
+        {/* Orders list */}
+        <Card className="overflow-hidden shadow-none hover:shadow-none">
+          {loading ? (
+            <div className="flex items-center justify-center py-20">
+              <Spinner size="lg" color="brand" useLucide />
+            </div>
+          ) : error ? (
+            <ErrorState message={error} onRetry={loadOrders} retryLabel="Попробовать снова" />
+          ) : orders.length === 0 ? (
+            <EmptyState
+              icon={FileText}
+              title="Заявки не найдены"
+              description={
+                hasActiveFilters
+                  ? 'Попробуйте изменить фильтры или сбросить поиск'
+                  : 'Создайте первую заявку на поставку'
+              }
+              action={
+                canCreateOrders && !hasActiveFilters ? (
+                  <Button variant="primary" leftIcon={Plus} onClick={() => openCreateModal('purchase')}>
+                    Новая заявка
+                  </Button>
+                ) : hasActiveFilters ? (
+                  <Button
+                    variant="secondary"
+                    onClick={() => setFilters({ page: 1, limit: 20 })}
+                  >
+                    Сбросить фильтры
+                  </Button>
+                ) : undefined
+              }
+            />
+          ) : (
+            <>
+              {/* Mobile cards */}
+              <div className="space-y-3 p-4 md:hidden">
+                {orders.map((order) => (
+                  <div
+                    key={order.id}
+                    role="button"
+                    tabIndex={0}
+                    className="cursor-pointer rounded-card border border-border bg-brand-white transition-colors duration-150 active:scale-[0.99] hover:border-gray-300"
+                    onClick={() => navigate(`/orders/${order.id}`)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        navigate(`/orders/${order.id}`);
+                      }
+                    }}
+                  >
+                    <div className="p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-h3 font-semibold tracking-tight text-brand-black">
+                              {order.orderNumber}
+                            </span>
+                            {order.type === 'return' && (
+                              <Badge variant="warning">
+                                <span className="inline-flex items-center gap-1">
+                                  <Undo2 className="h-3 w-3" />
+                                  Возврат
+                                </span>
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="mt-1 truncate text-body-medium text-brand-black">
+                            {order.supplier?.name}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1 text-caption text-text-muted">
+                          <span>{formatOrderDate(order.createdAt)}</span>
+                          <ChevronRight className="h-4 w-4 text-text-muted" aria-hidden />
+                        </div>
+                      </div>
+
+                      <div className="mt-4 border-t border-border-subtle pt-4">
+                        <p className="text-h3 font-bold tabular-nums text-brand-black">
+                          {formatPriceKZT(order.totalAmount)}
+                        </p>
+                        {Number(order.paidAmount) > 0 && (
+                          <p className="mt-0.5 text-caption text-text-muted">
+                            Оплачено: {formatPriceKZT(order.paidAmount)}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <Badge statusClass={getOrderStatusColor(order.status, 'compact')}>
+                          <span className="inline-flex items-center gap-1">
+                            {getStatusIcon(order.status)}
+                            {order.status}
+                          </span>
+                        </Badge>
+                        <Badge statusClass={getPaymentStatusColor(order.paymentStatus)}>
+                          {order.paymentStatus}
+                        </Badge>
+                      </div>
+
+                      {canManagePayments && order.paymentStatus !== 'Оплачено' && (
+                        <Button
+                          variant="secondary"
+                          size="md"
+                          fullWidth
+                          leftIcon={CreditCard}
+                          className="mt-4"
+                          onClick={(e) => handlePaymentClick(e, order)}
+                        >
+                          Оплатить
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop table */}
+              <div className="hidden md:block">
+                <Table scrollable={false}>
+                  <TableHead sticky>
+                    <TableRow className="hover:bg-transparent">
+                      <TableHeaderCell>Номер</TableHeaderCell>
+                      <TableHeaderCell>Поставщик</TableHeaderCell>
+                      <TableHeaderCell>Дата</TableHeaderCell>
+                      <TableHeaderCell className="text-right">Сумма</TableHeaderCell>
+                      <TableHeaderCell>Статус</TableHeaderCell>
+                      <TableHeaderCell>Оплата</TableHeaderCell>
+                      <TableHeaderCell className="text-right">Действия</TableHeaderCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {orders.map((order) => (
+                      <TableRow
+                        key={order.id}
+                        onClick={() => navigate(`/orders/${order.id}`)}
+                        className="cursor-pointer min-h-[56px]"
+                      >
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <span className="text-body-medium font-semibold text-brand-black">
+                              {order.orderNumber}
+                            </span>
+                            {order.type === 'return' && (
+                              <Badge variant="warning">
+                                <span className="inline-flex items-center gap-1">
+                                  <Undo2 className="h-3 w-3" />
+                                  Возврат
+                                </span>
+                              </Badge>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell className="whitespace-normal">
+                          <div className="text-body-medium text-brand-black">{order.supplier?.name}</div>
+                          {order.supplier?.phone && (
+                            <div className="text-caption text-text-muted">{order.supplier.phone}</div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-body text-brand-black">
+                            {formatOrderDate(order.createdAt)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="text-body-medium font-semibold tabular-nums text-brand-black">
+                            {formatPriceKZT(order.totalAmount)}
+                          </div>
+                          {Number(order.paidAmount) > 0 && (
+                            <div className="text-caption tabular-nums text-text-muted">
+                              оплачено: {formatPriceKZT(order.paidAmount)}
+                            </div>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge statusClass={getOrderStatusColor(order.status, 'compact')}>
+                            <span className="inline-flex items-center gap-1">
+                              {getStatusIcon(order.status)}
+                              {order.status}
+                            </span>
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge statusClass={getPaymentStatusColor(order.paymentStatus)}>
+                            {order.paymentStatus}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {canManagePayments && order.paymentStatus !== 'Оплачено' && (
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              leftIcon={CreditCard}
+                              onClick={(e) => handlePaymentClick(e, order)}
+                            >
+                              Оплатить
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <Pagination
+                currentPage={pagination.page}
+                totalPages={pagination.pages}
+                totalItems={pagination.total}
+                itemsPerPage={pagination.limit}
+                onPageChange={handlePageChange}
+              />
+            </>
+          )}
+        </Card>
       </div>
     </Layout>
   );

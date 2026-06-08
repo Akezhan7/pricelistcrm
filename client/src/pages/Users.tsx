@@ -1,7 +1,28 @@
 import React, { useState, useEffect } from 'react';
 import { Layout } from '../components/Layout';
-import { Users as UsersIcon, Plus, UserCheck, X, Save } from 'lucide-react';
+import { Users as UsersIcon, Plus, UserCheck } from 'lucide-react';
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  EmptyState,
+  FormFooter,
+  Input,
+  Modal,
+  PageHeader,
+  Select,
+  Spinner,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeaderCell,
+  TableRow,
+} from '../components/ui';
 import api from '../utils/api';
+import { toast } from '../context/ToastContext';
+import type { BadgeVariant } from '../components/ui/Badge';
 
 interface User {
   id: number;
@@ -11,14 +32,14 @@ interface User {
   createdAt: string;
 }
 
-const ROLES = [
-  { value: 'admin', label: 'Администратор', color: 'bg-red-100 text-red-800' },
-  { value: 'purchase_manager', label: 'Менеджер по закупкам', color: 'bg-blue-100 text-blue-800' },
-  { value: 'warehouse_operator', label: 'Оператор склада', color: 'bg-green-100 text-green-800' },
-  { value: 'collector', label: 'Сборщик', color: 'bg-purple-100 text-purple-800' },
-  { value: 'driver', label: 'Водитель', color: 'bg-yellow-100 text-yellow-800' },
-  { value: 'operator', label: 'Оператор', color: 'bg-gray-100 text-gray-800' },
-  { value: 'accountant', label: 'Бухгалтер', color: 'bg-indigo-100 text-indigo-800' },
+const ROLES: { value: string; label: string; badge: BadgeVariant }[] = [
+  { value: 'admin', label: 'Администратор', badge: 'danger' },
+  { value: 'purchase_manager', label: 'Менеджер по закупкам', badge: 'info' },
+  { value: 'warehouse_operator', label: 'Оператор склада', badge: 'success' },
+  { value: 'collector', label: 'Сборщик', badge: 'warning' },
+  { value: 'driver', label: 'Водитель', badge: 'outline' },
+  { value: 'operator', label: 'Оператор', badge: 'default' },
+  { value: 'accountant', label: 'Бухгалтер', badge: 'info' },
 ];
 
 export const Users: React.FC = () => {
@@ -30,7 +51,7 @@ export const Users: React.FC = () => {
     name: '',
     email: '',
     password: '',
-    role: 'collector'
+    role: 'collector',
   });
   const [submitting, setSubmitting] = useState(false);
 
@@ -43,9 +64,9 @@ export const Users: React.FC = () => {
       setLoading(true);
       const response = await api.get('/auth/users');
       setUsers(response.data.data.users || []);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Ошибка загрузки пользователей:', error);
-      alert('Ошибка загрузки пользователей');
+      toast.error('Ошибка загрузки пользователей');
     } finally {
       setLoading(false);
     }
@@ -57,47 +78,48 @@ export const Users: React.FC = () => {
       name: '',
       email: '',
       password: '',
-      role: 'collector'
+      role: 'collector',
     });
     setShowModal(true);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.name || !formData.email || (!editingUser && !formData.password)) {
-      alert('Заполните все обязательные поля');
+      toast.warning('Заполните все обязательные поля');
       return;
     }
 
     try {
       setSubmitting(true);
-      
+
       if (editingUser) {
-        alert('Редактирование пользователей пока не реализовано');
+        toast.info('Редактирование пользователей пока не реализовано');
       } else {
         await api.post('/auth/users', formData);
-        alert('Пользователь успешно создан');
+        toast.success('Пользователь успешно создан');
         setShowModal(false);
         loadUsers();
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Ошибка:', error);
-      alert(error.response?.data?.message || 'Ошибка при сохранении пользователя');
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Ошибка при сохранении пользователя');
     } finally {
       setSubmitting(false);
     }
   };
 
   const getRoleInfo = (role: string) => {
-    return ROLES.find(r => r.value === role) || { label: role, color: 'bg-gray-100 text-gray-800' };
+    return ROLES.find((r) => r.value === role) || { label: role, badge: 'default' as BadgeVariant };
   };
 
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="flex h-64 items-center justify-center">
+          <Spinner size="lg" color="brand" useLucide />
         </div>
       </Layout>
     );
@@ -106,209 +128,193 @@ export const Users: React.FC = () => {
   return (
     <Layout>
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <UsersIcon className="h-8 w-8 text-blue-600" />
-            <h1 className="text-2xl font-bold text-gray-900">Управление пользователями</h1>
-          </div>
-          <button
-            onClick={handleCreate}
-            className="btn-primary flex items-center gap-2"
-          >
-            <Plus className="h-4 w-4" />
-            Создать пользователя
-          </button>
-        </div>
+        <PageHeader
+          title="Управление пользователями"
+          description="Создание учётных записей и назначение ролей"
+          icon={UsersIcon}
+          actions={
+            <Button variant="primary" leftIcon={Plus} onClick={handleCreate}>
+              Создать пользователя
+            </Button>
+          }
+        />
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Имя
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Email
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Роль
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Дата создания
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {users.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="px-6 py-12 text-center text-gray-500">
-                      <UsersIcon className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                      <p>Пользователи не найдены</p>
-                    </td>
-                  </tr>
-                ) : (
-                  users.map((user) => {
-                    const roleInfo = getRoleInfo(user.role);
-                    return (
-                      <tr key={user.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-full flex items-center justify-center">
-                              <UserCheck className="h-5 w-5 text-blue-600" />
-                            </div>
-                            <div className="ml-4">
-                              <div className="text-sm font-medium text-gray-900">{user.name}</div>
-                            </div>
+        <Card>
+          <div className="space-y-3 p-4 md:hidden">
+            {users.length === 0 ? (
+              <EmptyState
+                icon={UsersIcon}
+                title="Пользователи не найдены"
+                action={
+                  <Button variant="primary" leftIcon={Plus} onClick={handleCreate}>
+                    Создать пользователя
+                  </Button>
+                }
+              />
+            ) : (
+              users.map((user) => {
+                const roleInfo = getRoleInfo(user.role);
+                return (
+                  <div
+                    key={user.id}
+                    className="rounded-xl border border-border-subtle bg-brand-white p-4"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-inset">
+                        <UserCheck className="h-5 w-5 text-text-muted" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-body-medium text-brand-black">{user.name}</p>
+                        <p className="truncate text-caption text-text-muted">{user.email}</p>
+                      </div>
+                      <Badge variant={roleInfo.badge}>{roleInfo.label}</Badge>
+                    </div>
+                    <p className="mt-3 border-t border-border-subtle pt-3 text-caption tabular-nums text-text-muted">
+                      Создан: {new Date(user.createdAt).toLocaleDateString('ru-RU')}
+                    </p>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <Table className="hidden md:table">
+            <TableHead sticky>
+              <TableRow className="hover:bg-transparent">
+                <TableHeaderCell>Имя</TableHeaderCell>
+                <TableHeaderCell>Email</TableHeaderCell>
+                <TableHeaderCell>Роль</TableHeaderCell>
+                <TableHeaderCell>Дата создания</TableHeaderCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {users.length === 0 ? (
+                <TableRow className="hover:bg-transparent">
+                  <TableCell colSpan={4} className="py-12">
+                    <EmptyState
+                      icon={UsersIcon}
+                      title="Пользователи не найдены"
+                      action={
+                        <Button variant="primary" leftIcon={Plus} onClick={handleCreate}>
+                          Создать пользователя
+                        </Button>
+                      }
+                    />
+                  </TableCell>
+                </TableRow>
+              ) : (
+                users.map((user) => {
+                  const roleInfo = getRoleInfo(user.role);
+                  return (
+                    <TableRow key={user.id}>
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-surface-inset">
+                            <UserCheck className="h-5 w-5 text-brand-yellow" />
                           </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{user.email}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${roleInfo.color}`}>
-                            {roleInfo.label}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                          {new Date(user.createdAt).toLocaleDateString('ru-RU')}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                          <div className="text-body-medium text-brand-black">{user.name}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-body text-brand-black">{user.email}</TableCell>
+                      <TableCell>
+                        <Badge variant={roleInfo.badge}>{roleInfo.label}</Badge>
+                      </TableCell>
+                      <TableCell className="text-caption text-text-muted tabular-nums">
+                        {new Date(user.createdAt).toLocaleDateString('ru-RU')}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </Card>
 
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex gap-3">
-            <UsersIcon className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-blue-800">
-              <p className="font-medium mb-1">Роли пользователей:</p>
-              <ul className="list-disc list-inside space-y-1 text-blue-700">
-                <li><strong>Администратор</strong> - полный доступ ко всем функциям</li>
-                <li><strong>Менеджер по закупкам</strong> - создание заявок, управление поставщиками</li>
-                <li><strong>Сборщик</strong> - просмотр заданий на сбор товара</li>
-                <li><strong>Оператор склада</strong> - приёмка товара на склад</li>
-                <li><strong>Водитель</strong> - доставка товара</li>
-                <li><strong>Бухгалтер</strong> - работа с оплатами</li>
-              </ul>
-            </div>
-          </div>
-        </div>
+        <Alert variant="info" icon={UsersIcon} title="Роли пользователей:">
+          <ul className="list-inside list-disc space-y-1">
+            <li>
+              <strong>Администратор</strong> — полный доступ ко всем функциям
+            </li>
+            <li>
+              <strong>Менеджер по закупкам</strong> — создание заявок, управление поставщиками
+            </li>
+            <li>
+              <strong>Сборщик</strong> — просмотр заданий на сбор товара
+            </li>
+            <li>
+              <strong>Оператор склада</strong> — приёмка товара на склад
+            </li>
+            <li>
+              <strong>Водитель</strong> — доставка товара
+            </li>
+            <li>
+              <strong>Бухгалтер</strong> — работа с оплатами
+            </li>
+          </ul>
+        </Alert>
       </div>
 
-      {/* Модальное окно создания пользователя */}
-      {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg w-full max-w-md">
-            <div className="flex items-center justify-between p-4 border-b border-gray-200">
-              <h2 className="text-lg font-semibold text-gray-900">
-                {editingUser ? 'Редактировать пользователя' : 'Создать пользователя'}
-              </h2>
-              <button
-                onClick={() => setShowModal(false)}
-                className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+      <Modal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title={editingUser ? 'Редактировать пользователя' : 'Создать пользователя'}
+        size="md"
+        footer={
+          <FormFooter
+            onCancel={() => setShowModal(false)}
+            submitLabel={submitting ? 'Сохранение...' : editingUser ? 'Сохранить' : 'Создать'}
+            submitLoading={submitting}
+            submitDisabled={submitting}
+            onSubmit={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
+            submitType="button"
+          />
+        }
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Input
+            label="Имя"
+            required
+            value={formData.name}
+            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+            placeholder="Иван Иванов"
+          />
 
-            <form onSubmit={handleSubmit} className="p-4 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Имя *
-                </label>
-                <input
-                  type="text"
-                  required
-                  className="input-field"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Иван Иванов"
-                />
-              </div>
+          <Input
+            label="Email"
+            type="email"
+            required
+            value={formData.email}
+            onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            placeholder="ivan@example.com"
+          />
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Email *
-                </label>
-                <input
-                  type="email"
-                  required
-                  className="input-field"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  placeholder="ivan@example.com"
-                />
-              </div>
+          {!editingUser && (
+            <Input
+              label="Пароль"
+              type="password"
+              required
+              minLength={6}
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              placeholder="Минимум 6 символов"
+              helperText="Пользователь сможет изменить пароль после входа"
+            />
+          )}
 
-              {!editingUser && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Пароль *
-                  </label>
-                  <input
-                    type="password"
-                    required
-                    className="input-field"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    placeholder="Минимум 6 символов"
-                    minLength={6}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Пользователь сможет изменить пароль после входа
-                  </p>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Роль *
-                </label>
-                <select
-                  required
-                  className="input-field"
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                >
-                  {ROLES.map((role) => (
-                    <option key={role.value} value={role.value}>
-                      {role.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex justify-end space-x-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="btn-secondary"
-                  disabled={submitting}
-                >
-                  Отмена
-                </button>
-                <button
-                  type="submit"
-                  className="btn-primary flex items-center gap-2"
-                  disabled={submitting}
-                >
-                  {submitting ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
-                  {submitting ? 'Сохранение...' : 'Создать'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+          <Select
+            label="Роль"
+            required
+            value={formData.role}
+            onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+          >
+            {ROLES.map((role) => (
+              <option key={role.value} value={role.value}>
+                {role.label}
+              </option>
+            ))}
+          </Select>
+        </form>
+      </Modal>
     </Layout>
   );
 };

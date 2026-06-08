@@ -1,0 +1,24 @@
+- generic [ref=e4]:
+  - generic [ref=e5]:
+    - generic [ref=e8]:
+      - heading "Plastkrep CRM" [level=2] [ref=e9]
+      - paragraph [ref=e10]: Стройматериалы
+    - heading "Вход в систему" [level=1] [ref=e11]
+    - paragraph [ref=e12]: CRM система управления товарами и поставщиками
+  - generic [ref=e15]:
+    - generic [ref=e16]:
+      - generic [ref=e17]: Email адрес
+      - textbox "Email адрес" [ref=e18]:
+        - /placeholder: admin@example.com
+    - generic [ref=e19]:
+      - generic [ref=e20]: Пароль
+      - textbox "Пароль" [ref=e21]:
+        - /placeholder: ••••••••
+    - button "Войти в систему" [ref=e22] [cursor=pointer]:
+      - img [ref=e23]
+      - text: Войти в систему
+    - paragraph [ref=e26]:
+      - text: Нет аккаунта?
+      - link "Зарегистрироваться" [ref=e27] [cursor=pointer]:
+        - /url: /register
+  - paragraph [ref=e28]: © 2026 Plastkrep CRM

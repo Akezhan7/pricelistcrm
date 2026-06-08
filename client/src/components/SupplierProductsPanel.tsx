@@ -8,12 +8,24 @@ import { useProductEditor } from '../hooks/useProductEditor';
 import { useSupplierProductActions } from '../hooks/useSupplierProductActions';
 import { useOrderDraft } from '../context/OrderDraftContext';
 import { calcDraftTotal, countDraftProducts } from '../utils/orderDraftStorage';
+import { Button, CardHeader } from './ui';
+import { formatPriceKZT } from '../utils/format';
+import { cn } from '../utils/cn';
+
+const blackButtonClass =
+  'bg-brand-black text-brand-white hover:bg-gray-800 focus-visible:ring-brand-black';
 
 interface SupplierProductsPanelProps {
   supplier: Supplier;
   onOrderSuccess?: () => void;
   canCreate?: boolean;
   canEdit?: boolean;
+  /** На экранах без нижней tab bar (например, детали поставщика) */
+  mobileActionBarAtBottom?: boolean;
+  /** Скрыть дублирующий заголовок «Поставщик {name}» (страница деталей) */
+  showSupplierHeader?: boolean;
+  /** Плотная сетка на странице деталей; список по умолчанию */
+  layout?: 'list' | 'grid';
 }
 
 export const SupplierProductsPanel: React.FC<SupplierProductsPanelProps> = ({
@@ -21,6 +33,9 @@ export const SupplierProductsPanel: React.FC<SupplierProductsPanelProps> = ({
   onOrderSuccess,
   canCreate = true,
   canEdit = false,
+  mobileActionBarAtBottom = false,
+  showSupplierHeader = true,
+  layout = 'list',
 }) => {
   const location = useLocation();
   const {
@@ -57,9 +72,6 @@ export const SupplierProductsPanel: React.FC<SupplierProductsPanelProps> = ({
     }
   }, [isActiveDraft, returnPath, setDraftReturnPath]);
 
-  const formatPrice = (price: number | string) =>
-    new Intl.NumberFormat('ru-RU').format(Number(price) || 0);
-
   const toggleSelect = (id: number) => {
     const product = products.find((p) => p.id === id);
     if (!product) return;
@@ -88,37 +100,53 @@ export const SupplierProductsPanel: React.FC<SupplierProductsPanelProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full" style={{ minHeight: 0 }}>
-      <div className="p-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between gap-3">
-        <div>
-          <div className="text-sm text-gray-500">Поставщик</div>
-          <div className="text-lg font-semibold text-gray-900">{supplier.name}</div>
+    <div className="flex flex-col h-full min-h-0">
+      <CardHeader
+        className={cn(
+          'flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between bg-surface-muted',
+          !showSupplierHeader && 'sm:justify-end'
+        )}
+      >
+        {showSupplierHeader ? (
+          <div className="min-w-0">
+            <div className="text-sm text-text-muted">Поставщик</div>
+            <div className="text-lg font-semibold text-brand-black truncate">{supplier.name}</div>
+          </div>
+        ) : (
+          <div className="min-w-0">
+            <div className="text-section-title text-brand-black">Каталог</div>
+            <div className="text-caption text-text-muted">Цены и оформление заявок</div>
+          </div>
+        )}
+        <div className="sm:text-right shrink-0">
+          <div className="text-xs text-text-muted">Выбрано</div>
+          <div className="text-lg font-bold text-brand-black tabular-nums">{selectedCount}</div>
         </div>
-        <div className="text-right">
-          <div className="text-xs text-gray-500">Выбрано</div>
-          <div className="text-lg font-bold text-gray-900">{selectedCount}</div>
-        </div>
-      </div>
+      </CardHeader>
 
-      <div className="flex-1 flex flex-col p-4 bg-white min-h-0">
+      <div className={cn('flex-1 flex flex-col p-4 min-h-0', canCreate && 'max-md:pb-44')}>
         {canEdit && (
-          <div className="flex gap-2 mb-3 flex-shrink-0">
-            <button
+          <div className="flex flex-wrap gap-2 mb-3 flex-shrink-0">
+            <Button
               type="button"
+              variant="outline"
+              size="md"
+              leftIcon={Link2}
               onClick={openLinkModal}
-              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              className="flex-1 min-w-[9rem]"
             >
-              <Link2 className="w-4 h-4" />
               Из каталога
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="primary"
+              size="md"
+              leftIcon={PackagePlus}
               onClick={openCreateModal}
-              className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium bg-yellow-400 hover:bg-yellow-500 text-black rounded-lg transition-colors"
+              className="flex-1 min-w-[9rem]"
             >
-              <PackagePlus className="w-4 h-4" />
               Создать новый
-            </button>
+            </Button>
           </div>
         )}
         <SupplierProductCatalog
@@ -127,6 +155,7 @@ export const SupplierProductsPanel: React.FC<SupplierProductsPanelProps> = ({
           search={search}
           onSearchChange={setSearch}
           mode="select"
+          layout={layout}
           className="flex-1"
           listMaxHeight="fill"
           selectedIds={selectedIds}
@@ -141,32 +170,52 @@ export const SupplierProductsPanel: React.FC<SupplierProductsPanelProps> = ({
       </div>
 
       {canCreate && (
-        <div className="border-t border-gray-200 p-4 bg-white">
+        <div
+          className={cn(
+            'border-t border-border-subtle bg-brand-white/95 backdrop-blur-md',
+            'p-4 md:relative',
+            'max-md:fixed max-md:inset-x-0 max-md:z-40',
+            mobileActionBarAtBottom ? 'max-md:bottom-0 max-md:pb-safe' : 'max-md:bottom-above-tab-bar',
+            'max-md:shadow-[0_-4px_20px_rgba(0,0,0,0.08)]'
+          )}
+        >
           {selectedCount > 0 && (
             <div className="mb-3 flex items-center justify-between text-sm">
-              <span className="text-gray-600">Итого по выбранным:</span>
-              <span className="font-bold text-gray-900">{formatPrice(totalSelected)} ₸</span>
+              <span className="text-text-muted">
+                Выбрано: {selectedCount}
+                <span className="hidden sm:inline"> · Итого</span>
+              </span>
+              <span className="font-bold tabular-nums text-brand-black">
+                {formatPriceKZT(totalSelected)}
+              </span>
             </div>
           )}
-          <div className="flex gap-2">
-            <button
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+            <Button
               type="button"
+              variant="primary"
+              size="md"
+              leftIcon={Plus}
               disabled={selectedCount === 0}
               onClick={() => handleOpenModal('purchase')}
-              className="flex-1 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full sm:flex-1 sm:min-w-[9rem]"
+              fullWidth
             >
-              <Plus className="w-4 h-4" />
               Создать заявку
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              variant="primary"
+              size="md"
+              leftIcon={Undo2}
               disabled={selectedCount === 0}
               onClick={() => handleOpenModal('return')}
-              className="flex-1 bg-black hover:bg-gray-800 text-white font-semibold py-2 px-3 rounded-lg flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className={cn('w-full sm:flex-1 sm:min-w-[9rem]', blackButtonClass)}
+              fullWidth
             >
-              <Undo2 className="w-4 h-4" />
-              Оформить возврат
-            </button>
+              <span className="sm:hidden">Возврат</span>
+              <span className="hidden sm:inline">Оформить возврат</span>
+            </Button>
           </div>
         </div>
       )}

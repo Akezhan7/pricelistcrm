@@ -2,6 +2,9 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { UIProvider } from './context/UIContext';
+import { ToastProvider } from './context/ToastContext';
+import { ConfirmDialogProvider } from './context/ConfirmDialogContext';
+import { Spinner } from './components/ui/Spinner';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { Login } from './pages/Login';
 import { Register } from './pages/Register';
@@ -33,8 +36,8 @@ const AppRoutes: React.FC = () => {
 
   if (!isAuthReady) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-yellow-500" />
+      <div className="min-h-screen flex items-center justify-center bg-surface-muted">
+        <Spinner size="lg" color="brand" useLucide />
       </div>
     );
   }
@@ -185,14 +188,18 @@ const AppRoutes: React.FC = () => {
 function App() {
   return (
     <AuthProvider>
-      <UIProvider>
-        <Router>
-          <OrderDraftProvider>
-            <AppRoutes />
-            <CreateOrderModal />
-          </OrderDraftProvider>
-        </Router>
-      </UIProvider>
+      <ToastProvider>
+        <ConfirmDialogProvider>
+          <UIProvider>
+            <Router>
+              <OrderDraftProvider>
+                <AppRoutes />
+                <CreateOrderModal />
+              </OrderDraftProvider>
+            </Router>
+          </UIProvider>
+        </ConfirmDialogProvider>
+      </ToastProvider>
     </AuthProvider>
   );
 }

@@ -11,6 +11,7 @@ import { useNavigate } from 'react-router-dom';
 import type { OrderType, ProductWithPrice } from '../types';
 import type { CreateOrderInitialItem, OrderLineForm } from '../utils/orderItems';
 import { getSupplierListPrice } from '../utils/orderItems';
+import { confirmDialog } from './ConfirmDialogContext';
 import {
   type OrderDraft,
   type OrderDraftModalFields,
@@ -68,34 +69,42 @@ interface OrderDraftContextValue {
 
 const OrderDraftContext = createContext<OrderDraftContextValue | undefined>(undefined);
 
-function confirmReplaceDraft(currentName: string): boolean {
-  return window.confirm(
-    `У вас есть черновик заявки для «${currentName}». Заменить его и начать заново?`
-  );
-}
-
-function shouldReplaceDraft(
+function needsReplaceConfirm(
   prev: OrderDraft | null,
   nextOrigin: 'supplier-panel' | 'modal',
   nextSupplierId?: number
 ): boolean {
-  if (!prev || prev.lines.length === 0) return true;
-  if (prev.origin !== nextOrigin) return confirmReplaceDraft(prev.supplierName);
+  if (!prev || prev.lines.length === 0) return false;
+  if (prev.origin !== nextOrigin) return true;
   if (
     nextSupplierId &&
     prev.supplierId !== nextSupplierId &&
     prev.origin === 'supplier-panel'
   ) {
-    return confirmReplaceDraft(prev.supplierName);
+    return true;
   }
-  return true;
+  return false;
+}
+
+async function confirmReplaceDraft(currentName: string): Promise<boolean> {
+  return confirmDialog.show({
+    title: 'Заменить черновик',
+    message: `У вас есть черновик заявки для «${currentName}». Заменить его и начать заново?`,
+    confirmLabel: 'Заменить',
+    variant: 'default',
+  });
 }
 
 export const OrderDraftProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const [draft, setDraft] = useState<OrderDraft | null>(() => loadOrderDraft());
+  const draftRef = useRef<OrderDraft | null>(draft);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const onSuccessRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    draftRef.current = draft;
+  }, [draft]);
 
   useEffect(() => {
     saveOrderDraft(draft);
@@ -142,49 +151,53 @@ export const OrderDraftProvider: React.FC<{ children: React.ReactNode }> = ({ ch
       product: ProductWithPrice,
       returnPath: string
     ) => {
-      const normalizedPath = normalizeAppPath(returnPath);
+      void (async () => {
+        const normalizedPath = normalizeAppPath(returnPath);
+        const prev = draftRef.current;
 
-      setDraft((prev) => {
-        if (!shouldReplaceDraft(prev, 'supplier-panel', supplierId)) {
-          return prev;
+        if (needsReplaceConfirm(prev, 'supplier-panel', supplierId)) {
+          const ok = await confirmReplaceDraft(prev!.supplierName);
+          if (!ok) return;
         }
 
-        const base =
-          prev &&
-          prev.origin === 'supplier-panel' &&
-          prev.supplierId === supplierId
-            ? { ...prev, returnPath: normalizedPath, updatedAt: Date.now() }
-            : createEmptyDraft({
-                supplierId,
-                supplierName,
-                type: prev?.type ?? 'purchase',
-                origin: 'supplier-panel',
-                returnPath: normalizedPath,
-                lines: [],
-              });
+        setDraft((current) => {
+          const base =
+            current &&
+            current.origin === 'supplier-panel' &&
+            current.supplierId === supplierId
+              ? { ...current, returnPath: normalizedPath, updatedAt: Date.now() }
+              : createEmptyDraft({
+                  supplierId,
+                  supplierName,
+                  type: current?.type ?? 'purchase',
+                  origin: 'supplier-panel',
+                  returnPath: normalizedPath,
+                  lines: [],
+                });
 
-        const exists = base.lines.some(
-          (l) => l.productId === product.id && !l.productVariationId
-        );
+          const exists = base.lines.some(
+            (l) => l.productId === product.id && !l.productVariationId
+          );
 
-        const lines = exists
-          ? base.lines.filter(
-              (l) => !(l.productId === product.id && !l.productVariationId)
-            )
-          : [
-              ...base.lines,
-              {
-                productId: product.id,
-                product: productToStored(product),
-                productVariationId: null,
-                quantity: 1,
-                priceAtPurchase: getSupplierListPrice(product),
-                notes: '',
-              },
-            ];
+          const lines = exists
+            ? base.lines.filter(
+                (l) => !(l.productId === product.id && !l.productVariationId)
+              )
+            : [
+                ...base.lines,
+                {
+                  productId: product.id,
+                  product: productToStored(product),
+                  productVariationId: null,
+                  quantity: 1,
+                  priceAtPurchase: getSupplierListPrice(product),
+                  notes: '',
+                },
+              ];
 
-        return { ...base, lines, updatedAt: Date.now() };
-      });
+          return { ...base, lines, updatedAt: Date.now() };
+        });
+      })();
     },
     []
   );
@@ -219,68 +232,68 @@ export const OrderDraftProvider: React.FC<{ children: React.ReactNode }> = ({ ch
   }, []);
 
   const openModal = useCallback((type: OrderType, options?: OpenModalOptions) => {
-    const returnPath = normalizeAppPath(options?.returnPath ?? DEFAULT_MODAL_RETURN_PATH);
-    onSuccessRef.current = options?.onSuccess ?? null;
-    let accepted = true;
+    void (async () => {
+      const returnPath = normalizeAppPath(options?.returnPath ?? DEFAULT_MODAL_RETURN_PATH);
+      onSuccessRef.current = options?.onSuccess ?? null;
+      const prev = draftRef.current;
 
-    if (options?.supplierId && options.supplierName) {
-      const supplierId = options.supplierId;
-      const supplierName = options.supplierName;
-      const lines = initialItemsToLines(options.items ?? []);
+      if (options?.supplierId && options.supplierName) {
+        const supplierId = options.supplierId;
+        const supplierName = options.supplierName;
+        const lines = initialItemsToLines(options.items ?? []);
 
-      setDraft((prev) => {
-        if (!shouldReplaceDraft(prev, 'supplier-panel', supplierId)) {
-          accepted = false;
-          return prev;
+        if (needsReplaceConfirm(prev, 'supplier-panel', supplierId)) {
+          const ok = await confirmReplaceDraft(prev!.supplierName);
+          if (!ok) return;
         }
 
-        const keepPreviousLines =
-          lines.length === 0 &&
-          prev?.origin === 'supplier-panel' &&
-          prev.supplierId === supplierId;
+        setDraft((current) => {
+          const keepPreviousLines =
+            lines.length === 0 &&
+            current?.origin === 'supplier-panel' &&
+            current.supplierId === supplierId;
 
-        return createEmptyDraft({
-          supplierId,
-          supplierName,
-          type,
-          origin: 'supplier-panel',
-          returnPath,
-          lines: lines.length > 0 ? lines : keepPreviousLines ? prev!.lines : [],
-          deliveryLocation: keepPreviousLines ? prev!.deliveryLocation : undefined,
-          expectedDeliveryDate: keepPreviousLines ? prev!.expectedDeliveryDate : undefined,
-          notes: keepPreviousLines ? prev!.notes : undefined,
-        });
-      });
-    } else {
-      setDraft((prev) => {
-        if (!shouldReplaceDraft(prev, 'modal')) {
-          accepted = false;
-          return prev;
-        }
-
-        if (prev && prev.origin === 'modal') {
-          return {
-            ...prev,
+          return createEmptyDraft({
+            supplierId,
+            supplierName,
             type,
+            origin: 'supplier-panel',
             returnPath,
-            updatedAt: Date.now(),
-          };
+            lines: lines.length > 0 ? lines : keepPreviousLines ? current!.lines : [],
+            deliveryLocation: keepPreviousLines ? current!.deliveryLocation : undefined,
+            expectedDeliveryDate: keepPreviousLines ? current!.expectedDeliveryDate : undefined,
+            notes: keepPreviousLines ? current!.notes : undefined,
+          });
+        });
+      } else {
+        if (needsReplaceConfirm(prev, 'modal')) {
+          const ok = await confirmReplaceDraft(prev!.supplierName);
+          if (!ok) return;
         }
 
-        return createEmptyDraft({
-          supplierId: 0,
-          supplierName: '',
-          type,
-          origin: 'modal',
-          returnPath,
-          lines: [],
-        });
-      });
-    }
+        setDraft((current) => {
+          if (current && current.origin === 'modal') {
+            return {
+              ...current,
+              type,
+              returnPath,
+              updatedAt: Date.now(),
+            };
+          }
 
-    if (accepted) {
+          return createEmptyDraft({
+            supplierId: 0,
+            supplierName: '',
+            type,
+            origin: 'modal',
+            returnPath,
+            lines: [],
+          });
+        });
+      }
+
       setIsModalOpen(true);
-    }
+    })();
   }, []);
 
   const closeModal = useCallback(() => {

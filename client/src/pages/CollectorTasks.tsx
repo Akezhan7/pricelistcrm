@@ -1,22 +1,70 @@
 import React, { useState, useEffect } from 'react';
 import { Layout } from '../components/Layout';
-import { Pagination } from '../components/Pagination';
-import { 
-  ClipboardList, 
-  CheckCircle2, 
-  Clock, 
+import {
+  ClipboardList,
+  CheckCircle2,
+  Clock,
   PlayCircle,
   MapPin,
   Phone,
   Package,
   AlertCircle,
   RefreshCw,
-  Filter
 } from 'lucide-react';
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  CardTitle,
+  EmptyState,
+  IconButton,
+  PageHeader,
+  Select,
+  Spinner,
+} from '../components/ui';
+import { Pagination } from '../components/Pagination';
 import collectorApi from '../services/collectorApi';
+import { collectorTaskStatusColors } from '../theme/statusColors';
+import { useToast } from '../context/ToastContext';
 import type { CollectorTask, CollectorTaskStatus } from '../types';
+import { cn } from '../utils/cn';
+
+interface StatCardProps {
+  label: string;
+  value: number;
+  active?: boolean;
+  onClick: () => void;
+}
+
+const StatCard: React.FC<StatCardProps> = ({ label, value, active, onClick }) => (
+  <button
+    type="button"
+    onClick={onClick}
+    className={cn(
+      'w-full rounded-xl border bg-brand-white p-4 text-left transition-all duration-150',
+      'hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-yellow focus-visible:ring-offset-2',
+      active
+        ? 'border-brand-yellow/40 border-l-[3px] border-l-brand-yellow bg-brand-yellow/10'
+        : 'border-border-subtle hover:border-border'
+    )}
+  >
+    <p className="text-caption font-medium text-text-muted">{label}</p>
+    <p className="mt-1 text-h2 font-bold tabular-nums tracking-tight text-brand-black">{value}</p>
+  </button>
+);
+
+const FILTER_OPTIONS: { value: CollectorTaskStatus | 'all'; label: string }[] = [
+  { value: 'all', label: 'Все задания' },
+  { value: 'pending', label: 'Ожидают' },
+  { value: 'in_progress', label: 'В работе' },
+  { value: 'completed', label: 'Завершено' },
+];
 
 export const CollectorTasks: React.FC = () => {
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [tasks, setTasks] = useState<CollectorTask[]>([]);
   const [stats, setStats] = useState({ pending: 0, inProgress: 0, completed: 0 });
@@ -26,7 +74,7 @@ export const CollectorTasks: React.FC = () => {
     total: 0,
     page: 1,
     pages: 1,
-    limit: 20
+    limit: 20,
   });
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -40,7 +88,7 @@ export const CollectorTasks: React.FC = () => {
       const data = await collectorApi.getMyTasks({
         status: filterStatus === 'all' ? undefined : filterStatus,
         page: pagination.page,
-        limit: pagination.limit
+        limit: pagination.limit,
       });
       setTasks(data.tasks);
       setStats(data.stats);
@@ -49,13 +97,14 @@ export const CollectorTasks: React.FC = () => {
       }
     } catch (error) {
       console.error('Ошибка загрузки заданий:', error);
+      toast.error('Не удалось загрузить задания');
     } finally {
       setLoading(false);
     }
   };
 
   const handlePageChange = (page: number) => {
-    setPagination(prev => ({ ...prev, page }));
+    setPagination((prev) => ({ ...prev, page }));
   };
 
   const handleStartTask = async (taskId: number) => {
@@ -63,8 +112,10 @@ export const CollectorTasks: React.FC = () => {
       setProcessingTaskId(taskId);
       await collectorApi.startTask(taskId);
       await loadTasks();
+      toast.success('Сбор начат');
     } catch (error) {
       console.error('Ошибка запуска задания:', error);
+      toast.error('Не удалось начать задание');
     } finally {
       setProcessingTaskId(null);
     }
@@ -75,21 +126,12 @@ export const CollectorTasks: React.FC = () => {
       setProcessingTaskId(taskId);
       await collectorApi.completeTask(taskId, notes ? { notes } : undefined);
       await loadTasks();
+      toast.success('Задание завершено');
     } catch (error) {
       console.error('Ошибка завершения задания:', error);
+      toast.error('Не удалось завершить задание');
     } finally {
       setProcessingTaskId(null);
-    }
-  };
-
-  const getStatusColor = (status: CollectorTaskStatus) => {
-    switch (status) {
-      case 'pending':
-        return 'bg-gray-100 text-gray-800 border-gray-300';
-      case 'in_progress':
-        return 'bg-blue-100 text-blue-800 border-blue-300';
-      case 'completed':
-        return 'bg-green-100 text-green-800 border-green-300';
     }
   };
 
@@ -118,8 +160,8 @@ export const CollectorTasks: React.FC = () => {
   if (loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="flex h-64 items-center justify-center">
+          <Spinner size="lg" color="brand" useLucide />
         </div>
       </Layout>
     );
@@ -128,224 +170,182 @@ export const CollectorTasks: React.FC = () => {
   return (
     <Layout>
       <div className="space-y-6">
-        {/* Заголовок */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <ClipboardList className="h-8 w-8 text-blue-600" />
-            <h1 className="text-2xl font-bold text-gray-900">Мои задания на сбор</h1>
-          </div>
-          <button
-            onClick={loadTasks}
-            className="btn-secondary flex items-center gap-2"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Обновить
-          </button>
+        <PageHeader
+          title="Мои задания на сбор"
+          description="Задания на сбор товара у поставщиков"
+          icon={ClipboardList}
+          actions={
+            <IconButton icon={RefreshCw} title="Обновить" variant="default" onClick={loadTasks} />
+          }
+        />
+
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <StatCard
+            label="Ожидают"
+            value={stats.pending}
+            active={filterStatus === 'pending'}
+            onClick={() => setFilterStatus('pending')}
+          />
+          <StatCard
+            label="В работе"
+            value={stats.inProgress}
+            active={filterStatus === 'in_progress'}
+            onClick={() => setFilterStatus('in_progress')}
+          />
+          <StatCard
+            label="Завершено"
+            value={stats.completed}
+            active={filterStatus === 'completed'}
+            onClick={() => setFilterStatus('completed')}
+          />
         </div>
 
-        {/* Статистика */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 font-medium">Ожидают</p>
-                <p className="text-2xl font-bold text-gray-700">{stats.pending}</p>
-              </div>
-              <Clock className="h-8 w-8 text-gray-400" />
-            </div>
-          </div>
-
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-blue-600 font-medium">В работе</p>
-                <p className="text-2xl font-bold text-blue-700">{stats.inProgress}</p>
-              </div>
-              <PlayCircle className="h-8 w-8 text-blue-500" />
-            </div>
-          </div>
-
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-green-600 font-medium">Завершено</p>
-                <p className="text-2xl font-bold text-green-700">{stats.completed}</p>
-              </div>
-              <CheckCircle2 className="h-8 w-8 text-green-500" />
-            </div>
-          </div>
-        </div>
-
-        {/* Фильтр */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-          <div className="flex items-center gap-3">
-            <Filter className="h-5 w-5 text-gray-400" />
-            <select
-              className="input-field max-w-xs"
+        <Card variant="inset" className="shadow-none">
+          <CardBody className="p-4">
+            <Select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value as CollectorTaskStatus | 'all')}
+              className="max-w-xs"
+              aria-label="Фильтр по статусу"
             >
-              <option value="all">Все задания</option>
-              <option value="pending">Ожидают</option>
-              <option value="in_progress">В работе</option>
-              <option value="completed">Завершено</option>
-            </select>
-          </div>
-        </div>
+              {FILTER_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </Select>
+          </CardBody>
+        </Card>
 
-        {/* Список заданий */}
         <div className="space-y-4">
           {tasks.length === 0 ? (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-              <ClipboardList className="h-12 w-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500">
-                {filterStatus === 'all' 
-                  ? 'Заданий пока нет' 
-                  : `Нет заданий со статусом "${getStatusLabel(filterStatus as CollectorTaskStatus)}"`}
-              </p>
-            </div>
+            <Card>
+              <EmptyState
+                icon={ClipboardList}
+                title={
+                  filterStatus === 'all'
+                    ? 'Заданий пока нет'
+                    : `Нет заданий со статусом «${getStatusLabel(filterStatus as CollectorTaskStatus)}»`
+                }
+              />
+            </Card>
           ) : (
             tasks.map((task) => (
-              <div
-                key={task.id}
-                className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold text-gray-900">
-                        Заявка {task.order?.orderNumber}
-                      </h3>
-                      <span
-                        className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(
-                          task.status
-                        )}`}
-                      >
+              <Card key={task.id} variant="elevated">
+                <CardHeader>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <CardTitle>Заявка {task.order?.orderNumber}</CardTitle>
+                    <Badge statusClass={collectorTaskStatusColors[task.status]}>
+                      <span className="inline-flex items-center gap-1">
                         {getStatusIcon(task.status)}
                         {getStatusLabel(task.status)}
                       </span>
-                    </div>
-                    {task.notes && (
-                      <p className="text-sm text-gray-600 mb-2">
-                        <AlertCircle className="h-4 w-4 inline mr-1" />
-                        {task.notes}
-                      </p>
-                    )}
+                    </Badge>
                   </div>
-                </div>
+                  {task.notes && (
+                    <p className="mt-2 flex items-start gap-1.5 text-caption text-text-muted">
+                      <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+                      {task.notes}
+                    </p>
+                  )}
+                </CardHeader>
 
-                {/* Информация о поставщике */}
-                {task.order?.supplier && (
-                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                    <h4 className="text-sm font-semibold text-gray-700 mb-3">
-                      Информация о поставщике
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div className="flex items-center gap-2 text-sm">
-                        <Package className="h-4 w-4 text-gray-400" />
-                        <span className="font-medium text-gray-700">
-                          {task.order.supplier.name}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm">
-                        <Phone className="h-4 w-4 text-gray-400" />
-                        <a
-                          href={`tel:${task.order.supplier.phone}`}
-                          className="text-blue-600 hover:underline"
-                        >
-                          {task.order.supplier.phone}
-                        </a>
-                      </div>
-                      {task.order.supplier.address && (
-                        <div className="flex items-center gap-2 text-sm md:col-span-2">
-                          <MapPin className="h-4 w-4 text-gray-400" />
-                          <span className="text-gray-600">{task.order.supplier.address}</span>
+                <CardBody className="space-y-4">
+                  {task.order?.supplier && (
+                    <div className="rounded-xl bg-surface-inset p-4">
+                      <p className="text-overline text-text-muted">Поставщик</p>
+                      <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <div className="flex items-center gap-2 text-body">
+                          <Package className="h-4 w-4 shrink-0 text-text-muted" />
+                          <span className="text-body-medium text-brand-black">
+                            {task.order.supplier.name}
+                          </span>
                         </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Список товаров */}
-                {task.order?.items && task.order.items.length > 0 && (
-                  <div className="mb-4">
-                    <h4 className="text-sm font-semibold text-gray-700 mb-3">
-                      Товары для сбора ({task.order.items.length})
-                    </h4>
-                    <div className="space-y-2">
-                      {task.order.items.map((item, index) => (
-                        <div
-                          key={item.id}
-                          className="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-200"
-                        >
-                          <div className="flex-1">
-                            <p className="text-sm font-medium text-gray-900">
-                              {index + 1}. {item.product?.name}
-                            </p>
-                            {item.product?.article && (
-                              <p className="text-xs text-gray-500">
-                                Артикул: {item.product.article}
-                              </p>
-                            )}
+                        <div className="flex items-center gap-2 text-body">
+                          <Phone className="h-4 w-4 shrink-0 text-text-muted" />
+                          <a
+                            href={`tel:${task.order.supplier.phone}`}
+                            className="text-accent-blue hover:underline"
+                          >
+                            {task.order.supplier.phone}
+                          </a>
+                        </div>
+                        {task.order.supplier.address && (
+                          <div className="flex items-center gap-2 text-body md:col-span-2">
+                            <MapPin className="h-4 w-4 shrink-0 text-text-muted" />
+                            <span className="text-text-muted">{task.order.supplier.address}</span>
                           </div>
-                          <div className="text-right">
-                            <p className="text-sm font-semibold text-gray-900">
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {task.order?.items && task.order.items.length > 0 && (
+                    <div>
+                      <p className="text-overline text-text-muted">
+                        Товары для сбора ({task.order.items.length})
+                      </p>
+                      <div className="mt-2 space-y-2">
+                        {task.order.items.map((item, index) => (
+                          <div
+                            key={item.id}
+                            className="flex items-center justify-between gap-3 rounded-lg border border-border-subtle bg-brand-white px-3 py-2.5"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <p className="text-body-medium text-brand-black">
+                                {index + 1}. {item.product?.name}
+                              </p>
+                              {item.product?.article && (
+                                <p className="text-caption text-text-muted">
+                                  Артикул: {item.product.article}
+                                </p>
+                              )}
+                            </div>
+                            <p className="shrink-0 text-body-medium tabular-nums text-brand-black">
                               {item.quantity} шт
                             </p>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-
-                {/* Кнопки действий */}
-                <div className="flex gap-3 pt-4 border-t border-gray-200">
-                  {task.status === 'pending' && (
-                    <button
-                      onClick={() => handleStartTask(task.id)}
-                      disabled={processingTaskId === task.id}
-                      className="btn-primary flex items-center gap-2"
-                    >
-                      {processingTaskId === task.id ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      ) : (
-                        <PlayCircle className="h-4 w-4" />
-                      )}
-                      Начать сбор
-                    </button>
                   )}
 
-                  {task.status === 'in_progress' && !task.isCollected && (
-                    <button
-                      onClick={() => handleCompleteTask(task.id)}
-                      disabled={processingTaskId === task.id}
-                      className="btn-primary flex items-center gap-2"
-                    >
-                      {processingTaskId === task.id ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      ) : (
+                  <div className="flex flex-wrap gap-3 border-t border-border-subtle pt-4">
+                    {task.status === 'pending' && (
+                      <Button
+                        variant="primary"
+                        leftIcon={PlayCircle}
+                        onClick={() => handleStartTask(task.id)}
+                        loading={processingTaskId === task.id}
+                      >
+                        Начать сбор
+                      </Button>
+                    )}
+
+                    {task.status === 'in_progress' && !task.isCollected && (
+                      <Button
+                        variant="primary"
+                        leftIcon={CheckCircle2}
+                        onClick={() => handleCompleteTask(task.id)}
+                        loading={processingTaskId === task.id}
+                      >
+                        Товар собран
+                      </Button>
+                    )}
+
+                    {task.isCollected && task.collectedAt && (
+                      <div className="flex items-center gap-2 text-caption text-success-dark">
                         <CheckCircle2 className="h-4 w-4" />
-                      )}
-                      Товар собран
-                    </button>
-                  )}
-
-                  {task.isCollected && task.collectedAt && (
-                    <div className="flex items-center gap-2 text-sm text-green-600">
-                      <CheckCircle2 className="h-4 w-4" />
-                      <span>
-                        Собрано {new Date(task.collectedAt).toLocaleString('ru-RU')}
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
+                        <span>Собрано {new Date(task.collectedAt).toLocaleString('ru-RU')}</span>
+                      </div>
+                    )}
+                  </div>
+                </CardBody>
+              </Card>
             ))
           )}
         </div>
 
-        {/* Пагинация */}
         {pagination.pages > 1 && (
           <Pagination
             currentPage={pagination.page}
@@ -356,21 +356,14 @@ export const CollectorTasks: React.FC = () => {
           />
         )}
 
-        {/* Подсказка */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex gap-3">
-            <ClipboardList className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-            <div className="text-sm text-blue-800">
-              <p className="font-medium mb-1">Инструкция для сборщика:</p>
-              <ul className="list-disc list-inside space-y-1 text-blue-700">
-                <li>Нажмите "Начать сбор" когда приступаете к заданию</li>
-                <li>Проверьте все товары из списка у поставщика</li>
-                <li>После сбора всех товаров нажмите "Товар собран"</li>
-                <li>При возникновении проблем свяжитесь с менеджером</li>
-              </ul>
-            </div>
-          </div>
-        </div>
+        <Alert variant="info" icon={ClipboardList} title="Инструкция для сборщика:">
+          <ul className="list-inside list-disc space-y-1">
+            <li>Нажмите «Начать сбор», когда приступаете к заданию</li>
+            <li>Проверьте все товары из списка у поставщика</li>
+            <li>После сбора всех товаров нажмите «Товар собран»</li>
+            <li>При возникновении проблем свяжитесь с менеджером</li>
+          </ul>
+        </Alert>
       </div>
     </Layout>
   );

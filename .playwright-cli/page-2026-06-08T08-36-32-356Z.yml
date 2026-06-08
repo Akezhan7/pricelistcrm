@@ -1,0 +1,122 @@
+- generic [ref=e3]:
+  - complementary [ref=e4]:
+    - generic [ref=e5]:
+      - heading [level=1] [ref=e9]: Plastkrep CRM
+      - button [ref=e10] [cursor=pointer]:
+        - img [ref=e11]
+    - navigation [ref=e14]:
+      - paragraph [ref=e15]: Навигация
+      - list [ref=e16]:
+        - listitem [ref=e17]:
+          - button [ref=e18] [cursor=pointer]:
+            - img [ref=e19]
+            - generic [ref=e22]: Главная
+        - listitem [ref=e23]:
+          - button [ref=e24] [cursor=pointer]:
+            - img [ref=e25]
+            - generic [ref=e28]: Заявки
+        - listitem [ref=e29]:
+          - button [ref=e30] [cursor=pointer]:
+            - img [ref=e31]
+            - generic [ref=e35]: Товары
+        - listitem [ref=e36]:
+          - button [ref=e37] [cursor=pointer]:
+            - img [ref=e38]
+            - generic [ref=e43]: Поставщики
+        - listitem [ref=e44]:
+          - button [ref=e45] [cursor=pointer]:
+            - img [ref=e46]
+            - generic [ref=e49]: Прайс
+        - listitem [ref=e50]:
+          - button [ref=e51] [cursor=pointer]:
+            - img [ref=e52]
+            - generic [ref=e55]: Остатки на складе
+        - listitem [ref=e56]:
+          - button [ref=e57] [cursor=pointer]:
+            - img [ref=e58]
+            - generic [ref=e63]: Категории
+        - listitem [ref=e64]:
+          - button [ref=e65] [cursor=pointer]:
+            - img [ref=e66]
+            - generic [ref=e69]: Задания сборщиков
+        - listitem [ref=e70]:
+          - button [ref=e71] [cursor=pointer]:
+            - img [ref=e72]
+            - generic [ref=e77]: Приёмка товара
+        - listitem [ref=e78]:
+          - button [ref=e79] [cursor=pointer]:
+            - img [ref=e80]
+            - generic [ref=e82]: Карта Plastkrep
+      - paragraph [ref=e84]: Администрирование
+      - list [ref=e85]:
+        - listitem [ref=e86]:
+          - button [ref=e87] [cursor=pointer]:
+            - img [ref=e88]
+            - generic [ref=e93]: Пользователи
+    - button [ref=e96] [cursor=pointer]:
+      - img [ref=e98]
+      - generic [ref=e101]:
+        - paragraph [ref=e102]: Администратор
+        - paragraph [ref=e103]: Администратор
+  - main [ref=e104]:
+    - generic [ref=e105]:
+      - button "Открыть меню" [ref=e106] [cursor=pointer]:
+        - img [ref=e107]
+      - generic [ref=e108]:
+        - generic [ref=e109]: Plastkrep CRM
+        - heading "Заявки" [level=1] [ref=e110]
+    - generic [ref=e114]:
+      - generic [ref=e115]:
+        - generic [ref=e116]:
+          - heading "Заявки" [level=1] [ref=e118]
+          - generic [ref=e119]:
+            - button "Обновить список" [ref=e120] [cursor=pointer]:
+              - img [ref=e121]
+            - button "Возврат" [ref=e126] [cursor=pointer]:
+              - img [ref=e127]
+              - text: Возврат
+            - button "Новая заявка" [ref=e130] [cursor=pointer]:
+              - img [ref=e131]
+              - text: Новая заявка
+        - generic [ref=e133]:
+          - generic [ref=e134]:
+            - generic [ref=e135]:
+              - img
+              - textbox "Поиск по номеру заявки..." [ref=e137]
+            - button "Искать" [ref=e139] [cursor=pointer]
+          - generic [ref=e140]:
+            - generic [ref=e141]:
+              - paragraph [ref=e142]: Статус оплаты
+              - generic [ref=e143]:
+                - button "Все" [ref=e144] [cursor=pointer]
+                - button "Не оплачено" [ref=e145] [cursor=pointer]
+                - button "Частично" [ref=e146] [cursor=pointer]
+                - button "Оплачено" [ref=e147] [cursor=pointer]
+            - generic [ref=e148]:
+              - paragraph [ref=e149]: Тип документа
+              - generic [ref=e150]:
+                - button "Все типы" [ref=e151] [cursor=pointer]
+                - button "Заявки" [ref=e152] [cursor=pointer]:
+                  - img [ref=e153]
+                  - text: Заявки
+                - button "Возвраты" [ref=e156] [cursor=pointer]:
+                  - img [ref=e157]
+                  - text: Возвраты
+      - status "Загрузка" [ref=e162]
+  - navigation "Основная навигация" [ref=e164]:
+    - generic [ref=e165]:
+      - button "Главная" [ref=e166] [cursor=pointer]:
+        - img [ref=e167]
+        - generic [ref=e170]: Главная
+      - button "Заявки" [ref=e171] [cursor=pointer]:
+        - img [ref=e172]
+        - generic [ref=e175]: Заявки
+      - button "Товары" [ref=e176] [cursor=pointer]:
+        - img [ref=e177]
+        - generic [ref=e181]: Товары
+      - button "Поставщики" [ref=e182] [cursor=pointer]:
+        - img [ref=e183]
+        - generic [ref=e188]: Поставщики
+      - button "Ещё — открыть меню" [ref=e189] [cursor=pointer]:
+        - img [ref=e190]
+        - generic [ref=e191]: Ещё

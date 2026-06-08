@@ -1,8 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Trash2, Edit, Check, AlertCircle, UserPlus, Users } from 'lucide-react';
+import { Trash2, Edit, UserPlus, Users } from 'lucide-react';
 import { Product, Supplier, SupplierWithPrice } from '../types';
-import { UnifiedSupplierForm } from './UnifiedSupplierForm';
+import { SupplierFormModal } from './SupplierFormModal';
+import { Modal } from './ui/Modal';
+import { Alert } from './ui/Alert';
+import { Button } from './ui/Button';
+import { IconButton } from './ui/IconButton';
+import { Input } from './ui/Input';
+import { Select } from './ui/Select';
+import { Card, CardBody } from './ui/Card';
+import { FormFooter } from './ui/FormFooter';
 import api from '../utils/api';
+import { useConfirmDialog } from '../context/ConfirmDialogContext';
 
 type ProductSuppliersModalProps = {
   isOpen: boolean;
@@ -28,6 +37,7 @@ export const ProductSuppliersModal: React.FC<ProductSuppliersModalProps> = ({
   product,
   contextSupplierId,
 }) => {
+  const { confirm } = useConfirmDialog();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [availableSuppliers, setAvailableSuppliers] = useState<Supplier[]>([]);
@@ -140,7 +150,14 @@ export const ProductSuppliersModal: React.FC<ProductSuppliersModalProps> = ({
   };
 
   const handleRemoveSupplier = async (supplierId: number) => {
-    if (!product || !window.confirm('Удалить поставщика из этого товара?')) return;
+    if (!product) return;
+    const ok = await confirm({
+      title: 'Удалить поставщика',
+      message: 'Удалить поставщика из этого товара?',
+      confirmLabel: 'Удалить',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     setLoading(true);
     try {
@@ -187,9 +204,13 @@ export const ProductSuppliersModal: React.FC<ProductSuppliersModalProps> = ({
   };
 
   const handleDeleteSupplierCompletely = async (supplierId: number, supplierName: string) => {
-    if (!window.confirm(`Полностью удалить поставщика "${supplierName}" из базы данных? Это действие необратимо и удалит поставщика из всех товаров.`)) {
-      return;
-    }
+    const ok = await confirm({
+      title: 'Удалить поставщика',
+      message: `Полностью удалить поставщика «${supplierName}» из базы данных? Это действие необратимо и удалит поставщика из всех товаров.`,
+      confirmLabel: 'Удалить',
+      variant: 'danger',
+    });
+    if (!ok) return;
 
     setLoading(true);
     try {
@@ -208,350 +229,318 @@ export const ProductSuppliersModal: React.FC<ProductSuppliersModalProps> = ({
   const unlinkedSuppliers = getUnlinkedSuppliers();
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-900">
-            Поставщики товара: {product.name}
-          </h2>
-          <button
-            onClick={onClose}
-            className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+    <>
+      <Modal
+        isOpen={isOpen}
+        onClose={onClose}
+        title={`Поставщики: ${product.name}`}
+        size="lg"
+      >
+        <div className="space-y-6">
+          {error && <Alert variant="error">{error}</Alert>}
 
-        <div className="p-4 max-h-[calc(90vh-8rem)] overflow-y-auto">
-          {error && (
-            <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-3 flex items-center gap-2 text-sm text-red-700">
-              <AlertCircle className="h-4 w-4" />
-              {error}
-            </div>
-          )}
-
-          {/* Текущие поставщики */}
-          <div className="mb-6">
-            <h3 className="text-md font-medium text-gray-900 mb-3">Текущие поставщики</h3>
+          <div className="space-y-3">
+            <p className="text-label uppercase tracking-wider text-text-muted">Текущие поставщики</p>
             {sortedSuppliers.length > 0 ? (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {sortedSuppliers.map((supplier) => (
-                  <div
+                  <Card
                     key={supplier.id}
-                    className={`border rounded-lg p-4 ${
-                      supplier.id === contextSupplierId
-                        ? 'border-yellow-400 bg-yellow-50/50'
-                        : 'border-gray-200'
-                    }`}
+                    variant="elevated"
+                    selected={supplier.id === contextSupplierId}
                   >
+                    <CardBody compact>
                     {editingSupplier === supplier.id ? (
-                      // Форма редактирования
-                      <div className="space-y-3">
-                        <div className="font-medium text-gray-900">
+                      <div className="space-y-4">
+                        <p className="text-body-medium text-brand-black">
                           {supplier.name}
                           {supplier.id === contextSupplierId && (
-                            <span className="ml-2 text-xs font-normal text-yellow-700">
+                            <span className="ml-2 text-caption text-brand-yellow-dark">
                               (текущий поставщик)
                             </span>
                           )}
-                        </div>
+                        </p>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Цена у поставщика, ₸
-                            </label>
-                            <input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              className="input-field"
-                              value={editData.supplierPrice}
-                              onChange={(e) => setEditData({ ...editData, supplierPrice: e.target.value })}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Количество
-                            </label>
-                            <input
-                              type="number"
-                              min="0"
-                              className="input-field"
-                              value={editData.quantity}
-                              onChange={(e) => setEditData({ ...editData, quantity: e.target.value })}
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                              Доступен
-                            </label>
-                            <select
-                              className="input-field"
-                              value={editData.isAvailable.toString()}
-                              onChange={(e) => setEditData({ ...editData, isAvailable: e.target.value === 'true' })}
-                            >
-                              <option value="true">Да</option>
-                              <option value="false">Нет</option>
-                            </select>
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">
-                            Заметки
-                          </label>
-                          <input
-                            type="text"
-                            className="input-field"
-                            value={editData.notes}
-                            onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
-                            placeholder="Дополнительные заметки..."
+                          <Input
+                            label="Цена у поставщика, ₸"
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            value={editData.supplierPrice}
+                            onChange={(e) =>
+                              setEditData({ ...editData, supplierPrice: e.target.value })
+                            }
                           />
-                        </div>
-                        <div className="flex justify-end space-x-2">
-                          <button
-                            type="button"
-                            onClick={() => setEditingSupplier(null)}
-                            className="btn-secondary"
-                            disabled={loading}
+                          <Input
+                            label="Количество"
+                            type="number"
+                            min={0}
+                            value={editData.quantity}
+                            onChange={(e) =>
+                              setEditData({ ...editData, quantity: e.target.value })
+                            }
+                          />
+                          <Select
+                            label="Доступен"
+                            value={editData.isAvailable.toString()}
+                            onChange={(e) =>
+                              setEditData({
+                                ...editData,
+                                isAvailable: e.target.value === 'true',
+                              })
+                            }
                           >
-                            Отмена
-                          </button>
-                          <button
-                            onClick={() => handleSaveEdit(supplier.id)}
-                            className="btn-primary flex items-center gap-2"
-                            disabled={loading}
-                          >
-                            <Check className="h-4 w-4" />
-                            Сохранить
-                          </button>
+                            <option value="true">Да</option>
+                            <option value="false">Нет</option>
+                          </Select>
                         </div>
+                        <Input
+                          label="Заметки"
+                          value={editData.notes}
+                          onChange={(e) => setEditData({ ...editData, notes: e.target.value })}
+                          placeholder="Дополнительные заметки..."
+                        />
+                        <FormFooter
+                          onCancel={() => setEditingSupplier(null)}
+                          submitLabel="Сохранить"
+                          submitLoading={loading}
+                          submitDisabled={loading}
+                          onSubmit={() => handleSaveEdit(supplier.id)}
+                          submitType="button"
+                          className="border-0 px-0 py-0"
+                        />
                       </div>
                     ) : (
-                      // Просмотр данных поставщика
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-900 mb-2">{supplier.name}</div>
-                          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm text-gray-600">
+                      <div className="flex justify-between items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-body-medium text-brand-black mb-2">{supplier.name}</p>
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-caption text-text-muted">
                             <div>
-                              <span className="font-medium">Цена:</span> {supplier.ProductSupplier.supplierPrice} ₽
+                              <span className="text-label uppercase tracking-wider block mb-0.5">Цена</span>
+                              {supplier.ProductSupplier.supplierPrice} ₸
                             </div>
                             <div>
-                              <span className="font-medium">Количество:</span> {supplier.ProductSupplier.quantity}
+                              <span className="text-label uppercase tracking-wider block mb-0.5">
+                                Количество
+                              </span>
+                              {supplier.ProductSupplier.quantity}
                             </div>
                             <div>
-                              <span className="font-medium">Доступен:</span>{' '}
-                              <span className={supplier.ProductSupplier.isAvailable ? 'text-green-600' : 'text-red-600'}>
+                              <span className="text-label uppercase tracking-wider block mb-0.5">
+                                Доступен
+                              </span>
+                              <span
+                                className={
+                                  supplier.ProductSupplier.isAvailable
+                                    ? 'text-success'
+                                    : 'text-danger'
+                                }
+                              >
                                 {supplier.ProductSupplier.isAvailable ? 'Да' : 'Нет'}
                               </span>
                             </div>
                             <div>
-                              <span className="font-medium">Телефон:</span> {supplier.phone}
+                              <span className="text-label uppercase tracking-wider block mb-0.5">
+                                Телефон
+                              </span>
+                              {supplier.phone}
                             </div>
                           </div>
                           {supplier.ProductSupplier.notes && (
-                            <div className="mt-2 text-sm text-gray-600">
-                              <span className="font-medium">Заметки:</span> {supplier.ProductSupplier.notes}
-                            </div>
+                            <p className="mt-2 text-caption text-text-muted">
+                              <span className="text-label uppercase tracking-wider mr-1">Заметки:</span>
+                              {supplier.ProductSupplier.notes}
+                            </p>
                           )}
                         </div>
-                        <div className="flex flex-col space-y-1 ml-4">
-                          <button
-                            onClick={() => handleEditSupplier(supplier)}
-                            className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+                        <div className="flex flex-col gap-1 flex-shrink-0">
+                          <IconButton
+                            icon={Edit}
                             title="Редактировать"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleRemoveSupplier(supplier.id)}
-                            className="p-2 text-yellow-600 hover:text-yellow-800 hover:bg-yellow-50 rounded-lg transition-colors"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditSupplier(supplier)}
+                          />
+                          <IconButton
+                            icon={Trash2}
                             title="Удалить из товара"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteSupplierCompletely(supplier.id, supplier.name)}
-                            className="p-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveSupplier(supplier.id)}
+                            className="text-warning hover:bg-warning-light/50"
+                          />
+                          <IconButton
+                            icon={Trash2}
                             title="Полностью удалить из базы данных"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              handleDeleteSupplierCompletely(supplier.id, supplier.name)
+                            }
                             disabled={loading}
-                          >
-                            <X className="h-4 w-4" />
-                          </button>
+                            className="text-danger hover:bg-danger-light/50"
+                          />
                         </div>
                       </div>
                     )}
-                  </div>
+                    </CardBody>
+                  </Card>
                 ))}
               </div>
             ) : (
-              <p className="text-gray-500 italic">У этого товара пока нет поставщиков</p>
+              <p className="text-caption text-text-muted italic">У этого товара пока нет поставщиков</p>
             )}
           </div>
 
-          {/* Управление поставщиками */}
-          <div>
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-md font-medium text-gray-900">Управление поставщиками</h3>
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-label uppercase tracking-wider text-text-muted">
+                Управление поставщиками
+              </p>
               {!showAddForm && !showCreateForm && (
-                <div className="flex space-x-3">
+                <div className="flex flex-wrap gap-2">
                   {unlinkedSuppliers.length > 0 && (
-                    <button
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      leftIcon={Users}
                       onClick={() => {
                         setActionType('existing');
                         setShowAddForm(true);
                       }}
-                      className="btn-secondary flex items-center gap-2"
                       disabled={loading}
                     >
-                      <Users className="h-4 w-4" />
-                      Выбрать существующего поставщика
-                    </button>
+                      Выбрать существующего
+                    </Button>
                   )}
-                  <button
+                  <Button
+                    type="button"
+                    variant="primary"
+                    size="sm"
+                    leftIcon={UserPlus}
                     onClick={() => {
                       setActionType('create');
                       setShowCreateForm(true);
                     }}
-                    className="btn-primary flex items-center gap-2"
                     disabled={loading}
                   >
-                    <UserPlus className="h-4 w-4" />
-                    Создать нового поставщика
-                  </button>
+                    Создать нового
+                  </Button>
                 </div>
               )}
             </div>
 
-            {/* Форма выбора существующего поставщика */}
             {showAddForm && actionType === 'existing' && (
-              <form onSubmit={handleAddSupplier} className="border border-gray-200 rounded-lg p-4 bg-blue-50">
-                <h4 className="text-lg font-medium text-gray-900 mb-3">Выбрать существующего поставщика</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Поставщик *
-                    </label>
-                    <select
-                      required
-                      className="input-field"
-                      value={newSupplierData.supplierId}
-                      onChange={(e) => setNewSupplierData({ ...newSupplierData, supplierId: e.target.value })}
-                    >
-                      <option value="">Выберите поставщика</option>
-                      {unlinkedSuppliers.map(supplier => (
-                        <option key={supplier.id} value={supplier.id}>
-                          {supplier.name} - {supplier.address}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Цена поставщика для этого товара *
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      step="0.01"
-                      className="input-field"
-                      value={newSupplierData.supplierPrice}
-                      onChange={(e) => setNewSupplierData({ ...newSupplierData, supplierPrice: e.target.value })}
-                      placeholder="0.00"
+              <Card variant="inset">
+                <CardBody>
+                  <p className="text-label uppercase tracking-wider text-text-muted mb-4">
+                    Выбрать существующего поставщика
+                  </p>
+                  <form onSubmit={handleAddSupplier} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Select
+                        label="Поставщик"
+                        required
+                        value={newSupplierData.supplierId}
+                        onChange={(e) =>
+                          setNewSupplierData({ ...newSupplierData, supplierId: e.target.value })
+                        }
+                      >
+                        <option value="">Выберите поставщика</option>
+                        {unlinkedSuppliers.map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name} - {s.address}
+                          </option>
+                        ))}
+                      </Select>
+                      <Input
+                        label="Цена поставщика для этого товара"
+                        type="number"
+                        required
+                        min={0}
+                        step="0.01"
+                        value={newSupplierData.supplierPrice}
+                        onChange={(e) =>
+                          setNewSupplierData({
+                            ...newSupplierData,
+                            supplierPrice: e.target.value,
+                          })
+                        }
+                        placeholder="0.00"
+                      />
+                      <Input
+                        label="Количество на складе у поставщика"
+                        type="number"
+                        min={0}
+                        value={newSupplierData.quantity}
+                        onChange={(e) =>
+                          setNewSupplierData({ ...newSupplierData, quantity: e.target.value })
+                        }
+                        placeholder="0"
+                      />
+                      <Select
+                        label="Доступность"
+                        value={newSupplierData.isAvailable.toString()}
+                        onChange={(e) =>
+                          setNewSupplierData({
+                            ...newSupplierData,
+                            isAvailable: e.target.value === 'true',
+                          })
+                        }
+                      >
+                        <option value="true">Доступен</option>
+                        <option value="false">Недоступен</option>
+                      </Select>
+                    </div>
+                    <Input
+                      label="Заметки для этого товара"
+                      value={newSupplierData.notes}
+                      onChange={(e) =>
+                        setNewSupplierData({ ...newSupplierData, notes: e.target.value })
+                      }
+                      placeholder="Особые условия поставки..."
                     />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Количество на складе у поставщика
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      className="input-field"
-                      value={newSupplierData.quantity}
-                      onChange={(e) => setNewSupplierData({ ...newSupplierData, quantity: e.target.value })}
-                      placeholder="0"
+                    <FormFooter
+                      onCancel={() => {
+                        setShowAddForm(false);
+                        setActionType(null);
+                        setNewSupplierData({
+                          supplierId: '',
+                          supplierPrice: '',
+                          quantity: '0',
+                          isAvailable: true,
+                          notes: '',
+                        });
+                      }}
+                      submitLabel={loading ? 'Добавление...' : 'Добавить поставщика'}
+                      submitLoading={loading}
+                      submitDisabled={loading}
+                      className="border-0 px-0 py-0"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Доступность
-                    </label>
-                    <select
-                      className="input-field"
-                      value={newSupplierData.isAvailable.toString()}
-                      onChange={(e) => setNewSupplierData({ ...newSupplierData, isAvailable: e.target.value === 'true' })}
-                    >
-                      <option value="true">Доступен</option>
-                      <option value="false">Недоступен</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Заметки для этого товара
-                  </label>
-                  <input
-                    type="text"
-                    className="input-field"
-                    value={newSupplierData.notes}
-                    onChange={(e) => setNewSupplierData({ ...newSupplierData, notes: e.target.value })}
-                    placeholder="Особые условия поставки, заметки о качестве и т.д."
-                  />
-                </div>
-                <div className="flex justify-end space-x-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAddForm(false);
-                      setActionType(null);
-                      setNewSupplierData({
-                        supplierId: '',
-                        supplierPrice: '',
-                        quantity: '0',
-                        isAvailable: true,
-                        notes: '',
-                      });
-                    }}
-                    className="btn-secondary"
-                    disabled={loading}
-                  >
-                    Отмена
-                  </button>
-                  <button
-                    type="submit"
-                    className="btn-primary"
-                    disabled={loading}
-                  >
-                    {loading ? 'Добавление...' : 'Добавить существующего поставщика'}
-                  </button>
-                </div>
-              </form>
+                  </form>
+                </CardBody>
+              </Card>
             )}
 
-            {/* Информационные сообщения */}
             {!showAddForm && !showCreateForm && (
-              <div>
+              <div className="space-y-2">
                 {unlinkedSuppliers.length === 0 && (
-                  <p className="text-gray-500 italic mb-2">Все доступные поставщики уже привязаны к этому товару</p>
-                )}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <h4 className="text-sm font-medium text-blue-900 mb-1">Управление поставщиками</h4>
-                  <p className="text-sm text-blue-700">
-                    • <strong>Выбрать существующего поставщика</strong> - добавить к товару поставщика из уже созданных в системе<br/>
-                    • <strong>Создать нового поставщика</strong> - создать нового поставщика и сразу добавить его к товару<br/>
-                    • <strong>Удалить из товара</strong> - убрать поставщика только из этого товара (желтая кнопка)<br/>
-                    • <strong>Полностью удалить</strong> - удалить поставщика из всех товаров и из базы данных (красная кнопка)
+                  <p className="text-caption text-text-muted italic">
+                    Все доступные поставщики уже привязаны к этому товару
                   </p>
-                </div>
+                )}
+                <Alert variant="info" title="Управление поставщиками">
+                  Выберите существующего поставщика или создайте нового. Удаление из товара убирает
+                  связь только для этого товара; полное удаление — из всей базы.
+                </Alert>
               </div>
             )}
           </div>
         </div>
-      </div>
+      </Modal>
 
-      {/* Унифицированная форма создания поставщика */}
-      <UnifiedSupplierForm
+      <SupplierFormModal
         isOpen={showCreateForm && actionType === 'create'}
         onClose={() => {
           setShowCreateForm(false);
@@ -563,10 +552,10 @@ export const ProductSuppliersModal: React.FC<ProductSuppliersModalProps> = ({
           setShowCreateForm(false);
           setActionType(null);
         }}
-        mode="with-product"
+        mode="create"
         productId={product?.id}
         productName={product?.name}
       />
-    </div>
+    </>
   );
 };

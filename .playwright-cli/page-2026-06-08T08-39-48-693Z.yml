@@ -1,0 +1,221 @@
+- generic [ref=e1150]:
+  - complementary [ref=e1151]:
+    - generic [ref=e1152]:
+      - heading [level=1] [ref=e1156]: Plastkrep CRM
+      - button [ref=e1157] [cursor=pointer]:
+        - img [ref=e1158]
+    - navigation [ref=e1161]:
+      - paragraph [ref=e1162]: Навигация
+      - list [ref=e1163]:
+        - listitem [ref=e1164]:
+          - button [ref=e1165] [cursor=pointer]:
+            - img [ref=e1166]
+            - generic [ref=e1169]: Главная
+        - listitem [ref=e1170]:
+          - button [ref=e1171] [cursor=pointer]:
+            - img [ref=e1172]
+            - generic [ref=e1175]: Заявки
+        - listitem [ref=e1176]:
+          - button [ref=e1177] [cursor=pointer]:
+            - img [ref=e1178]
+            - generic [ref=e1182]: Товары
+        - listitem [ref=e1183]:
+          - button [ref=e1184] [cursor=pointer]:
+            - img [ref=e1185]
+            - generic [ref=e1190]: Поставщики
+        - listitem [ref=e1191]:
+          - button [ref=e1192] [cursor=pointer]:
+            - img [ref=e1193]
+            - generic [ref=e1196]: Прайс
+        - listitem [ref=e1197]:
+          - button [ref=e1198] [cursor=pointer]:
+            - img [ref=e1199]
+            - generic [ref=e1202]: Остатки на складе
+        - listitem [ref=e1203]:
+          - button [ref=e1204] [cursor=pointer]:
+            - img [ref=e1205]
+            - generic [ref=e1210]: Категории
+        - listitem [ref=e1211]:
+          - button [ref=e1212] [cursor=pointer]:
+            - img [ref=e1213]
+            - generic [ref=e1216]: Задания сборщиков
+        - listitem [ref=e1217]:
+          - button [ref=e1218] [cursor=pointer]:
+            - img [ref=e1219]
+            - generic [ref=e1224]: Приёмка товара
+        - listitem [ref=e1225]:
+          - button [ref=e1226] [cursor=pointer]:
+            - img [ref=e1227]
+            - generic [ref=e1229]: Карта Plastkrep
+      - paragraph [ref=e1231]: Администрирование
+      - list [ref=e1232]:
+        - listitem [ref=e1233]:
+          - button [ref=e1234] [cursor=pointer]:
+            - img [ref=e1235]
+            - generic [ref=e1240]: Пользователи
+    - button [ref=e1243] [cursor=pointer]:
+      - img [ref=e1245]
+      - generic [ref=e1248]:
+        - paragraph [ref=e1249]: Администратор
+        - paragraph [ref=e1250]: Администратор
+  - main [ref=e1251]:
+    - generic [ref=e1252]:
+      - button "Открыть меню" [ref=e1253] [cursor=pointer]:
+        - img [ref=e1254]
+      - generic [ref=e1255]:
+        - generic [ref=e1256]: Plastkrep CRM
+        - heading "Поставщик" [level=1] [ref=e1257]
+    - generic [ref=e1261]:
+      - generic [ref=e1263]:
+        - generic [ref=e1264]:
+          - button "Назад к поставщикам" [ref=e1265] [cursor=pointer]:
+            - img [ref=e1266]
+            - text: Назад к поставщикам
+          - heading "Алтынбек" [level=1] [ref=e1268]
+        - generic [ref=e1270]:
+          - button "Финансы" [ref=e1271] [cursor=pointer]:
+            - img [ref=e1272]
+            - text: Финансы
+          - button "Сверка" [ref=e1274] [cursor=pointer]:
+            - img [ref=e1275]
+            - text: Сверка
+          - button "Ещё" [ref=e1279] [cursor=pointer]:
+            - img [ref=e1280]
+            - text: Ещё
+      - generic [ref=e1284]:
+        - generic [ref=e1289]:
+          - generic [ref=e1290]:
+            - generic [ref=e1291]:
+              - generic [ref=e1292]: Каталог
+              - generic [ref=e1293]: Цены и оформление заявок
+            - generic [ref=e1294]:
+              - generic [ref=e1295]: Выбрано
+              - generic [ref=e1296]: "0"
+          - generic [ref=e1297]:
+            - generic [ref=e1298]:
+              - button "Из каталога" [ref=e1299] [cursor=pointer]:
+                - img [ref=e1300]
+                - text: Из каталога
+              - button "Создать новый" [ref=e1303] [cursor=pointer]:
+                - img [ref=e1304]
+                - text: Создать новый
+            - generic:
+              - generic [ref=e1308]:
+                - img
+                - textbox "Поиск товара по названию или артикулу..." [ref=e1310]
+              - generic [ref=e1311]:
+                - generic [ref=e1312]:
+                  - generic [ref=e1313]:
+                    - button "Редактировать товар" [ref=e1314] [cursor=pointer]:
+                      - img [ref=e1315]
+                    - button "Цены и поставщики" [ref=e1318] [cursor=pointer]:
+                      - img [ref=e1319]
+                  - generic [ref=e1324]:
+                    - button "Выбрать товар" [ref=e1325] [cursor=pointer]
+                    - generic [ref=e1327]:
+                      - heading "Нурофен" [level=3] [ref=e1328]
+                      - paragraph [ref=e1329]: ART-1017
+                  - generic [ref=e1330]:
+                    - generic [ref=e1331]:
+                      - generic [ref=e1332]: Себес
+                      - generic [ref=e1333]: 9 600 ₸
+                    - generic [ref=e1334]:
+                      - generic [ref=e1335]: Закуп
+                      - generic [ref=e1336]: 9 600 ₸
+                    - generic [ref=e1337]:
+                      - generic [ref=e1338]: Продажа
+                      - generic [ref=e1339]: 15 168 ₸
+                - generic [ref=e1340]:
+                  - generic [ref=e1341]:
+                    - button "Редактировать товар" [ref=e1342] [cursor=pointer]:
+                      - img [ref=e1343]
+                    - button "Цены и поставщики" [ref=e1346] [cursor=pointer]:
+                      - img [ref=e1347]
+                  - generic [ref=e1352]:
+                    - button "Выбрать товар" [ref=e1353] [cursor=pointer]
+                    - generic [ref=e1355]:
+                      - heading "Товар 2" [level=3] [ref=e1356]
+                      - paragraph [ref=e1357]: вфыв234242342
+                  - generic [ref=e1358]:
+                    - generic [ref=e1359]:
+                      - generic [ref=e1360]: Себес
+                      - generic [ref=e1361]: 131 ₸
+                    - generic [ref=e1362]:
+                      - generic [ref=e1363]: Закуп
+                      - generic [ref=e1364]: 131 ₸
+                    - generic [ref=e1365]:
+                      - generic [ref=e1366]: Продажа
+                      - generic [ref=e1367]: 123 213 ₸
+                - generic [ref=e1368]:
+                  - generic [ref=e1369]:
+                    - button "Редактировать товар" [ref=e1370] [cursor=pointer]:
+                      - img [ref=e1371]
+                    - button "Цены и поставщики" [ref=e1374] [cursor=pointer]:
+                      - img [ref=e1375]
+                  - generic [ref=e1380]:
+                    - button "Выбрать товар" [ref=e1381] [cursor=pointer]
+                    - generic [ref=e1383]:
+                      - heading "Товар 12" [level=3] [ref=e1384]
+                      - paragraph [ref=e1385]: вфывфыв3123
+                  - generic [ref=e1386]:
+                    - generic [ref=e1387]:
+                      - generic [ref=e1388]: Себес
+                      - generic [ref=e1389]: 111 ₸
+                    - generic [ref=e1390]:
+                      - generic [ref=e1391]: Закуп
+                      - generic [ref=e1392]: 100 ₸
+                    - generic [ref=e1393]:
+                      - generic [ref=e1394]: Продажа
+                      - generic [ref=e1395]: 1 111 ₸
+                - generic [ref=e1396]:
+                  - generic [ref=e1397]:
+                    - button "Редактировать товар" [ref=e1398] [cursor=pointer]:
+                      - img [ref=e1399]
+                    - button "Цены и поставщики" [ref=e1402] [cursor=pointer]:
+                      - img [ref=e1403]
+                  - generic [ref=e1408]:
+                    - button "Выбрать товар" [ref=e1409] [cursor=pointer]
+                    - generic [ref=e1411]:
+                      - heading "KOLOS" [level=3] [ref=e1412]
+                      - paragraph [ref=e1413]: dsad1213
+                  - generic [ref=e1414]:
+                    - generic [ref=e1415]:
+                      - generic [ref=e1416]: Себес
+                      - generic [ref=e1417]: 111 ₸
+                    - generic [ref=e1418]:
+                      - generic [ref=e1419]: Закуп
+                      - generic [ref=e1420]: 1 133 ₸
+                    - generic [ref=e1421]:
+                      - generic [ref=e1422]: Продажа
+                      - generic [ref=e1423]: 14 444 ₸
+          - generic [ref=e1425]:
+            - button "Создать заявку" [disabled] [ref=e1426]:
+              - img [ref=e1427]
+              - text: Создать заявку
+            - button "Возврат" [disabled] [ref=e1428]:
+              - img [ref=e1429]
+              - generic [ref=e1432]: Возврат
+        - complementary [ref=e1433]:
+          - generic [ref=e1434]:
+            - img [ref=e1436]
+            - generic [ref=e1440]:
+              - generic [ref=e1441]:
+                - generic [ref=e1442]:
+                  - img [ref=e1443]
+                  - generic [ref=e1446]: "123213123123123"
+                - link "+79031421919" [ref=e1447] [cursor=pointer]:
+                  - /url: tel:+79031421919
+                  - img [ref=e1448]
+                  - text: "+79031421919"
+              - generic [ref=e1450]:
+                - button "WhatsApp" [ref=e1451] [cursor=pointer]:
+                  - img [ref=e1452]
+                  - text: WhatsApp
+                - button "Звонок" [ref=e1454] [cursor=pointer]:
+                  - img [ref=e1455]
+                  - text: Звонок
+              - generic [ref=e1458]:
+                - generic [ref=e1459]:
+                  - img [ref=e1460]
+                  - paragraph [ref=e1462]: Задолженность
+                - paragraph [ref=e1463]: 100,00 ₸

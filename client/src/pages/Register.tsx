@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { UserPlus, AlertCircle } from 'lucide-react';
+import { useToast } from '../context/ToastContext';
+import { UserPlus } from 'lucide-react';
+import { Alert, Button, Input } from '../components/ui';
+import { AuthLayout } from '../components/AuthLayout';
 
 export const Register: React.FC = () => {
   const [name, setName] = useState('');
@@ -9,24 +12,25 @@ export const Register: React.FC = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [validationError, setValidationError] = useState('');
 
   const { register } = useAuth();
+  const toast = useToast();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    setError('');
+    setValidationError('');
 
     if (password !== confirmPassword) {
-      setError('Пароли не совпадают');
+      setValidationError('Пароли не совпадают');
       setLoading(false);
       return;
     }
 
     if (password.length < 6) {
-      setError('Пароль должен содержать минимум 6 символов');
+      setValidationError('Пароль должен содержать минимум 6 символов');
       setLoading(false);
       return;
     }
@@ -34,138 +38,98 @@ export const Register: React.FC = () => {
     try {
       await register(name, email, password);
       navigate('/');
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Ошибка регистрации');
+    } catch (err: unknown) {
+      const message =
+        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        'Ошибка регистрации';
+      toast.error(message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <div className="mx-auto h-16 w-16 bg-green-600 rounded-full flex items-center justify-center">
-            <UserPlus className="h-8 w-8 text-white" />
-          </div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            Регистрация
-          </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
-            Создайте новый аккаунт для работы с системой
-          </p>
-        </div>
+    <AuthLayout
+      title="Регистрация"
+      subtitle="Создайте новый аккаунт для работы с системой"
+    >
+      <form className="space-y-5" onSubmit={handleSubmit}>
+        {validationError && <Alert variant="error">{validationError}</Alert>}
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-center gap-3">
-              <AlertCircle className="h-5 w-5 text-red-500" />
-              <span className="text-sm text-red-700">{error}</span>
-            </div>
-          )}
+        <Input
+          id="name"
+          name="name"
+          type="text"
+          label="Полное имя"
+          autoComplete="name"
+          required
+          placeholder="Иван Петров"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
 
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700">
-                Полное имя
-              </label>
-              <input
-                id="name"
-                name="name"
-                type="text"
-                autoComplete="name"
-                required
-                className="input-field mt-1"
-                placeholder="Иван Петров"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
+        <Input
+          id="email"
+          name="email"
+          type="email"
+          label="Email адрес"
+          autoComplete="email"
+          required
+          placeholder="ivan@example.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
 
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                Email адрес
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                autoComplete="email"
-                required
-                className="input-field mt-1"
-                placeholder="ivan@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
+        <Input
+          id="password"
+          name="password"
+          type="password"
+          label="Пароль"
+          autoComplete="new-password"
+          required
+          placeholder="Минимум 6 символов"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Пароль
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                autoComplete="new-password"
-                required
-                className="input-field mt-1"
-                placeholder="Минимум 6 символов"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
+        <Input
+          id="confirmPassword"
+          name="confirmPassword"
+          type="password"
+          label="Подтверждение пароля"
+          autoComplete="new-password"
+          required
+          placeholder="Повторите пароль"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+        />
 
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
-                Подтверждение пароля
-              </label>
-              <input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                autoComplete="new-password"
-                required
-                className="input-field mt-1"
-                placeholder="Повторите пароль"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-              />
-            </div>
-          </div>
+        <Button
+          type="submit"
+          variant="primary"
+          size="lg"
+          fullWidth
+          loading={loading}
+          leftIcon={UserPlus}
+        >
+          {loading ? 'Регистрация...' : 'Зарегистрироваться'}
+        </Button>
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary w-full flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-              ) : (
-                <UserPlus className="h-5 w-5" />
-              )}
-              {loading ? 'Регистрация...' : 'Зарегистрироваться'}
-            </button>
-          </div>
+        <p className="text-center text-body text-text-muted">
+          Уже есть аккаунт?{' '}
+          <Link
+            to="/login"
+            className="font-medium text-accent hover:text-accent-hover transition-colors duration-200"
+          >
+            Войти в систему
+          </Link>
+        </p>
 
-          <div className="text-center">
-            <p className="text-sm text-gray-600">
-              Уже есть аккаунт?{' '}
-              <Link
-                to="/login"
-                className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
-              >
-                Войти в систему
-              </Link>
-            </p>
-          </div>
-
-          <div className="text-xs text-gray-500 bg-gray-50 p-3 rounded-lg">
-            <p><strong>Примечание:</strong> Новые пользователи создаются с ролью "Оператор". Права администратора может назначить только существующий администратор.</p>
-          </div>
-        </form>
-      </div>
-    </div>
+        <Alert variant="info" icon={false}>
+          <strong>Примечание:</strong> Новые пользователи создаются с ролью «Оператор».
+          Права администратора может назначить только существующий администратор.
+        </Alert>
+      </form>
+    </AuthLayout>
   );
 };

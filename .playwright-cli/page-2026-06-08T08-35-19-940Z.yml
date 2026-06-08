@@ -1,0 +1,1450 @@
+- generic [ref=e29]:
+  - complementary [ref=e30]:
+    - heading "Plastkrep CRM" [level=1] [ref=e35]
+    - generic [ref=e37]:
+      - img
+      - textbox "Поиск..." [ref=e39]
+    - navigation [ref=e40]:
+      - paragraph [ref=e41]: Навигация
+      - list [ref=e42]:
+        - listitem [ref=e43]:
+          - button "Главная" [ref=e44] [cursor=pointer]:
+            - img [ref=e45]
+            - generic [ref=e48]: Главная
+        - listitem [ref=e49]:
+          - button "Заявки" [ref=e50] [cursor=pointer]:
+            - img [ref=e51]
+            - generic [ref=e54]: Заявки
+        - listitem [ref=e55]:
+          - button "Товары" [ref=e56] [cursor=pointer]:
+            - img [ref=e57]
+            - generic [ref=e61]: Товары
+        - listitem [ref=e62]:
+          - button "Поставщики" [ref=e63] [cursor=pointer]:
+            - img [ref=e64]
+            - generic [ref=e69]: Поставщики
+        - listitem [ref=e70]:
+          - button "Прайс" [ref=e71] [cursor=pointer]:
+            - img [ref=e72]
+            - generic [ref=e75]: Прайс
+        - listitem [ref=e76]:
+          - button "Остатки на складе" [ref=e77] [cursor=pointer]:
+            - img [ref=e78]
+            - generic [ref=e81]: Остатки на складе
+        - listitem [ref=e82]:
+          - button "Категории" [ref=e83] [cursor=pointer]:
+            - img [ref=e84]
+            - generic [ref=e89]: Категории
+        - listitem [ref=e90]:
+          - button "Задания сборщиков" [ref=e91] [cursor=pointer]:
+            - img [ref=e92]
+            - generic [ref=e95]: Задания сборщиков
+        - listitem [ref=e96]:
+          - button "Приёмка товара" [ref=e97] [cursor=pointer]:
+            - img [ref=e98]
+            - generic [ref=e103]: Приёмка товара
+        - listitem [ref=e104]:
+          - button "Карта Plastkrep" [ref=e105] [cursor=pointer]:
+            - img [ref=e106]
+            - generic [ref=e108]: Карта Plastkrep
+      - paragraph [ref=e110]: Администрирование
+      - list [ref=e111]:
+        - listitem [ref=e112]:
+          - button "Пользователи" [ref=e113] [cursor=pointer]:
+            - img [ref=e114]
+            - generic [ref=e119]: Пользователи
+    - button "Администратор Администратор" [ref=e122] [cursor=pointer]:
+      - img [ref=e124]
+      - generic [ref=e127]:
+        - paragraph [ref=e128]: Администратор
+        - paragraph [ref=e129]: Администратор
+    - button "Свернуть меню" [ref=e130] [cursor=pointer]:
+      - img [ref=e131]
+  - main [ref=e133]:
+    - generic [ref=e136]:
+      - generic [ref=e137]:
+        - generic [ref=e138]:
+          - generic [ref=e139]:
+            - generic [ref=e140]:
+              - img [ref=e141]
+              - generic [ref=e146]: Plastkrep CRM
+            - heading "Рабочий стол" [level=1] [ref=e147]
+            - paragraph [ref=e148]: Подбор товара и поставщика для новой заявки
+          - button "Обновить данные" [ref=e149] [cursor=pointer]:
+            - img [ref=e150]
+        - generic [ref=e155]:
+          - generic [ref=e156]:
+            - generic [ref=e157]:
+              - img [ref=e158]
+              - paragraph [ref=e162]: Товары
+            - paragraph [ref=e163]: "69"
+          - generic [ref=e164]:
+            - generic [ref=e165]:
+              - img [ref=e166]
+              - paragraph [ref=e170]: Поставщики
+            - paragraph [ref=e171]: "46"
+          - generic [ref=e172]:
+            - generic [ref=e173]:
+              - img [ref=e174]
+              - paragraph [ref=e176]: В подборе
+            - paragraph [ref=e177]: —
+        - generic [ref=e178]:
+          - generic [ref=e179]:
+            - img [ref=e180]
+            - text: 1. Товар
+          - img [ref=e184]
+          - generic [ref=e186]:
+            - img [ref=e187]
+            - text: 2. Поставщик
+      - generic [ref=e191]:
+        - generic [ref=e192]:
+          - generic [ref=e195]:
+            - img [ref=e197]
+            - generic [ref=e201]:
+              - heading "Товары69" [level=3] [ref=e202]
+              - paragraph [ref=e203]: Выберите позицию для фильтрации поставщиков
+          - generic [ref=e206]:
+            - generic [ref=e207]:
+              - button "Добавить товар" [ref=e208] [cursor=pointer]:
+                - img [ref=e209]
+                - text: Добавить товар
+              - generic [ref=e210]:
+                - img
+                - textbox "Поиск по названию или артикулу..." [ref=e212]
+            - generic [ref=e214]:
+              - 'button "Нурофен12 Нурофен12 выфв1111 1 поставщик 123 123 ₸ Себ-ть: 1 133 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e215] [cursor=pointer]':
+                - generic [ref=e216]:
+                  - img "Нурофен12" [ref=e218]
+                  - generic [ref=e219]:
+                    - heading "Нурофен12" [level=3] [ref=e220]
+                    - paragraph [ref=e221]: выфв1111
+                    - paragraph [ref=e222]:
+                      - img [ref=e223]
+                      - generic [ref=e227]: 1 поставщик
+                  - generic [ref=e228]:
+                    - generic [ref=e229]: 123 123 ₸
+                    - generic [ref=e230]: "Себ-ть: 1 133 ₸"
+                - generic [ref=e233]:
+                  - button "История цен" [ref=e234]:
+                    - img [ref=e235]
+                  - button "Управление поставщиками" [ref=e238]:
+                    - img [ref=e239]
+                  - button "Управление вариациями" [ref=e244]:
+                    - img [ref=e245]
+                  - button "Редактировать товар" [ref=e248]:
+                    - img [ref=e249]
+                  - button "Удалить товар" [ref=e252]:
+                    - img [ref=e253]
+              - 'button "KOLOS KOLOS dsad1213 1 поставщик 14 444 ₸ Себ-ть: 111 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e256] [cursor=pointer]':
+                - generic [ref=e257]:
+                  - img "KOLOS" [ref=e259]
+                  - generic [ref=e260]:
+                    - heading "KOLOS" [level=3] [ref=e261]
+                    - paragraph [ref=e262]: dsad1213
+                    - paragraph [ref=e263]:
+                      - img [ref=e264]
+                      - generic [ref=e268]: 1 поставщик
+                  - generic [ref=e269]:
+                    - generic [ref=e270]: 14 444 ₸
+                    - generic [ref=e271]: "Себ-ть: 111 ₸"
+                - generic [ref=e274]:
+                  - button "История цен" [ref=e275]:
+                    - img [ref=e276]
+                  - button "Управление поставщиками" [ref=e279]:
+                    - img [ref=e280]
+                  - button "Управление вариациями" [ref=e285]:
+                    - img [ref=e286]
+                  - button "Редактировать товар" [ref=e289]:
+                    - img [ref=e290]
+                  - button "Удалить товар" [ref=e293]:
+                    - img [ref=e294]
+              - 'button "вфыв 12312312 1 111 ₸ Себ-ть: 11 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e297] [cursor=pointer]':
+                - generic [ref=e298]:
+                  - img [ref=e301]
+                  - generic [ref=e305]:
+                    - heading "вфыв" [level=3] [ref=e306]
+                    - paragraph [ref=e307]: "12312312"
+                  - generic [ref=e308]:
+                    - generic [ref=e309]: 1 111 ₸
+                    - generic [ref=e310]: "Себ-ть: 11 ₸"
+                - generic [ref=e313]:
+                  - button "История цен" [ref=e314]:
+                    - img [ref=e315]
+                  - button "Управление поставщиками" [ref=e318]:
+                    - img [ref=e319]
+                  - button "Управление вариациями" [ref=e324]:
+                    - img [ref=e325]
+                  - button "Редактировать товар" [ref=e328]:
+                    - img [ref=e329]
+                  - button "Удалить товар" [ref=e332]:
+                    - img [ref=e333]
+              - 'button "Товар 2 вфыв234242342 1 поставщик 123 213 ₸ Себ-ть: 131 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e336] [cursor=pointer]':
+                - generic [ref=e337]:
+                  - img [ref=e340]
+                  - generic [ref=e344]:
+                    - heading "Товар 2" [level=3] [ref=e345]
+                    - paragraph [ref=e346]: вфыв234242342
+                    - paragraph [ref=e347]:
+                      - img [ref=e348]
+                      - generic [ref=e352]: 1 поставщик
+                  - generic [ref=e353]:
+                    - generic [ref=e354]: 123 213 ₸
+                    - generic [ref=e355]: "Себ-ть: 131 ₸"
+                - generic [ref=e358]:
+                  - button "История цен" [ref=e359]:
+                    - img [ref=e360]
+                  - button "Управление поставщиками" [ref=e363]:
+                    - img [ref=e364]
+                  - button "Управление вариациями" [ref=e369]:
+                    - img [ref=e370]
+                  - button "Редактировать товар" [ref=e373]:
+                    - img [ref=e374]
+                  - button "Удалить товар" [ref=e377]:
+                    - img [ref=e378]
+              - 'button "Товар 1 авп4545565 1 233 ₸ Себ-ть: 123 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e381] [cursor=pointer]':
+                - generic [ref=e382]:
+                  - img [ref=e385]
+                  - generic [ref=e389]:
+                    - heading "Товар 1" [level=3] [ref=e390]
+                    - paragraph [ref=e391]: авп4545565
+                  - generic [ref=e392]:
+                    - generic [ref=e393]: 1 233 ₸
+                    - generic [ref=e394]: "Себ-ть: 123 ₸"
+                - generic [ref=e397]:
+                  - button "История цен" [ref=e398]:
+                    - img [ref=e399]
+                  - button "Управление поставщиками" [ref=e402]:
+                    - img [ref=e403]
+                  - button "Управление вариациями" [ref=e408]:
+                    - img [ref=e409]
+                  - button "Редактировать товар" [ref=e412]:
+                    - img [ref=e413]
+                  - button "Удалить товар" [ref=e416]:
+                    - img [ref=e417]
+              - 'button "товар 1 12321321вфыв444444 13 233 ₸ Себ-ть: 123 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e420] [cursor=pointer]':
+                - generic [ref=e421]:
+                  - img [ref=e424]
+                  - generic [ref=e428]:
+                    - heading "товар 1" [level=3] [ref=e429]
+                    - paragraph [ref=e430]: 12321321вфыв444444
+                  - generic [ref=e431]:
+                    - generic [ref=e432]: 13 233 ₸
+                    - generic [ref=e433]: "Себ-ть: 123 ₸"
+                - generic [ref=e436]:
+                  - button "История цен" [ref=e437]:
+                    - img [ref=e438]
+                  - button "Управление поставщиками" [ref=e441]:
+                    - img [ref=e442]
+                  - button "Управление вариациями" [ref=e447]:
+                    - img [ref=e448]
+                  - button "Редактировать товар" [ref=e451]:
+                    - img [ref=e452]
+                  - button "Удалить товар" [ref=e455]:
+                    - img [ref=e456]
+              - 'button "Товар 1 5423авы12 123 123 ₸ Себ-ть: 12 131 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e459] [cursor=pointer]':
+                - generic [ref=e460]:
+                  - img [ref=e463]
+                  - generic [ref=e467]:
+                    - heading "Товар 1" [level=3] [ref=e468]
+                    - paragraph [ref=e469]: 5423авы12
+                  - generic [ref=e470]:
+                    - generic [ref=e471]: 123 123 ₸
+                    - generic [ref=e472]: "Себ-ть: 12 131 ₸"
+                - generic [ref=e475]:
+                  - button "История цен" [ref=e476]:
+                    - img [ref=e477]
+                  - button "Управление поставщиками" [ref=e480]:
+                    - img [ref=e481]
+                  - button "Управление вариациями" [ref=e486]:
+                    - img [ref=e487]
+                  - button "Редактировать товар" [ref=e490]:
+                    - img [ref=e491]
+                  - button "Удалить товар" [ref=e494]:
+                    - img [ref=e495]
+              - 'button "Товар 1 42346786 4 324 ₸ Себ-ть: 12 223 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e498] [cursor=pointer]':
+                - generic [ref=e499]:
+                  - img [ref=e502]
+                  - generic [ref=e506]:
+                    - heading "Товар 1" [level=3] [ref=e507]
+                    - paragraph [ref=e508]: "42346786"
+                  - generic [ref=e509]:
+                    - generic [ref=e510]: 4 324 ₸
+                    - generic [ref=e511]: "Себ-ть: 12 223 ₸"
+                - generic [ref=e514]:
+                  - button "История цен" [ref=e515]:
+                    - img [ref=e516]
+                  - button "Управление поставщиками" [ref=e519]:
+                    - img [ref=e520]
+                  - button "Управление вариациями" [ref=e525]:
+                    - img [ref=e526]
+                  - button "Редактировать товар" [ref=e529]:
+                    - img [ref=e530]
+                  - button "Удалить товар" [ref=e533]:
+                    - img [ref=e534]
+              - 'button "Товар 12 Товар 12 вфывфыв3123 2 поставщиков 1 111 ₸ Себ-ть: 111 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e537] [cursor=pointer]':
+                - generic [ref=e538]:
+                  - img "Товар 12" [ref=e540]
+                  - generic [ref=e541]:
+                    - heading "Товар 12" [level=3] [ref=e542]
+                    - paragraph [ref=e543]: вфывфыв3123
+                    - paragraph [ref=e544]:
+                      - img [ref=e545]
+                      - generic [ref=e549]: 2 поставщиков
+                  - generic [ref=e550]:
+                    - generic [ref=e551]: 1 111 ₸
+                    - generic [ref=e552]: "Себ-ть: 111 ₸"
+                - generic [ref=e555]:
+                  - button "История цен" [ref=e556]:
+                    - img [ref=e557]
+                  - button "Управление поставщиками" [ref=e560]:
+                    - img [ref=e561]
+                  - button "Управление вариациями" [ref=e566]:
+                    - img [ref=e567]
+                  - button "Редактировать товар" [ref=e570]:
+                    - img [ref=e571]
+                  - button "Удалить товар" [ref=e574]:
+                    - img [ref=e575]
+              - 'button "Пиносол капли ART-1039 3 поставщиков 56 544 ₸ Себ-ть: 45 600 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e578] [cursor=pointer]':
+                - generic [ref=e579]:
+                  - img [ref=e582]
+                  - generic [ref=e586]:
+                    - heading "Пиносол капли" [level=3] [ref=e587]
+                    - paragraph [ref=e588]: ART-1039
+                    - paragraph [ref=e589]:
+                      - img [ref=e590]
+                      - generic [ref=e594]: 3 поставщиков
+                  - generic [ref=e595]:
+                    - generic [ref=e596]: 56 544 ₸
+                    - generic [ref=e597]: "Себ-ть: 45 600 ₸"
+                - generic [ref=e600]:
+                  - button "История цен" [ref=e601]:
+                    - img [ref=e602]
+                  - button "Управление поставщиками" [ref=e605]:
+                    - img [ref=e606]
+                  - button "Управление вариациями" [ref=e611]:
+                    - img [ref=e612]
+                  - button "Редактировать товар" [ref=e615]:
+                    - img [ref=e616]
+                  - button "Удалить товар" [ref=e619]:
+                    - img [ref=e620]
+              - 'button "Називин спрей ART-1038 1 поставщик 25 438 ₸ Себ-ть: 16 100 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e623] [cursor=pointer]':
+                - generic [ref=e624]:
+                  - img [ref=e627]
+                  - generic [ref=e631]:
+                    - heading "Називин спрей" [level=3] [ref=e632]
+                    - paragraph [ref=e633]: ART-1038
+                    - paragraph [ref=e634]:
+                      - img [ref=e635]
+                      - generic [ref=e639]: 1 поставщик
+                  - generic [ref=e640]:
+                    - generic [ref=e641]: 25 438 ₸
+                    - generic [ref=e642]: "Себ-ть: 16 100 ₸"
+                - generic [ref=e645]:
+                  - button "История цен" [ref=e646]:
+                    - img [ref=e647]
+                  - button "Управление поставщиками" [ref=e650]:
+                    - img [ref=e651]
+                  - button "Управление вариациями" [ref=e656]:
+                    - img [ref=e657]
+                  - button "Редактировать товар" [ref=e660]:
+                    - img [ref=e661]
+                  - button "Удалить товар" [ref=e664]:
+                    - img [ref=e665]
+              - 'button "Доктор Мом мазь ART-1037 2 поставщиков 62 868 ₸ Себ-ть: 37 200 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e668] [cursor=pointer]':
+                - generic [ref=e669]:
+                  - img [ref=e672]
+                  - generic [ref=e676]:
+                    - heading "Доктор Мом мазь" [level=3] [ref=e677]
+                    - paragraph [ref=e678]: ART-1037
+                    - paragraph [ref=e679]:
+                      - img [ref=e680]
+                      - generic [ref=e684]: 2 поставщиков
+                  - generic [ref=e685]:
+                    - generic [ref=e686]: 62 868 ₸
+                    - generic [ref=e687]: "Себ-ть: 37 200 ₸"
+                - generic [ref=e690]:
+                  - button "История цен" [ref=e691]:
+                    - img [ref=e692]
+                  - button "Управление поставщиками" [ref=e695]:
+                    - img [ref=e696]
+                  - button "Управление вариациями" [ref=e701]:
+                    - img [ref=e702]
+                  - button "Редактировать товар" [ref=e705]:
+                    - img [ref=e706]
+                  - button "Удалить товар" [ref=e709]:
+                    - img [ref=e710]
+              - 'button "Звездочка бальзам ART-1036 1 поставщик 59 736 ₸ Себ-ть: 39 300 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e713] [cursor=pointer]':
+                - generic [ref=e714]:
+                  - img [ref=e717]
+                  - generic [ref=e721]:
+                    - heading "Звездочка бальзам" [level=3] [ref=e722]
+                    - paragraph [ref=e723]: ART-1036
+                    - paragraph [ref=e724]:
+                      - img [ref=e725]
+                      - generic [ref=e729]: 1 поставщик
+                  - generic [ref=e730]:
+                    - generic [ref=e731]: 59 736 ₸
+                    - generic [ref=e732]: "Себ-ть: 39 300 ₸"
+                - generic [ref=e735]:
+                  - button "История цен" [ref=e736]:
+                    - img [ref=e737]
+                  - button "Управление поставщиками" [ref=e740]:
+                    - img [ref=e741]
+                  - button "Управление вариациями" [ref=e746]:
+                    - img [ref=e747]
+                  - button "Редактировать товар" [ref=e750]:
+                    - img [ref=e751]
+                  - button "Удалить товар" [ref=e754]:
+                    - img [ref=e755]
+              - 'button "Фастум гель ART-1035 2 поставщиков 9 660 ₸ Себ-ть: 6 000 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e758] [cursor=pointer]':
+                - generic [ref=e759]:
+                  - img [ref=e762]
+                  - generic [ref=e766]:
+                    - heading "Фастум гель" [level=3] [ref=e767]
+                    - paragraph [ref=e768]: ART-1035
+                    - paragraph [ref=e769]:
+                      - img [ref=e770]
+                      - generic [ref=e774]: 2 поставщиков
+                  - generic [ref=e775]:
+                    - generic [ref=e776]: 9 660 ₸
+                    - generic [ref=e777]: "Себ-ть: 6 000 ₸"
+                - generic [ref=e780]:
+                  - button "История цен" [ref=e781]:
+                    - img [ref=e782]
+                  - button "Управление поставщиками" [ref=e785]:
+                    - img [ref=e786]
+                  - button "Управление вариациями" [ref=e791]:
+                    - img [ref=e792]
+                  - button "Редактировать товар" [ref=e795]:
+                    - img [ref=e796]
+                  - button "Удалить товар" [ref=e799]:
+                    - img [ref=e800]
+              - 'button "Вольтарен эмульгель ART-1034 2 поставщиков 11 084 ₸ Себ-ть: 6 800 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e803] [cursor=pointer]':
+                - generic [ref=e804]:
+                  - img [ref=e807]
+                  - generic [ref=e811]:
+                    - heading "Вольтарен эмульгель" [level=3] [ref=e812]
+                    - paragraph [ref=e813]: ART-1034
+                    - paragraph [ref=e814]:
+                      - img [ref=e815]
+                      - generic [ref=e819]: 2 поставщиков
+                  - generic [ref=e820]:
+                    - generic [ref=e821]: 11 084 ₸
+                    - generic [ref=e822]: "Себ-ть: 6 800 ₸"
+                - generic [ref=e825]:
+                  - button "История цен" [ref=e826]:
+                    - img [ref=e827]
+                  - button "Управление поставщиками" [ref=e830]:
+                    - img [ref=e831]
+                  - button "Управление вариациями" [ref=e836]:
+                    - img [ref=e837]
+                  - button "Редактировать товар" [ref=e840]:
+                    - img [ref=e841]
+                  - button "Удалить товар" [ref=e844]:
+                    - img [ref=e845]
+              - 'button "Финалгон мазь ART-1033 1 поставщик 56 448 ₸ Себ-ть: 38 400 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e848] [cursor=pointer]':
+                - generic [ref=e849]:
+                  - img [ref=e852]
+                  - generic [ref=e856]:
+                    - heading "Финалгон мазь" [level=3] [ref=e857]
+                    - paragraph [ref=e858]: ART-1033
+                    - paragraph [ref=e859]:
+                      - img [ref=e860]
+                      - generic [ref=e864]: 1 поставщик
+                  - generic [ref=e865]:
+                    - generic [ref=e866]: 56 448 ₸
+                    - generic [ref=e867]: "Себ-ть: 38 400 ₸"
+                - generic [ref=e870]:
+                  - button "История цен" [ref=e871]:
+                    - img [ref=e872]
+                  - button "Управление поставщиками" [ref=e875]:
+                    - img [ref=e876]
+                  - button "Управление вариациями" [ref=e881]:
+                    - img [ref=e882]
+                  - button "Редактировать товар" [ref=e885]:
+                    - img [ref=e886]
+                  - button "Удалить товар" [ref=e889]:
+                    - img [ref=e890]
+              - 'button "Троксевазин гель ART-1032 1 поставщик 44 198 ₸ Себ-ть: 28 700 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e893] [cursor=pointer]':
+                - generic [ref=e894]:
+                  - img [ref=e897]
+                  - generic [ref=e901]:
+                    - heading "Троксевазин гель" [level=3] [ref=e902]
+                    - paragraph [ref=e903]: ART-1032
+                    - paragraph [ref=e904]:
+                      - img [ref=e905]
+                      - generic [ref=e909]: 1 поставщик
+                  - generic [ref=e910]:
+                    - generic [ref=e911]: 44 198 ₸
+                    - generic [ref=e912]: "Себ-ть: 28 700 ₸"
+                - generic [ref=e915]:
+                  - button "История цен" [ref=e916]:
+                    - img [ref=e917]
+                  - button "Управление поставщиками" [ref=e920]:
+                    - img [ref=e921]
+                  - button "Управление вариациями" [ref=e926]:
+                    - img [ref=e927]
+                  - button "Редактировать товар" [ref=e930]:
+                    - img [ref=e931]
+                  - button "Удалить товар" [ref=e934]:
+                    - img [ref=e935]
+              - 'button "Солкосерил гель ART-1031 1 поставщик 25 750 ₸ Себ-ть: 20 600 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e938] [cursor=pointer]':
+                - generic [ref=e939]:
+                  - img [ref=e942]
+                  - generic [ref=e946]:
+                    - heading "Солкосерил гель" [level=3] [ref=e947]
+                    - paragraph [ref=e948]: ART-1031
+                    - paragraph [ref=e949]:
+                      - img [ref=e950]
+                      - generic [ref=e954]: 1 поставщик
+                  - generic [ref=e955]:
+                    - generic [ref=e956]: 25 750 ₸
+                    - generic [ref=e957]: "Себ-ть: 20 600 ₸"
+                - generic [ref=e960]:
+                  - button "История цен" [ref=e961]:
+                    - img [ref=e962]
+                  - button "Управление поставщиками" [ref=e965]:
+                    - img [ref=e966]
+                  - button "Управление вариациями" [ref=e971]:
+                    - img [ref=e972]
+                  - button "Редактировать товар" [ref=e975]:
+                    - img [ref=e976]
+                  - button "Удалить товар" [ref=e979]:
+                    - img [ref=e980]
+              - 'button "Бепантен крем ART-1030 2 поставщиков 58 608 ₸ Себ-ть: 39 600 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e983] [cursor=pointer]':
+                - generic [ref=e984]:
+                  - img [ref=e987]
+                  - generic [ref=e991]:
+                    - heading "Бепантен крем" [level=3] [ref=e992]
+                    - paragraph [ref=e993]: ART-1030
+                    - paragraph [ref=e994]:
+                      - img [ref=e995]
+                      - generic [ref=e999]: 2 поставщиков
+                  - generic [ref=e1000]:
+                    - generic [ref=e1001]: 58 608 ₸
+                    - generic [ref=e1002]: "Себ-ть: 39 600 ₸"
+                - generic [ref=e1005]:
+                  - button "История цен" [ref=e1006]:
+                    - img [ref=e1007]
+                  - button "Управление поставщиками" [ref=e1010]:
+                    - img [ref=e1011]
+                  - button "Управление вариациями" [ref=e1016]:
+                    - img [ref=e1017]
+                  - button "Редактировать товар" [ref=e1020]:
+                    - img [ref=e1021]
+                  - button "Удалить товар" [ref=e1024]:
+                    - img [ref=e1025]
+              - 'button "Пантенол спрей ART-1029 3 поставщиков 16 352 ₸ Себ-ть: 11 200 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e1028] [cursor=pointer]':
+                - generic [ref=e1029]:
+                  - img [ref=e1032]
+                  - generic [ref=e1036]:
+                    - heading "Пантенол спрей" [level=3] [ref=e1037]
+                    - paragraph [ref=e1038]: ART-1029
+                    - paragraph [ref=e1039]:
+                      - img [ref=e1040]
+                      - generic [ref=e1044]: 3 поставщиков
+                  - generic [ref=e1045]:
+                    - generic [ref=e1046]: 16 352 ₸
+                    - generic [ref=e1047]: "Себ-ть: 11 200 ₸"
+                - generic [ref=e1050]:
+                  - button "История цен" [ref=e1051]:
+                    - img [ref=e1052]
+                  - button "Управление поставщиками" [ref=e1055]:
+                    - img [ref=e1056]
+                  - button "Управление вариациями" [ref=e1061]:
+                    - img [ref=e1062]
+                  - button "Редактировать товар" [ref=e1065]:
+                    - img [ref=e1066]
+                  - button "Удалить товар" [ref=e1069]:
+                    - img [ref=e1070]
+              - 'button "Левомеколь мазь ART-1028 1 поставщик 43 392 ₸ Себ-ть: 33 900 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e1073] [cursor=pointer]':
+                - generic [ref=e1074]:
+                  - img [ref=e1077]
+                  - generic [ref=e1081]:
+                    - heading "Левомеколь мазь" [level=3] [ref=e1082]
+                    - paragraph [ref=e1083]: ART-1028
+                    - paragraph [ref=e1084]:
+                      - img [ref=e1085]
+                      - generic [ref=e1089]: 1 поставщик
+                  - generic [ref=e1090]:
+                    - generic [ref=e1091]: 43 392 ₸
+                    - generic [ref=e1092]: "Себ-ть: 33 900 ₸"
+                - generic [ref=e1095]:
+                  - button "История цен" [ref=e1096]:
+                    - img [ref=e1097]
+                  - button "Управление поставщиками" [ref=e1100]:
+                    - img [ref=e1101]
+                  - button "Управление вариациями" [ref=e1106]:
+                    - img [ref=e1107]
+                  - button "Редактировать товар" [ref=e1110]:
+                    - img [ref=e1111]
+                  - button "Удалить товар" [ref=e1114]:
+                    - img [ref=e1115]
+              - 'button "Стрептоцид ART-1027 3 поставщиков 61 752 ₸ Себ-ть: 37 200 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e1118] [cursor=pointer]':
+                - generic [ref=e1119]:
+                  - img [ref=e1122]
+                  - generic [ref=e1126]:
+                    - heading "Стрептоцид" [level=3] [ref=e1127]
+                    - paragraph [ref=e1128]: ART-1027
+                    - paragraph [ref=e1129]:
+                      - img [ref=e1130]
+                      - generic [ref=e1134]: 3 поставщиков
+                  - generic [ref=e1135]:
+                    - generic [ref=e1136]: 61 752 ₸
+                    - generic [ref=e1137]: "Себ-ть: 37 200 ₸"
+                - generic [ref=e1140]:
+                  - button "История цен" [ref=e1141]:
+                    - img [ref=e1142]
+                  - button "Управление поставщиками" [ref=e1145]:
+                    - img [ref=e1146]
+                  - button "Управление вариациями" [ref=e1151]:
+                    - img [ref=e1152]
+                  - button "Редактировать товар" [ref=e1155]:
+                    - img [ref=e1156]
+                  - button "Удалить товар" [ref=e1159]:
+                    - img [ref=e1160]
+              - 'button "Фурацилин таблетки ART-1026 2 поставщиков 30 438 ₸ Себ-ть: 17 100 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e1163] [cursor=pointer]':
+                - generic [ref=e1164]:
+                  - img [ref=e1167]
+                  - generic [ref=e1171]:
+                    - heading "Фурацилин таблетки" [level=3] [ref=e1172]
+                    - paragraph [ref=e1173]: ART-1026
+                    - paragraph [ref=e1174]:
+                      - img [ref=e1175]
+                      - generic [ref=e1179]: 2 поставщиков
+                  - generic [ref=e1180]:
+                    - generic [ref=e1181]: 30 438 ₸
+                    - generic [ref=e1182]: "Себ-ть: 17 100 ₸"
+                - generic [ref=e1185]:
+                  - button "История цен" [ref=e1186]:
+                    - img [ref=e1187]
+                  - button "Управление поставщиками" [ref=e1190]:
+                    - img [ref=e1191]
+                  - button "Управление вариациями" [ref=e1196]:
+                    - img [ref=e1197]
+                  - button "Редактировать товар" [ref=e1200]:
+                    - img [ref=e1201]
+                  - button "Удалить товар" [ref=e1204]:
+                    - img [ref=e1205]
+              - 'button "Борная кислота ART-1025 2 поставщиков 30 972 ₸ Себ-ть: 17 400 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e1208] [cursor=pointer]':
+                - generic [ref=e1209]:
+                  - img [ref=e1212]
+                  - generic [ref=e1216]:
+                    - heading "Борная кислота" [level=3] [ref=e1217]
+                    - paragraph [ref=e1218]: ART-1025
+                    - paragraph [ref=e1219]:
+                      - img [ref=e1220]
+                      - generic [ref=e1224]: 2 поставщиков
+                  - generic [ref=e1225]:
+                    - generic [ref=e1226]: 30 972 ₸
+                    - generic [ref=e1227]: "Себ-ть: 17 400 ₸"
+                - generic [ref=e1230]:
+                  - button "История цен" [ref=e1231]:
+                    - img [ref=e1232]
+                  - button "Управление поставщиками" [ref=e1235]:
+                    - img [ref=e1236]
+                  - button "Управление вариациями" [ref=e1241]:
+                    - img [ref=e1242]
+                  - button "Редактировать товар" [ref=e1245]:
+                    - img [ref=e1246]
+                  - button "Удалить товар" [ref=e1249]:
+                    - img [ref=e1250]
+              - 'button "Нашатырный спирт ART-1024 3 поставщиков 41 860 ₸ Себ-ть: 32 200 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e1253] [cursor=pointer]':
+                - generic [ref=e1254]:
+                  - img [ref=e1257]
+                  - generic [ref=e1261]:
+                    - heading "Нашатырный спирт" [level=3] [ref=e1262]
+                    - paragraph [ref=e1263]: ART-1024
+                    - paragraph [ref=e1264]:
+                      - img [ref=e1265]
+                      - generic [ref=e1269]: 3 поставщиков
+                  - generic [ref=e1270]:
+                    - generic [ref=e1271]: 41 860 ₸
+                    - generic [ref=e1272]: "Себ-ть: 32 200 ₸"
+                - generic [ref=e1275]:
+                  - button "История цен" [ref=e1276]:
+                    - img [ref=e1277]
+                  - button "Управление поставщиками" [ref=e1280]:
+                    - img [ref=e1281]
+                  - button "Управление вариациями" [ref=e1286]:
+                    - img [ref=e1287]
+                  - button "Редактировать товар" [ref=e1290]:
+                    - img [ref=e1291]
+                  - button "Удалить товар" [ref=e1294]:
+                    - img [ref=e1295]
+              - 'button "Валидол таблетки ART-1023 1 поставщик 39 040 ₸ Себ-ть: 30 500 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e1298] [cursor=pointer]':
+                - generic [ref=e1299]:
+                  - img [ref=e1302]
+                  - generic [ref=e1306]:
+                    - heading "Валидол таблетки" [level=3] [ref=e1307]
+                    - paragraph [ref=e1308]: ART-1023
+                    - paragraph [ref=e1309]:
+                      - img [ref=e1310]
+                      - generic [ref=e1314]: 1 поставщик
+                  - generic [ref=e1315]:
+                    - generic [ref=e1316]: 39 040 ₸
+                    - generic [ref=e1317]: "Себ-ть: 30 500 ₸"
+                - generic [ref=e1320]:
+                  - button "История цен" [ref=e1321]:
+                    - img [ref=e1322]
+                  - button "Управление поставщиками" [ref=e1325]:
+                    - img [ref=e1326]
+                  - button "Управление вариациями" [ref=e1331]:
+                    - img [ref=e1332]
+                  - button "Редактировать товар" [ref=e1335]:
+                    - img [ref=e1336]
+                  - button "Удалить товар" [ref=e1339]:
+                    - img [ref=e1340]
+              - 'button "Корвалол капли ART-1022 3 поставщиков 42 968 ₸ Себ-ть: 26 200 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e1343] [cursor=pointer]':
+                - generic [ref=e1344]:
+                  - img [ref=e1347]
+                  - generic [ref=e1351]:
+                    - heading "Корвалол капли" [level=3] [ref=e1352]
+                    - paragraph [ref=e1353]: ART-1022
+                    - paragraph [ref=e1354]:
+                      - img [ref=e1355]
+                      - generic [ref=e1359]: 3 поставщиков
+                  - generic [ref=e1360]:
+                    - generic [ref=e1361]: 42 968 ₸
+                    - generic [ref=e1362]: "Себ-ть: 26 200 ₸"
+                - generic [ref=e1365]:
+                  - button "История цен" [ref=e1366]:
+                    - img [ref=e1367]
+                  - button "Управление поставщиками" [ref=e1370]:
+                    - img [ref=e1371]
+                  - button "Управление вариациями" [ref=e1376]:
+                    - img [ref=e1377]
+                  - button "Редактировать товар" [ref=e1380]:
+                    - img [ref=e1381]
+                  - button "Удалить товар" [ref=e1384]:
+                    - img [ref=e1385]
+              - 'button "Смекта порошок ART-1021 3 поставщиков 45 990 ₸ Себ-ть: 31 500 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e1388] [cursor=pointer]':
+                - generic [ref=e1389]:
+                  - img [ref=e1392]
+                  - generic [ref=e1396]:
+                    - heading "Смекта порошок" [level=3] [ref=e1397]
+                    - paragraph [ref=e1398]: ART-1021
+                    - paragraph [ref=e1399]:
+                      - img [ref=e1400]
+                      - generic [ref=e1404]: 3 поставщиков
+                  - generic [ref=e1405]:
+                    - generic [ref=e1406]: 45 990 ₸
+                    - generic [ref=e1407]: "Себ-ть: 31 500 ₸"
+                - generic [ref=e1410]:
+                  - button "История цен" [ref=e1411]:
+                    - img [ref=e1412]
+                  - button "Управление поставщиками" [ref=e1415]:
+                    - img [ref=e1416]
+                  - button "Управление вариациями" [ref=e1421]:
+                    - img [ref=e1422]
+                  - button "Редактировать товар" [ref=e1425]:
+                    - img [ref=e1426]
+                  - button "Удалить товар" [ref=e1429]:
+                    - img [ref=e1430]
+              - 'button "Линекс капсулы ART-1020 1 поставщик 52 269 ₸ Себ-ть: 39 900 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e1433] [cursor=pointer]':
+                - generic [ref=e1434]:
+                  - img [ref=e1437]
+                  - generic [ref=e1441]:
+                    - heading "Линекс капсулы" [level=3] [ref=e1442]
+                    - paragraph [ref=e1443]: ART-1020
+                    - paragraph [ref=e1444]:
+                      - img [ref=e1445]
+                      - generic [ref=e1449]: 1 поставщик
+                  - generic [ref=e1450]:
+                    - generic [ref=e1451]: 52 269 ₸
+                    - generic [ref=e1452]: "Себ-ть: 39 900 ₸"
+                - generic [ref=e1455]:
+                  - button "История цен" [ref=e1456]:
+                    - img [ref=e1457]
+                  - button "Управление поставщиками" [ref=e1460]:
+                    - img [ref=e1461]
+                  - button "Управление вариациями" [ref=e1466]:
+                    - img [ref=e1467]
+                  - button "Редактировать товар" [ref=e1470]:
+                    - img [ref=e1471]
+                  - button "Удалить товар" [ref=e1474]:
+                    - img [ref=e1475]
+              - 'button "Мезим форте ART-1019 3 поставщиков 49 500 ₸ Себ-ть: 37 500 ₸ История цен Управление поставщиками Управление вариациями Редактировать товар Удалить товар" [ref=e1478] [cursor=pointer]':
+                - generic [ref=e1479]:
+                  - img [ref=e1482]
+                  - generic [ref=e1486]:
+                    - heading "Мезим форте" [level=3] [ref=e1487]
+                    - paragraph [ref=e1488]: ART-1019
+                    - paragraph [ref=e1489]:
+                      - img [ref=e1490]
+                      - generic [ref=e1494]: 3 поставщиков
+                  - generic [ref=e1495]:
+                    - generic [ref=e1496]: 49 500 ₸
+                    - generic [ref=e1497]: "Себ-ть: 37 500 ₸"
+                - generic [ref=e1500]:
+                  - button "История цен" [ref=e1501]:
+                    - img [ref=e1502]
+                  - button "Управление поставщиками" [ref=e1505]:
+                    - img [ref=e1506]
+                  - button "Управление вариациями" [ref=e1511]:
+                    - img [ref=e1512]
+                  - button "Редактировать товар" [ref=e1515]:
+                    - img [ref=e1516]
+                  - button "Удалить товар" [ref=e1519]:
+                    - img [ref=e1520]
+            - generic [ref=e1524]:
+              - generic [ref=e1525]: Показано 1–30 из 69
+              - generic [ref=e1526]:
+                - button "««" [disabled] [ref=e1527]
+                - button "Предыдущая страница" [disabled] [ref=e1528]:
+                  - img [ref=e1529]
+                - generic [ref=e1531]:
+                  - button "1" [ref=e1532] [cursor=pointer]
+                  - button "2" [ref=e1533] [cursor=pointer]
+                  - button "3" [ref=e1534] [cursor=pointer]
+                - button "Следующая страница" [ref=e1535] [cursor=pointer]:
+                  - img [ref=e1536]
+                - button "»»" [ref=e1538] [cursor=pointer]
+        - generic [ref=e1539]:
+          - generic [ref=e1542]:
+            - img [ref=e1544]
+            - generic [ref=e1548]:
+              - heading "Все поставщики" [level=3] [ref=e1549]
+              - paragraph [ref=e1550]: Выберите товар слева для фильтрации по ценам
+          - paragraph [ref=e1552]: "Подсказка: выберите товар слева, чтобы отфильтровать поставщиков по цене и наличию"
+          - generic [ref=e1555]:
+            - generic [ref=e1556]:
+              - button "Добавить поставщика" [ref=e1557] [cursor=pointer]:
+                - img [ref=e1558]
+                - text: Добавить поставщика
+              - generic [ref=e1559]:
+                - img
+                - textbox "Поиск по названию, телефону, адресу, сектору..." [ref=e1561]
+            - generic [ref=e1563]:
+              - generic [ref=e1564] [cursor=pointer]:
+                - img [ref=e1567]
+                - generic [ref=e1571]:
+                  - generic [ref=e1572]:
+                    - heading "213" [level=3] [ref=e1573]
+                    - generic [ref=e1574]:
+                      - img [ref=e1575]
+                      - generic [ref=e1579]: Ауе1
+                    - generic [ref=e1580]:
+                      - img [ref=e1581]
+                      - generic [ref=e1584]: Ряд 11, Контейнер 3
+                    - generic [ref=e1585]: Сектор A
+                  - generic [ref=e1586]:
+                    - button "WhatsApp" [ref=e1587]:
+                      - img [ref=e1588]
+                      - text: WhatsApp
+                    - button "+77779440077" [ref=e1590]:
+                      - img [ref=e1591]
+                      - generic [ref=e1593]: "+77779440077"
+                  - generic [ref=e1595]:
+                    - generic [ref=e1596]:
+                      - generic [ref=e1597]: Финансы
+                      - generic [ref=e1598]: Нет долга
+                    - button "Управление финансами" [ref=e1599]:
+                      - img [ref=e1600]
+                  - generic [ref=e1602]:
+                    - button "Редактировать поставщика" [ref=e1603]:
+                      - img [ref=e1604]
+                    - button "Удалить поставщика" [ref=e1607]:
+                      - img [ref=e1608]
+              - generic [ref=e1611] [cursor=pointer]:
+                - img [ref=e1614]
+                - generic [ref=e1618]:
+                  - generic [ref=e1619]:
+                    - heading "dsadsad" [level=3] [ref=e1620]
+                    - generic [ref=e1621]:
+                      - img [ref=e1622]
+                      - generic [ref=e1625]: dsadasd
+                  - generic [ref=e1626]:
+                    - button "WhatsApp" [ref=e1627]:
+                      - img [ref=e1628]
+                      - text: WhatsApp
+                    - button "+79031421919" [ref=e1630]:
+                      - img [ref=e1631]
+                      - generic [ref=e1633]: "+79031421919"
+                  - generic [ref=e1635]:
+                    - generic [ref=e1636]:
+                      - generic [ref=e1637]: Финансы
+                      - generic [ref=e1638]: "Долг: 254 ₸"
+                    - button "Управление финансами" [ref=e1639]:
+                      - img [ref=e1640]
+                  - generic [ref=e1642]:
+                    - button "Редактировать поставщика" [ref=e1643]:
+                      - img [ref=e1644]
+                    - button "Удалить поставщика" [ref=e1647]:
+                      - img [ref=e1648]
+              - generic [ref=e1651] [cursor=pointer]:
+                - img [ref=e1654]
+                - generic [ref=e1658]:
+                  - generic [ref=e1659]:
+                    - heading "JKKF" [level=3] [ref=e1660]
+                    - generic [ref=e1661]:
+                      - img [ref=e1662]
+                      - generic [ref=e1666]: Байсат
+                    - generic [ref=e1667]:
+                      - img [ref=e1668]
+                      - generic [ref=e1671]: Ряд 44, Контейнер 1
+                  - generic [ref=e1672]:
+                    - button "WhatsApp" [ref=e1673]:
+                      - img [ref=e1674]
+                      - text: WhatsApp
+                    - button "+77779440077" [ref=e1676]:
+                      - img [ref=e1677]
+                      - generic [ref=e1679]: "+77779440077"
+                  - generic [ref=e1681]:
+                    - generic [ref=e1682]:
+                      - generic [ref=e1683]: Финансы
+                      - generic [ref=e1684]: Нет долга
+                    - button "Управление финансами" [ref=e1685]:
+                      - img [ref=e1686]
+                  - generic [ref=e1688]:
+                    - button "Редактировать поставщика" [ref=e1689]:
+                      - img [ref=e1690]
+                    - button "Удалить поставщика" [ref=e1693]:
+                      - img [ref=e1694]
+              - generic [ref=e1697] [cursor=pointer]:
+                - img "Контейнер Алтын" [ref=e1699]
+                - generic [ref=e1700]:
+                  - generic [ref=e1701]:
+                    - heading "Алтын" [level=3] [ref=e1702]
+                    - generic [ref=e1703]:
+                      - img [ref=e1704]
+                      - generic [ref=e1707]: ввыфв1
+                  - generic [ref=e1708]:
+                    - button "WhatsApp" [ref=e1709]:
+                      - img [ref=e1710]
+                      - text: WhatsApp
+                    - button "+79031421919" [ref=e1712]:
+                      - img [ref=e1713]
+                      - generic [ref=e1715]: "+79031421919"
+                  - generic [ref=e1717]:
+                    - generic [ref=e1718]:
+                      - generic [ref=e1719]: Финансы
+                      - generic [ref=e1720]: "Долг: 123 ₸"
+                    - button "Управление финансами" [ref=e1721]:
+                      - img [ref=e1722]
+                  - generic [ref=e1724]:
+                    - button "Редактировать поставщика" [ref=e1725]:
+                      - img [ref=e1726]
+                    - button "Удалить поставщика" [ref=e1729]:
+                      - img [ref=e1730]
+              - generic [ref=e1733] [cursor=pointer]:
+                - img [ref=e1736]
+                - generic [ref=e1740]:
+                  - generic [ref=e1741]:
+                    - heading "Алтынбек" [level=3] [ref=e1742]
+                    - generic [ref=e1743]:
+                      - img [ref=e1744]
+                      - generic [ref=e1747]: "123213123123123"
+                  - generic [ref=e1748]:
+                    - img [ref=e1749]
+                    - generic [ref=e1753]: "Товаров: 4"
+                  - generic [ref=e1754]:
+                    - button "WhatsApp" [ref=e1755]:
+                      - img [ref=e1756]
+                      - text: WhatsApp
+                    - button "+79031421919" [ref=e1758]:
+                      - img [ref=e1759]
+                      - generic [ref=e1761]: "+79031421919"
+                  - generic [ref=e1763]:
+                    - generic [ref=e1764]:
+                      - generic [ref=e1765]: Финансы
+                      - generic [ref=e1766]: "Долг: 100 ₸"
+                    - button "Управление финансами" [ref=e1767]:
+                      - img [ref=e1768]
+                  - generic [ref=e1770]:
+                    - button "Редактировать поставщика" [ref=e1771]:
+                      - img [ref=e1772]
+                    - button "Удалить поставщика" [ref=e1775]:
+                      - img [ref=e1776]
+              - generic [ref=e1779] [cursor=pointer]:
+                - img "Контейнер Андрей" [ref=e1781]
+                - generic [ref=e1782]:
+                  - generic [ref=e1783]:
+                    - heading "Андрей" [level=3] [ref=e1784]
+                    - generic [ref=e1785]:
+                      - img [ref=e1786]
+                      - generic [ref=e1790]: Байсат
+                    - generic [ref=e1791]:
+                      - img [ref=e1792]
+                      - generic [ref=e1795]: 24 ряд
+                    - generic [ref=e1796]: Материалы
+                  - generic [ref=e1797]:
+                    - img [ref=e1798]
+                    - generic [ref=e1802]: "Товаров: 1"
+                  - generic [ref=e1803]:
+                    - button "WhatsApp" [ref=e1804]:
+                      - img [ref=e1805]
+                      - text: WhatsApp
+                    - button "+71231231231" [ref=e1807]:
+                      - img [ref=e1808]
+                      - generic [ref=e1810]: "+71231231231"
+                  - generic [ref=e1812]:
+                    - generic [ref=e1813]:
+                      - generic [ref=e1814]: Финансы
+                      - generic [ref=e1815]: "Долг: 20 000 ₸"
+                    - button "Управление финансами" [ref=e1816]:
+                      - img [ref=e1817]
+                  - paragraph [ref=e1819]: вфыв
+                  - generic [ref=e1820]:
+                    - button "Редактировать поставщика" [ref=e1821]:
+                      - img [ref=e1822]
+                    - button "Удалить поставщика" [ref=e1825]:
+                      - img [ref=e1826]
+              - generic [ref=e1829] [cursor=pointer]:
+                - img "Контейнер Аолл" [ref=e1831]
+                - generic [ref=e1832]:
+                  - generic [ref=e1833]:
+                    - heading "Аолл" [level=3] [ref=e1834]
+                    - generic [ref=e1835]:
+                      - img [ref=e1836]
+                      - generic [ref=e1840]: Байсат
+                    - generic [ref=e1841]:
+                      - img [ref=e1842]
+                      - generic [ref=e1845]: Ряд 33, Контейнер 7
+                  - generic [ref=e1846]:
+                    - img [ref=e1847]
+                    - generic [ref=e1851]: "Товаров: 1"
+                  - generic [ref=e1852]:
+                    - button "WhatsApp" [ref=e1853]:
+                      - img [ref=e1854]
+                      - text: WhatsApp
+                    - button "+77779440077" [ref=e1856]:
+                      - img [ref=e1857]
+                      - generic [ref=e1859]: "+77779440077"
+                  - generic [ref=e1861]:
+                    - generic [ref=e1862]:
+                      - generic [ref=e1863]: Финансы
+                      - generic [ref=e1864]: Нет долга
+                    - button "Управление финансами" [ref=e1865]:
+                      - img [ref=e1866]
+                  - generic [ref=e1868]:
+                    - button "Редактировать поставщика" [ref=e1869]:
+                      - img [ref=e1870]
+                    - button "Удалить поставщика" [ref=e1873]:
+                      - img [ref=e1874]
+              - generic [ref=e1877] [cursor=pointer]:
+                - img "Контейнер Ауаф" [ref=e1879]
+                - generic [ref=e1880]:
+                  - generic [ref=e1881]:
+                    - heading "Ауаф" [level=3] [ref=e1882]
+                    - generic [ref=e1883]:
+                      - img [ref=e1884]
+                      - generic [ref=e1888]: Байсат
+                    - generic [ref=e1889]:
+                      - img [ref=e1890]
+                      - generic [ref=e1893]: Ряд 27, Контейнер 4
+                  - generic [ref=e1894]:
+                    - img [ref=e1895]
+                    - generic [ref=e1899]: "Товаров: 1"
+                  - generic [ref=e1900]:
+                    - button "WhatsApp" [ref=e1901]:
+                      - img [ref=e1902]
+                      - text: WhatsApp
+                    - button "+77779440077" [ref=e1904]:
+                      - img [ref=e1905]
+                      - generic [ref=e1907]: "+77779440077"
+                  - generic [ref=e1909]:
+                    - generic [ref=e1910]:
+                      - generic [ref=e1911]: Финансы
+                      - generic [ref=e1912]: "Долг: 1 133 ₸"
+                    - button "Управление финансами" [ref=e1913]:
+                      - img [ref=e1914]
+                  - generic [ref=e1916]:
+                    - button "Редактировать поставщика" [ref=e1917]:
+                      - img [ref=e1918]
+                    - button "Удалить поставщика" [ref=e1921]:
+                      - img [ref=e1922]
+              - generic [ref=e1925] [cursor=pointer]:
+                - img [ref=e1928]
+                - generic [ref=e1932]:
+                  - generic [ref=e1933]:
+                    - heading "ВВВВ1" [level=3] [ref=e1934]
+                    - generic [ref=e1935]:
+                      - img [ref=e1936]
+                      - generic [ref=e1939]: Ряд 11, Контейнер 11
+                  - generic [ref=e1940]:
+                    - img [ref=e1941]
+                    - generic [ref=e1945]: "Товаров: 1"
+                  - generic [ref=e1946]:
+                    - button "WhatsApp" [ref=e1947]:
+                      - img [ref=e1948]
+                      - text: WhatsApp
+                    - button "+79031421919" [ref=e1950]:
+                      - img [ref=e1951]
+                      - generic [ref=e1953]: "+79031421919"
+                  - generic [ref=e1955]:
+                    - generic [ref=e1956]:
+                      - generic [ref=e1957]: Финансы
+                      - generic [ref=e1958]: Нет долга
+                    - button "Управление финансами" [ref=e1959]:
+                      - img [ref=e1960]
+                  - generic [ref=e1962]:
+                    - button "Редактировать поставщика" [ref=e1963]:
+                      - img [ref=e1964]
+                    - button "Удалить поставщика" [ref=e1967]:
+                      - img [ref=e1968]
+              - generic [ref=e1971] [cursor=pointer]:
+                - img [ref=e1974]
+                - generic [ref=e1978]:
+                  - generic [ref=e1979]:
+                    - heading "выфвыфв111" [level=3] [ref=e1980]
+                    - generic [ref=e1981]:
+                      - img [ref=e1982]
+                      - generic [ref=e1985]: выфвфывфывыфв1
+                  - generic [ref=e1986]:
+                    - button "WhatsApp" [ref=e1987]:
+                      - img [ref=e1988]
+                      - text: WhatsApp
+                    - button "+79031421919" [ref=e1990]:
+                      - img [ref=e1991]
+                      - generic [ref=e1993]: "+79031421919"
+                  - generic [ref=e1995]:
+                    - generic [ref=e1996]:
+                      - generic [ref=e1997]: Финансы
+                      - generic [ref=e1998]: Нет долга
+                    - button "Управление финансами" [ref=e1999]:
+                      - img [ref=e2000]
+                  - generic [ref=e2002]:
+                    - button "Редактировать поставщика" [ref=e2003]:
+                      - img [ref=e2004]
+                    - button "Удалить поставщика" [ref=e2007]:
+                      - img [ref=e2008]
+              - generic [ref=e2011] [cursor=pointer]:
+                - img [ref=e2014]
+                - generic [ref=e2018]:
+                  - generic [ref=e2019]:
+                    - heading "ИП Волков" [level=3] [ref=e2020]
+                    - generic [ref=e2021]:
+                      - img [ref=e2022]
+                      - generic [ref=e2026]: Алтын Орда
+                    - generic [ref=e2027]:
+                      - img [ref=e2028]
+                      - generic [ref=e2031]: Ряд 18, Контейнер 8
+                    - generic [ref=e2032]: Товары для дома
+                  - generic [ref=e2033]:
+                    - img [ref=e2034]
+                    - generic [ref=e2038]: "Товаров: 2"
+                  - generic [ref=e2039]:
+                    - button "WhatsApp" [ref=e2040]:
+                      - img [ref=e2041]
+                      - text: WhatsApp
+                    - button "+77776761164" [ref=e2043]:
+                      - img [ref=e2044]
+                      - generic [ref=e2046]: "+77776761164"
+                  - generic [ref=e2048]:
+                    - generic [ref=e2049]:
+                      - generic [ref=e2050]: Финансы
+                      - generic [ref=e2051]: "Долг: 7 599 400 ₸"
+                    - button "Управление финансами" [ref=e2052]:
+                      - img [ref=e2053]
+                  - paragraph [ref=e2055]: Надежный поставщик, работаем давно
+                  - generic [ref=e2056]:
+                    - button "Редактировать поставщика" [ref=e2057]:
+                      - img [ref=e2058]
+                    - button "Удалить поставщика" [ref=e2061]:
+                      - img [ref=e2062]
+              - generic [ref=e2065] [cursor=pointer]:
+                - img [ref=e2068]
+                - generic [ref=e2072]:
+                  - generic [ref=e2073]:
+                    - heading "ИП Иванов" [level=3] [ref=e2074]
+                    - generic [ref=e2075]:
+                      - img [ref=e2076]
+                      - generic [ref=e2080]: Байсат
+                    - generic [ref=e2081]:
+                      - img [ref=e2082]
+                      - generic [ref=e2085]: г. Шымкент
+                  - generic [ref=e2086]:
+                    - img [ref=e2087]
+                    - generic [ref=e2091]: "Товаров: 3"
+                  - generic [ref=e2092]:
+                    - button "WhatsApp" [ref=e2093]:
+                      - img [ref=e2094]
+                      - text: WhatsApp
+                    - button "+77009876543" [ref=e2096]:
+                      - img [ref=e2097]
+                      - generic [ref=e2099]: "+77009876543"
+                  - generic [ref=e2101]:
+                    - generic [ref=e2102]:
+                      - generic [ref=e2103]: Финансы
+                      - generic [ref=e2104]: "Долг: 55 000 ₸"
+                    - button "Управление финансами" [ref=e2105]:
+                      - img [ref=e2106]
+                  - generic [ref=e2108]:
+                    - button "Редактировать поставщика" [ref=e2109]:
+                      - img [ref=e2110]
+                    - button "Удалить поставщика" [ref=e2113]:
+                      - img [ref=e2114]
+              - generic [ref=e2117] [cursor=pointer]:
+                - img [ref=e2120]
+                - generic [ref=e2124]:
+                  - generic [ref=e2125]:
+                    - heading "ИП Иванов" [level=3] [ref=e2126]
+                    - generic [ref=e2127]:
+                      - img [ref=e2128]
+                      - generic [ref=e2132]: Байсат
+                    - generic [ref=e2133]:
+                      - img [ref=e2134]
+                      - generic [ref=e2137]: Ряд 19, Контейнер 10
+                    - generic [ref=e2138]: Гигиена
+                  - generic [ref=e2139]:
+                    - img [ref=e2140]
+                    - generic [ref=e2144]: "Товаров: 2"
+                  - generic [ref=e2145]:
+                    - button "WhatsApp" [ref=e2146]:
+                      - img [ref=e2147]
+                      - text: WhatsApp
+                    - button "+77652750790" [ref=e2149]:
+                      - img [ref=e2150]
+                      - generic [ref=e2152]: "+77652750790"
+                  - generic [ref=e2154]:
+                    - generic [ref=e2155]:
+                      - generic [ref=e2156]: Финансы
+                      - generic [ref=e2157]: "Долг: 73 447 ₸"
+                    - button "Управление финансами" [ref=e2158]:
+                      - img [ref=e2159]
+                  - paragraph [ref=e2161]: Надежный поставщик, работаем давно
+                  - generic [ref=e2162]:
+                    - button "Редактировать поставщика" [ref=e2163]:
+                      - img [ref=e2164]
+                    - button "Удалить поставщика" [ref=e2167]:
+                      - img [ref=e2168]
+              - generic [ref=e2171] [cursor=pointer]:
+                - img [ref=e2174]
+                - generic [ref=e2178]:
+                  - generic [ref=e2179]:
+                    - heading "ИП Козлов" [level=3] [ref=e2180]
+                    - generic [ref=e2181]:
+                      - img [ref=e2182]
+                      - generic [ref=e2186]: Алтын Орда
+                    - generic [ref=e2187]:
+                      - img [ref=e2188]
+                      - generic [ref=e2191]: Ряд 2, Контейнер 8
+                    - generic [ref=e2192]: Товары для дома
+                  - generic [ref=e2193]:
+                    - button "WhatsApp" [ref=e2194]:
+                      - img [ref=e2195]
+                      - text: WhatsApp
+                    - button "+77251149433" [ref=e2197]:
+                      - img [ref=e2198]
+                      - generic [ref=e2200]: "+77251149433"
+                  - generic [ref=e2202]:
+                    - generic [ref=e2203]:
+                      - generic [ref=e2204]: Финансы
+                      - generic [ref=e2205]: "Долг: 77 057 ₸"
+                    - button "Управление финансами" [ref=e2206]:
+                      - img [ref=e2207]
+                  - paragraph [ref=e2209]: Надежный поставщик, работаем давно
+                  - generic [ref=e2210]:
+                    - button "Редактировать поставщика" [ref=e2211]:
+                      - img [ref=e2212]
+                    - button "Удалить поставщика" [ref=e2215]:
+                      - img [ref=e2216]
+              - generic [ref=e2219] [cursor=pointer]:
+                - img [ref=e2222]
+                - generic [ref=e2226]:
+                  - generic [ref=e2227]:
+                    - heading "ИП Лебедев" [level=3] [ref=e2228]
+                    - generic [ref=e2229]:
+                      - img [ref=e2230]
+                      - generic [ref=e2233]: ул. Сатпаева 90
+                    - generic [ref=e2234]: Товары для дома
+                  - generic [ref=e2235]:
+                    - img [ref=e2236]
+                    - generic [ref=e2240]: "Товаров: 1"
+                  - generic [ref=e2241]:
+                    - button "WhatsApp" [ref=e2242]:
+                      - img [ref=e2243]
+                      - text: WhatsApp
+                    - button "+77165446531" [ref=e2245]:
+                      - img [ref=e2246]
+                      - generic [ref=e2248]: "+77165446531"
+                  - generic [ref=e2250]:
+                    - generic [ref=e2251]:
+                      - generic [ref=e2252]: Финансы
+                      - generic [ref=e2253]: "Долг: 89 811 ₸"
+                    - button "Управление финансами" [ref=e2254]:
+                      - img [ref=e2255]
+                  - paragraph [ref=e2257]: Надежный поставщик, работаем давно
+                  - generic [ref=e2258]:
+                    - button "Редактировать поставщика" [ref=e2259]:
+                      - img [ref=e2260]
+                    - button "Удалить поставщика" [ref=e2263]:
+                      - img [ref=e2264]
+              - generic [ref=e2267] [cursor=pointer]:
+                - img [ref=e2270]
+                - generic [ref=e2274]:
+                  - generic [ref=e2275]:
+                    - heading "ИП Морозов" [level=3] [ref=e2276]
+                    - generic [ref=e2277]:
+                      - img [ref=e2278]
+                      - generic [ref=e2282]: Оптима
+                    - generic [ref=e2283]:
+                      - img [ref=e2284]
+                      - generic [ref=e2287]: Ряд 9, Контейнер 15
+                    - generic [ref=e2288]: Медицина
+                  - generic [ref=e2289]:
+                    - img [ref=e2290]
+                    - generic [ref=e2294]: "Товаров: 6"
+                  - generic [ref=e2295]:
+                    - button "WhatsApp" [ref=e2296]:
+                      - img [ref=e2297]
+                      - text: WhatsApp
+                    - button "+77365186489" [ref=e2299]:
+                      - img [ref=e2300]
+                      - generic [ref=e2302]: "+77365186489"
+                  - generic [ref=e2304]:
+                    - generic [ref=e2305]:
+                      - generic [ref=e2306]: Финансы
+                      - generic [ref=e2307]: "Долг: 65 741 ₸"
+                    - button "Управление финансами" [ref=e2308]:
+                      - img [ref=e2309]
+                  - paragraph [ref=e2311]: Надежный поставщик, работаем давно
+                  - generic [ref=e2312]:
+                    - button "Редактировать поставщика" [ref=e2313]:
+                      - img [ref=e2314]
+                    - button "Удалить поставщика" [ref=e2317]:
+                      - img [ref=e2318]
+              - generic [ref=e2321] [cursor=pointer]:
+                - img [ref=e2324]
+                - generic [ref=e2328]:
+                  - generic [ref=e2329]:
+                    - heading "ИП Новиков" [level=3] [ref=e2330]
+                    - generic [ref=e2331]:
+                      - img [ref=e2332]
+                      - generic [ref=e2335]: ул. Розыбакиева 247
+                    - generic [ref=e2336]: Медицина
+                  - generic [ref=e2337]:
+                    - img [ref=e2338]
+                    - generic [ref=e2342]: "Товаров: 5"
+                  - generic [ref=e2343]:
+                    - button "WhatsApp" [ref=e2344]:
+                      - img [ref=e2345]
+                      - text: WhatsApp
+                    - button "+77666395174" [ref=e2347]:
+                      - img [ref=e2348]
+                      - generic [ref=e2350]: "+77666395174"
+                  - generic [ref=e2352]:
+                    - generic [ref=e2353]:
+                      - generic [ref=e2354]: Финансы
+                      - generic [ref=e2355]: "Долг: 15 493 ₸"
+                    - button "Управление финансами" [ref=e2356]:
+                      - img [ref=e2357]
+                  - paragraph [ref=e2359]: Надежный поставщик, работаем давно
+                  - generic [ref=e2360]:
+                    - button "Редактировать поставщика" [ref=e2361]:
+                      - img [ref=e2362]
+                    - button "Удалить поставщика" [ref=e2365]:
+                      - img [ref=e2366]
+              - generic [ref=e2369] [cursor=pointer]:
+                - img [ref=e2372]
+                - generic [ref=e2376]:
+                  - generic [ref=e2377]:
+                    - heading "ИП Петров" [level=3] [ref=e2378]
+                    - generic [ref=e2379]:
+                      - img [ref=e2380]
+                      - generic [ref=e2384]: Евразия
+                    - generic [ref=e2385]:
+                      - img [ref=e2386]
+                      - generic [ref=e2389]: Ряд 5, Контейнер 8
+                    - generic [ref=e2390]: Гигиена
+                  - generic [ref=e2391]:
+                    - img [ref=e2392]
+                    - generic [ref=e2396]: "Товаров: 2"
+                  - generic [ref=e2397]:
+                    - button "WhatsApp" [ref=e2398]:
+                      - img [ref=e2399]
+                      - text: WhatsApp
+                    - button "+77955759571" [ref=e2401]:
+                      - img [ref=e2402]
+                      - generic [ref=e2404]: "+77955759571"
+                  - generic [ref=e2406]:
+                    - generic [ref=e2407]:
+                      - generic [ref=e2408]: Финансы
+                      - generic [ref=e2409]: "Долг: 2 551 ₸"
+                    - button "Управление финансами" [ref=e2410]:
+                      - img [ref=e2411]
+                  - paragraph [ref=e2413]: Надежный поставщик, работаем давно
+                  - generic [ref=e2414]:
+                    - button "Редактировать поставщика" [ref=e2415]:
+                      - img [ref=e2416]
+                    - button "Удалить поставщика" [ref=e2419]:
+                      - img [ref=e2420]
+              - generic [ref=e2423] [cursor=pointer]:
+                - img [ref=e2426]
+                - generic [ref=e2430]:
+                  - generic [ref=e2431]:
+                    - heading "ИП Сидоров" [level=3] [ref=e2432]
+                    - generic [ref=e2433]:
+                      - img [ref=e2434]
+                      - generic [ref=e2438]: Алтын Орда
+                    - generic [ref=e2439]:
+                      - img [ref=e2440]
+                      - generic [ref=e2443]: Ряд 42, Контейнер 17
+                    - generic [ref=e2444]: Косметика
+                  - generic [ref=e2445]:
+                    - img [ref=e2446]
+                    - generic [ref=e2450]: "Товаров: 2"
+                  - generic [ref=e2451]:
+                    - button "WhatsApp" [ref=e2452]:
+                      - img [ref=e2453]
+                      - text: WhatsApp
+                    - button "+77052230692" [ref=e2455]:
+                      - img [ref=e2456]
+                      - generic [ref=e2458]: "+77052230692"
+                  - generic [ref=e2460]:
+                    - generic [ref=e2461]:
+                      - generic [ref=e2462]: Финансы
+                      - generic [ref=e2463]: "Долг: 60 919 ₸"
+                    - button "Управление финансами" [ref=e2464]:
+                      - img [ref=e2465]
+                  - paragraph [ref=e2467]: Надежный поставщик, работаем давно
+                  - generic [ref=e2468]:
+                    - button "Редактировать поставщика" [ref=e2469]:
+                      - img [ref=e2470]
+                    - button "Удалить поставщика" [ref=e2473]:
+                      - img [ref=e2474]
+              - generic [ref=e2477] [cursor=pointer]:
+                - img [ref=e2480]
+                - generic [ref=e2484]:
+                  - generic [ref=e2485]:
+                    - heading "ИП Смирнов" [level=3] [ref=e2486]
+                    - generic [ref=e2487]:
+                      - img [ref=e2488]
+                      - generic [ref=e2491]: пр. Абая 120
+                    - generic [ref=e2492]: Гигиена
+                  - generic [ref=e2493]:
+                    - img [ref=e2494]
+                    - generic [ref=e2498]: "Товаров: 2"
+                  - generic [ref=e2499]:
+                    - button "WhatsApp" [ref=e2500]:
+                      - img [ref=e2501]
+                      - text: WhatsApp
+                    - button "+77806793877" [ref=e2503]:
+                      - img [ref=e2504]
+                      - generic [ref=e2506]: "+77806793877"
+                  - generic [ref=e2508]:
+                    - generic [ref=e2509]:
+                      - generic [ref=e2510]: Финансы
+                      - generic [ref=e2511]: "Долг: 44 758 ₸"
+                    - button "Управление финансами" [ref=e2512]:
+                      - img [ref=e2513]
+                  - paragraph [ref=e2515]: Надежный поставщик, работаем давно
+                  - generic [ref=e2516]:
+                    - button "Редактировать поставщика" [ref=e2517]:
+                      - img [ref=e2518]
+                    - button "Удалить поставщика" [ref=e2521]:
+                      - img [ref=e2522]
+            - generic [ref=e2526]:
+              - generic [ref=e2527]: Показано 1–20 из 46
+              - generic [ref=e2528]:
+                - button "««" [disabled] [ref=e2529]
+                - button "Предыдущая страница" [disabled] [ref=e2530]:
+                  - img [ref=e2531]
+                - generic [ref=e2533]:
+                  - button "1" [ref=e2534] [cursor=pointer]
+                  - button "2" [ref=e2535] [cursor=pointer]
+                  - button "3" [ref=e2536] [cursor=pointer]
+                - button "Следующая страница" [ref=e2537] [cursor=pointer]:
+                  - img [ref=e2538]
+                - button "»»" [ref=e2540] [cursor=pointer]
