@@ -57,8 +57,11 @@ export const SupplierProductCatalog: React.FC<SupplierProductCatalogProps> = ({
     [products, search]
   );
 
-  const listScrollClass =
-    listMaxHeight === 'fill' ? 'flex-1 min-h-0' : listMaxHeight;
+  const isFillHeight = listMaxHeight === 'fill';
+  const listScrollClass = isFillHeight ? 'md:flex-1 md:min-h-0' : listMaxHeight;
+  const listOverflowClass = isFillHeight
+    ? 'overflow-x-hidden md:overflow-y-auto max-md:overflow-visible'
+    : 'overflow-y-auto overflow-x-hidden';
 
   return (
     <div className={`flex flex-col min-h-0 ${className}`}>
@@ -89,7 +92,7 @@ export const SupplierProductCatalog: React.FC<SupplierProductCatalogProps> = ({
       </div>
 
       <div
-        className={`overflow-y-auto ${listScrollClass}`}
+        className={`${listOverflowClass} ${listScrollClass}`}
       >
         {loading ? (
           <div className="flex items-center justify-center py-10 text-text-muted gap-2">
@@ -103,7 +106,7 @@ export const SupplierProductCatalog: React.FC<SupplierProductCatalogProps> = ({
             className="py-10"
           />
         ) : layout === 'grid' ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 px-1 pb-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 px-1 pb-1">
             {filtered.map((product) => {
               const isPicked = pickedProductIds?.has(product.id);
               const isSelected = selectedIds?.has(product.id);

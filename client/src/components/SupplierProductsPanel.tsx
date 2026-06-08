@@ -124,7 +124,13 @@ export const SupplierProductsPanel: React.FC<SupplierProductsPanelProps> = ({
         </div>
       </CardHeader>
 
-      <div className={cn('flex-1 flex flex-col p-4 min-h-0', canCreate && 'max-md:pb-44')}>
+      <div
+        className={cn(
+          'flex-1 flex flex-col p-4 min-h-0',
+          layout === 'grid' && 'max-md:flex-none',
+          canCreate && 'max-md:pb-28'
+        )}
+      >
         {canEdit && (
           <div className="flex flex-wrap gap-2 mb-3 flex-shrink-0">
             <Button
@@ -156,7 +162,7 @@ export const SupplierProductsPanel: React.FC<SupplierProductsPanelProps> = ({
           onSearchChange={setSearch}
           mode="select"
           layout={layout}
-          className="flex-1"
+          className={layout === 'grid' ? 'md:flex-1' : 'flex-1'}
           listMaxHeight="fill"
           selectedIds={selectedIds}
           onToggleSelect={toggleSelect}
@@ -173,7 +179,7 @@ export const SupplierProductsPanel: React.FC<SupplierProductsPanelProps> = ({
         <div
           className={cn(
             'border-t border-border-subtle bg-brand-white/95 backdrop-blur-md',
-            'p-4 md:relative',
+            'p-4 max-md:p-3 md:relative',
             'max-md:fixed max-md:inset-x-0 max-md:z-40',
             mobileActionBarAtBottom ? 'max-md:bottom-0 max-md:pb-safe' : 'max-md:bottom-above-tab-bar',
             'max-md:shadow-[0_-4px_20px_rgba(0,0,0,0.08)]'
@@ -190,7 +196,7 @@ export const SupplierProductsPanel: React.FC<SupplierProductsPanelProps> = ({
               </span>
             </div>
           )}
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-row sm:flex-wrap">
             <Button
               type="button"
               variant="primary"

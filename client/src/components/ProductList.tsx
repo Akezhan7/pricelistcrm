@@ -202,7 +202,7 @@ export const ProductList: React.FC<ProductListProps> = ({
                           title="История цен"
                           size="md"
                           variant="ghost"
-                          className="md:h-8 md:w-8 md:min-h-8 md:min-w-8"
+                          className="h-8 w-8 min-h-8 min-w-8"
                           onClick={(e) => {
                             e.stopPropagation();
                             setProductForPriceHistory(product);
@@ -213,7 +213,7 @@ export const ProductList: React.FC<ProductListProps> = ({
                           title="Управление поставщиками"
                           size="md"
                           variant="ghost"
-                          className="md:h-8 md:w-8 md:min-h-8 md:min-w-8"
+                          className="h-8 w-8 min-h-8 min-w-8"
                           onClick={(e) => {
                             e.stopPropagation();
                             openSuppliers(product);
@@ -224,7 +224,7 @@ export const ProductList: React.FC<ProductListProps> = ({
                           title="Управление вариациями"
                           size="md"
                           variant="ghost"
-                          className="md:h-8 md:w-8 md:min-h-8 md:min-w-8"
+                          className="h-8 w-8 min-h-8 min-w-8"
                           onClick={(e) => {
                             e.stopPropagation();
                             setProductForVariations(product);
@@ -235,7 +235,7 @@ export const ProductList: React.FC<ProductListProps> = ({
                           title="Редактировать товар"
                           size="md"
                           variant="ghost"
-                          className="md:h-8 md:w-8 md:min-h-8 md:min-w-8"
+                          className="h-8 w-8 min-h-8 min-w-8"
                           onClick={(e) => {
                             e.stopPropagation();
                             openEdit(product);
@@ -246,7 +246,7 @@ export const ProductList: React.FC<ProductListProps> = ({
                           title="Удалить товар"
                           size="md"
                           variant="danger"
-                          className="md:h-8 md:w-8 md:min-h-8 md:min-w-8"
+                          className="h-8 w-8 min-h-8 min-w-8"
                           onClick={(e) => {
                             e.stopPropagation();
                             setProductToDelete(product);

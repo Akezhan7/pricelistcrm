@@ -44,7 +44,7 @@ export const SupplierProductGridCard: React.FC<SupplierProductGridCardProps> = (
       )}
     >
       {showEditActions && (
-        <div className="absolute right-2 top-2 z-10 inline-flex items-center gap-0.5 rounded-lg border border-border-subtle bg-surface-inset/60 p-0.5">
+        <div className="mb-2 ml-auto inline-flex items-center gap-0.5 rounded-lg border border-border-subtle bg-surface-inset/60 p-0.5">
           {onEditProduct && (
             <IconButton
               icon={Edit}
@@ -74,7 +74,7 @@ export const SupplierProductGridCard: React.FC<SupplierProductGridCardProps> = (
         </div>
       )}
 
-      <div className={cn('flex items-start gap-2', showEditActions && 'pr-14')}>
+      <div className="flex items-start gap-2">
         {onToggleSelect && (
           <button
             type="button"

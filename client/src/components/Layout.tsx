@@ -82,8 +82,8 @@ export const Layout: React.FC<LayoutProps> = ({
         <OrderDraftBanner />
 
         {fullHeight ? (
-          <div className="flex-1 p-4 md:p-6 overflow-hidden max-md:pb-tab-bar">
-            <div className="h-full max-w-[1600px] mx-auto w-full">{children}</div>
+          <div className="flex-1 p-4 md:p-6 overflow-y-auto md:overflow-hidden max-md:pb-tab-bar">
+            <div className="min-h-full md:h-full max-w-[1600px] mx-auto w-full">{children}</div>
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto overscroll-y-contain">

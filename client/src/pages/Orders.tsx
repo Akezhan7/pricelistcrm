@@ -15,6 +15,7 @@ import {
   Archive,
   Undo2,
   ChevronRight,
+  SlidersHorizontal,
 } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
@@ -131,6 +132,7 @@ const Orders: React.FC = () => {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   const [filters, setFilters] = useState<OrderFilters>({
     page: 1,
@@ -348,7 +350,18 @@ const Orders: React.FC = () => {
                 </div>
               </form>
 
-              <div className="space-y-3">
+              <Button
+                type="button"
+                variant="secondary"
+                size="md"
+                leftIcon={SlidersHorizontal}
+                onClick={() => setShowMobileFilters((prev) => !prev)}
+                fullWidth
+              >
+                {showMobileFilters ? 'Скрыть фильтры' : hasActiveFilters ? 'Фильтры применены' : 'Фильтры'}
+              </Button>
+
+              <div className={cn('space-y-3', !showMobileFilters && 'hidden')}>
                 <div>
                   <p className="mb-2 text-label font-medium text-text-muted">Статус оплаты</p>
                   <div className="flex gap-2 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-0.5 -mx-1 px-1">
@@ -383,7 +396,7 @@ const Orders: React.FC = () => {
                 </div>
               </div>
 
-              {stats && (
+              {stats && showMobileFilters && (
                 <div>
                   <p className="mb-2 text-label font-medium text-text-muted">Статус заявки</p>
                   <div className="flex gap-2 overflow-x-auto snap-x snap-mandatory scrollbar-hide pb-0.5 -mx-1 px-1">

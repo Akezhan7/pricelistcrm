@@ -325,7 +325,7 @@ export const PriceListPage: React.FC = () => {
             />
           </div>
           <div className="flex min-h-11 flex-1 items-center rounded-xl border border-border-subtle bg-surface-inset px-3 py-2 text-body text-text-muted">
-            Округление до <strong className="mx-1 text-brand-black">5</strong> по правилам клиента
+            Округление до <strong className="mx-1 text-brand-black">5</strong>
           </div>
         </div>
 
@@ -420,7 +420,7 @@ export const PriceListPage: React.FC = () => {
   return (
     <Layout searchQuery={searchQuery} onSearchChange={setSearchQuery} fullHeight>
       <div className="h-full flex flex-col gap-4 min-h-0">
-        <div className="lg:hidden sticky top-0 z-10 -mx-4 px-4 pt-1 pb-3 bg-surface-page/95 backdrop-blur-sm border-b border-border-subtle space-y-3 shrink-0">
+        <div className="lg:hidden top-0 z-10 -mx-4 px-4 pt-1 pb-3 bg-surface-page/95 backdrop-blur-sm border-b border-border-subtle space-y-3 shrink-0">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <h1 className="text-section-title font-semibold text-brand-black flex items-center gap-2">
               <Tag className="w-5 h-5 text-brand-yellow shrink-0" aria-hidden />

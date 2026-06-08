@@ -31,9 +31,6 @@ import { Supplier } from '../types';
 import { formatPriceKZT } from '../utils/format';
 import { cn } from '../utils/cn';
 
-const darkCtaClass =
-  'border-brand-black bg-brand-black text-white hover:border-gray-800 hover:bg-gray-800 hover:text-white';
-
 export const SupplierDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -245,7 +242,6 @@ export const SupplierDetailsPage: React.FC = () => {
                   size="sm"
                   leftIcon={FileText}
                   onClick={() => setShowReconciliation(true)}
-                  className={darkCtaClass}
                 >
                   Сверка
                 </Button>
@@ -303,7 +299,6 @@ export const SupplierDetailsPage: React.FC = () => {
                   size="sm"
                   leftIcon={FileText}
                   onClick={() => setShowReconciliation(true)}
-                  className={darkCtaClass}
                 >
                   Сверка
                 </Button>
@@ -325,7 +320,7 @@ export const SupplierDetailsPage: React.FC = () => {
           <div className="flex-1 min-w-0 min-h-0 flex flex-col order-2 lg:order-1">
             <Card className="flex flex-col flex-1 min-h-0 shadow-none hover:shadow-none">
               <div className="flex-1 min-h-0 flex flex-col">
-                <div className="flex-1 min-h-0 flex flex-col mx-3 mb-3 md:mx-4 md:mb-4 rounded-xl bg-surface-inset border border-border-subtle overflow-hidden">
+                <div className="flex-1 min-h-0 flex flex-col mx-3 mb-3 md:mx-4 md:mb-4 rounded-xl bg-surface-inset border border-border-subtle overflow-visible md:overflow-hidden">
                   <SupplierProductsPanel
                     supplier={supplier}
                     canCreate={canEdit}

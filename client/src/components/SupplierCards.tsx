@@ -218,11 +218,11 @@ export const SupplierCards: React.FC<SupplierCardsProps> = ({
                       <img
                         src={getImageUrl(supplier.containerImage) || undefined}
                         alt={`Контейнер ${supplier.name}`}
-                        className="w-full aspect-video object-cover"
+                        className="h-32 w-full object-cover sm:h-auto sm:aspect-video"
                         onError={handleImgError}
                       />
                     ) : (
-                      <div className="w-full aspect-video bg-surface-inset flex items-center justify-center">
+                      <div className="h-32 w-full bg-surface-inset flex items-center justify-center sm:h-auto sm:aspect-video">
                         <ImageIcon className="h-8 w-8 text-text-muted" />
                       </div>
                     )}
