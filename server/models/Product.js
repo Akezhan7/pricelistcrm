@@ -1,5 +1,9 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
+const {
+  PRODUCT_LIFECYCLE_STATUSES,
+  PRODUCT_LIFECYCLE_STATUS_VALUES,
+} = require('../constants/productLifecycle');
 
 const Product = sequelize.define('Product', {
   id: {
@@ -96,6 +100,63 @@ const Product = sequelize.define('Product', {
     allowNull: true,
     comment: 'Связь с категорией товара',
   },
+  lifecycleStatus: {
+    type: DataTypes.STRING(40),
+    allowNull: false,
+    defaultValue: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
+    validate: {
+      isIn: [PRODUCT_LIFECYCLE_STATUS_VALUES],
+    },
+    comment: 'Product lifecycle status',
+  },
+  lifecycleStartedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    comment: 'When lifecycle processing started',
+  },
+  lifecycleCompletedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+    comment: 'When product reached sale status',
+  },
+  assignedToUserId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: 'Current lifecycle assignee',
+  },
+  designerId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: 'Assigned designer',
+  },
+  marketplaceManagerId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: 'Assigned marketplace manager',
+  },
+  createdByUserId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: 'User who created the lifecycle product card',
+  },
+  reviewedByUserId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: 'Last reviewer',
+  },
+  kpiWeight: {
+    type: DataTypes.DECIMAL(5, 2),
+    allowNull: true,
+    validate: {
+      min: 0,
+    },
+    comment: 'Optional KPI weight for lifecycle reporting',
+  },
+  launchNotes: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+    comment: 'Lifecycle notes for product launch',
+  },
   isActive: {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
@@ -134,6 +195,22 @@ const Product = sequelize.define('Product', {
     {
       fields: ['category_id'],
       name: 'idx_products_category_id',
+    },
+    {
+      fields: ['lifecycle_status'],
+      name: 'idx_products_lifecycle_status',
+    },
+    {
+      fields: ['assigned_to_user_id'],
+      name: 'idx_products_assigned_to_user_id',
+    },
+    {
+      fields: ['designer_id'],
+      name: 'idx_products_designer_id',
+    },
+    {
+      fields: ['marketplace_manager_id'],
+      name: 'idx_products_marketplace_manager_id',
     },
   ],
   hooks: {

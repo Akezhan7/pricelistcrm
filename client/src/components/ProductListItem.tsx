@@ -10,11 +10,15 @@ import { formatPriceKZT } from '../utils/format';
 
 import { cn } from '../utils/cn';
 
+import { Badge } from './ui';
+
+import { getProductLifecycleLabel } from '../constants/productLifecycle';
+
 
 
 export interface ProductListItemProps {
 
-  product: Pick<Product, 'id' | 'name' | 'article' | 'image' | 'costPrice' | 'sellingPrice'> & {
+  product: Pick<Product, 'id' | 'name' | 'article' | 'image' | 'costPrice' | 'sellingPrice' | 'lifecycleStatus'> & {
 
     suppliers?: Product['suppliers'];
 
@@ -95,6 +99,8 @@ export const ProductListItem: React.FC<ProductListItemProps> = ({
 
 
   const imgClass = imageSizeClasses[imageSize];
+
+  const lifecycleLabel = getProductLifecycleLabel(product.lifecycleStatus);
 
 
 
@@ -310,7 +316,14 @@ export const ProductListItem: React.FC<ProductListItemProps> = ({
 
           </h3>
 
-          <p className="text-caption text-text-muted truncate mt-0.5">{product.article}</p>
+          <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
+            <p className="text-caption text-text-muted truncate">{product.article}</p>
+            {lifecycleLabel && (
+              <Badge variant="outline" className="shrink-0">
+                {lifecycleLabel}
+              </Badge>
+            )}
+          </div>
 
           {product.suppliers && product.suppliers.length > 0 && (
 

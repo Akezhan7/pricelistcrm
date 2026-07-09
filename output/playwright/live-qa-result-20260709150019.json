@@ -1,0 +1,31 @@
+{
+  "runId": "20260709150019",
+  "productName": "QA Lifecycle 20260709150019",
+  "productSku": "QA-KASPI-20260709150019",
+  "generatedAt": "2026-07-09T15:00:26.997Z",
+  "fatalError": "locator.selectOption: options[0].label: expected string, got object",
+  "steps": [
+    {
+      "name": "Admin can log in",
+      "status": "passed",
+      "durationMs": 2512
+    },
+    {
+      "name": "Admin can create product draft from UI",
+      "status": "passed",
+      "durationMs": 3234
+    },
+    {
+      "name": "Admin can select new draft and assign designer from UI",
+      "status": "failed",
+      "durationMs": 1866,
+      "error": "locator.selectOption: options[0].label: expected string, got object"
+    }
+  ],
+  "findings": [],
+  "screenshots": [
+    "output/playwright/01-login-admin.png",
+    "output/playwright/02-draft-modal-filled.png",
+    "output/playwright/03-new-product-filtered.png"
+  ]
+}

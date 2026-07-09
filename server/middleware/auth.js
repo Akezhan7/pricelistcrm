@@ -32,7 +32,7 @@ const auth = async (req, res, next) => {
   }
 };
 
-const requireRole = (roles) => {
+const requireRole = (...roles) => {
   return (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ 
@@ -41,7 +41,7 @@ const requireRole = (roles) => {
       });
     }
 
-    const userRoles = Array.isArray(roles) ? roles : [roles];
+    const userRoles = roles.length === 1 && Array.isArray(roles[0]) ? roles[0] : roles;
     if (!userRoles.includes(req.user.role)) {
       return res.status(403).json({ 
         success: false, 

@@ -18,6 +18,7 @@ import { CollectorTasks } from './pages/CollectorTasks';
 import { WarehouseReceipt } from './pages/WarehouseReceipt';
 import { Users } from './pages/Users';
 import { ProductsPage } from './pages/ProductsPage';
+import { ProductWorkflowPage } from './pages/ProductWorkflowPage';
 import { SuppliersPage } from './pages/SuppliersPage';
 import { SupplierDetailsPage } from './pages/SupplierDetailsPage';
 import { PriceListPage } from './pages/PriceListPage';
@@ -94,6 +95,15 @@ const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute>
             <ProductsPage />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/workflow"
+        element={
+          <ProtectedRoute>
+            <ProductWorkflowPage />
           </ProtectedRoute>
         }
       />

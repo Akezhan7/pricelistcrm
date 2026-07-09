@@ -1,11 +1,28 @@
 const express = require('express');
 const { body } = require('express-validator');
 const { auth, requireRole } = require('../middleware/auth');
-const { upload, handleUploadError } = require('../middleware/upload');
+const { upload, uploadProductAsset, handleUploadError } = require('../middleware/upload');
 const {
   getAllProducts,
+  getProductWorkflowQueue,
   getProductById,
+  getProductAssets,
+  createProductAsset,
+  deleteProductAsset,
+  createProductDraft,
   createProduct,
+  assignDesignerToProduct,
+  bulkAssignDesignerToProducts,
+  submitProductContent,
+  submitProductReview,
+  approveProductReview,
+  requestProductRevision,
+  resubmitProductRevision,
+  getProductRevisionRequests,
+  getProductMarketplaceListings,
+  saveProductMarketplaceListing,
+  updateProductMarketplaceListing,
+  markProductPlacementReady,
   updateProduct,
   deleteProduct,
   addSupplierToProduct,
@@ -46,14 +63,49 @@ const productValidation = [
     .withMessage('Описание не должно превышать 1000 символов'),
 ];
 
+const productDraftValidation = [
+  body('name')
+    .trim()
+    .isLength({ min: 1, max: 200 })
+    .withMessage('Product draft name must contain 1 to 200 characters'),
+  body('costPrice')
+    .isFloat({ min: 0 })
+    .withMessage('costPrice must be a non-negative number'),
+  body('supplierId')
+    .optional({ values: 'falsy' })
+    .isInt({ min: 1 })
+    .withMessage('supplierId must be a positive integer'),
+  body('supplierPrice')
+    .optional({ values: 'falsy' })
+    .isFloat({ min: 0 })
+    .withMessage('supplierPrice must be a non-negative number'),
+  body('comment')
+    .optional()
+    .isLength({ max: 1000 })
+    .withMessage('Comment must not exceed 1000 characters'),
+];
+
 // Публичные маршруты (для всех авторизованных пользователей)
 router.get('/', auth, getAllProducts);
 router.get('/low-stock', auth, getLowStockProducts);
 router.get('/stock-analytics', auth, getStockAnalytics);
 router.get('/purchase-suggestions', auth, getPurchaseSuggestions);
+router.get('/workflow', auth, getProductWorkflowQueue);
+router.get('/:id/assets', auth, getProductAssets);
+router.get('/:id/revisions', auth, getProductRevisionRequests);
+router.get('/:id/marketplaces', auth, getProductMarketplaceListings);
 router.get('/:id', auth, getProductById);
 
 // Маршруты для администраторов и менеджеров по закупкам
+router.post('/drafts',
+  auth,
+  requireRole('admin'),
+  upload.single('image'),
+  productDraftValidation,
+  handleUploadError,
+  createProductDraft
+);
+
 router.post('/', 
   auth, 
   requireRole('admin', 'purchase_manager'), 
@@ -79,6 +131,119 @@ router.delete('/:id',
 );
 
 // PUT /api/products/:id/stock - Обновление остатков товара
+router.post('/:id/lifecycle/assign-designer',
+  auth,
+  requireRole('admin'),
+  [
+    body('designerId').isInt({ min: 1 }).withMessage('designerId must be a positive integer'),
+  ],
+  assignDesignerToProduct
+);
+
+router.post('/:id/lifecycle/submit-content',
+  auth,
+  requireRole('admin', 'designer'),
+  submitProductContent
+);
+
+router.post('/:id/lifecycle/submit-review',
+  auth,
+  requireRole('admin', 'designer'),
+  submitProductReview
+);
+
+router.post('/:id/lifecycle/approve',
+  auth,
+  requireRole('admin'),
+  approveProductReview
+);
+
+router.post('/:id/lifecycle/request-revision',
+  auth,
+  requireRole('admin'),
+  uploadProductAsset.single('attachment'),
+  [
+    body('comment')
+      .trim()
+      .isLength({ min: 1, max: 4000 })
+      .withMessage('Revision comment is required'),
+  ],
+  handleUploadError,
+  requestProductRevision
+);
+
+router.post('/:id/lifecycle/resubmit-revision',
+  auth,
+  requireRole('admin', 'designer'),
+  resubmitProductRevision
+);
+
+router.post('/:id/lifecycle/mark-placement-ready',
+  auth,
+  requireRole('admin', 'marketplace_manager'),
+  markProductPlacementReady
+);
+
+router.post('/bulk/assign-designer',
+  auth,
+  requireRole('admin'),
+  [
+    body('productIds')
+      .isArray({ min: 1 })
+      .withMessage('productIds must contain at least one product'),
+    body('productIds.*')
+      .isInt({ min: 1 })
+      .withMessage('productIds must contain positive integer ids'),
+    body('designerId').isInt({ min: 1 }).withMessage('designerId must be a positive integer'),
+  ],
+  bulkAssignDesignerToProducts
+);
+
+router.post('/:id/assets',
+  auth,
+  requireRole('admin', 'designer'),
+  uploadProductAsset.single('asset'),
+  handleUploadError,
+  createProductAsset
+);
+
+router.delete('/:id/assets/:assetId',
+  auth,
+  requireRole('admin', 'designer'),
+  deleteProductAsset
+);
+
+router.post('/:id/marketplaces',
+  auth,
+  requireRole('admin', 'marketplace_manager'),
+  [
+    body('marketplace').optional().isString().isLength({ min: 1, max: 40 }),
+    body('status').optional().isString().isLength({ min: 1, max: 40 }),
+    body('sku').optional({ nullable: true }).isLength({ max: 120 }),
+    body('marketplaceName').optional({ nullable: true }).isLength({ max: 255 }),
+    body('marketplaceArticle').optional({ nullable: true }).isLength({ max: 120 }),
+    body('price').optional({ nullable: true, values: 'falsy' }).isFloat({ min: 0 }),
+    body('url').optional({ nullable: true }).isLength({ max: 500 }),
+    body('description').optional({ nullable: true }).isLength({ max: 4000 }),
+  ],
+  saveProductMarketplaceListing
+);
+
+router.put('/:id/marketplaces/:listingId',
+  auth,
+  requireRole('admin', 'marketplace_manager'),
+  [
+    body('status').optional().isString().isLength({ min: 1, max: 40 }),
+    body('sku').optional({ nullable: true }).isLength({ max: 120 }),
+    body('marketplaceName').optional({ nullable: true }).isLength({ max: 255 }),
+    body('marketplaceArticle').optional({ nullable: true }).isLength({ max: 120 }),
+    body('price').optional({ nullable: true, values: 'falsy' }).isFloat({ min: 0 }),
+    body('url').optional({ nullable: true }).isLength({ max: 500 }),
+    body('description').optional({ nullable: true }).isLength({ max: 4000 }),
+  ],
+  updateProductMarketplaceListing
+);
+
 router.put('/:id/stock',
   auth,
   requireRole('admin', 'warehouse_operator'),

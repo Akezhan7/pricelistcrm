@@ -69,6 +69,30 @@ const receiptFileFilter = (req, file, cb) => {
   }
 };
 
+const productAssetFileFilter = (req, file, cb) => {
+  const allowedMimeTypes = [
+    'image/jpeg',
+    'image/jpg',
+    'image/png',
+    'image/gif',
+    'image/webp',
+    'application/pdf',
+    'application/zip',
+    'application/x-zip-compressed',
+    'application/octet-stream',
+    'application/x-photoshop',
+    'application/photoshop',
+    'image/vnd.adobe.photoshop',
+    'image/photoshop',
+  ];
+
+  if (allowedMimeTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('Недопустимый тип файла для материалов товара'), false);
+  }
+};
+
 const upload = multer({
   storage,
   fileFilter,
@@ -85,13 +109,21 @@ const uploadReceipt = multer({
   },
 });
 
+const uploadProductAsset = multer({
+  storage,
+  fileFilter: productAssetFileFilter,
+  limits: {
+    fileSize: parseInt(process.env.MAX_PSD_FILE_SIZE) || 200 * 1024 * 1024,
+  },
+});
+
 // Middleware для обработки ошибок загрузки
 const handleUploadError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     if (err.code === 'LIMIT_FILE_SIZE') {
       return res.status(400).json({
         success: false,
-        message: 'Файл слишком большой. Максимальный размер: 5MB',
+        message: 'Файл слишком большой для выбранного типа загрузки',
       });
     }
     if (err.code === 'LIMIT_FILE_COUNT') {
@@ -121,5 +153,6 @@ const handleUploadError = (err, req, res, next) => {
 module.exports = {
   upload,
   uploadReceipt,
+  uploadProductAsset,
   handleUploadError,
 };

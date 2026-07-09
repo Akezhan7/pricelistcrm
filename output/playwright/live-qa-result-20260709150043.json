@@ -1,0 +1,31 @@
+{
+  "runId": "20260709150043",
+  "productName": "QA Lifecycle 20260709150043",
+  "productSku": "QA-KASPI-20260709150043",
+  "generatedAt": "2026-07-09T15:00:51.101Z",
+  "fatalError": "locator.selectOption: Error: strict mode violation: getByLabel('Дизайнер') resolved to 2 elements:\n    1) <div role=\"dialog\" tabindex=\"-1\" aria-modal=\"true\" aria-labelledby=\"«rg»\" class=\"relative flex flex-col bg-surface-overlay shadow-xl pointer-events-auto w-full max-h-[92vh] sm:max-h-[90vh] overflow-hidden border-t sm:border border-border-subtle rounded-t-2xl sm:rounded-modal animate-modal-in max-sm:h-auto max-sm:max-h-[92vh] max-w-sm\">…</div> aka getByRole('dialog', { name: 'Передать дизайнеру' })\n    2) <select required=\"\" id=\"select-дизайнер\" class=\"w-full min-h-11 px-3 py-2.5 text-body rounded-lg bg-brand-white border border-border-input text-brand-black shadow-sm transition-[border-color,box-shadow,background-color] duration-200 hover:border-text-muted/60 focus:outline-none focus:border-brand-yellow focus:ring-2 focus:ring-brand-yellow/20 disabled:bg-surface-inset disabled:border-border-subtle disabled:text-text-muted disabled:shadow-none disabled:cursor-not-allowed\">…</select> aka getByLabel('Дизайнер', { exact: true })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Дизайнер')\u001b[22m\n",
+  "steps": [
+    {
+      "name": "Admin can log in",
+      "status": "passed",
+      "durationMs": 2470
+    },
+    {
+      "name": "Admin can create product draft from UI",
+      "status": "passed",
+      "durationMs": 3305
+    },
+    {
+      "name": "Admin can select new draft and assign designer from UI",
+      "status": "failed",
+      "durationMs": 1832,
+      "error": "locator.selectOption: Error: strict mode violation: getByLabel('Дизайнер') resolved to 2 elements:\n    1) <div role=\"dialog\" tabindex=\"-1\" aria-modal=\"true\" aria-labelledby=\"«rg»\" class=\"relative flex flex-col bg-surface-overlay shadow-xl pointer-events-auto w-full max-h-[92vh] sm:max-h-[90vh] overflow-hidden border-t sm:border border-border-subtle rounded-t-2xl sm:rounded-modal animate-modal-in max-sm:h-auto max-sm:max-h-[92vh] max-w-sm\">…</div> aka getByRole('dialog', { name: 'Передать дизайнеру' })\n    2) <select required=\"\" id=\"select-дизайнер\" class=\"w-full min-h-11 px-3 py-2.5 text-body rounded-lg bg-brand-white border border-border-input text-brand-black shadow-sm transition-[border-color,box-shadow,background-color] duration-200 hover:border-text-muted/60 focus:outline-none focus:border-brand-yellow focus:ring-2 focus:ring-brand-yellow/20 disabled:bg-surface-inset disabled:border-border-subtle disabled:text-text-muted disabled:shadow-none disabled:cursor-not-allowed\">…</select> aka getByLabel('Дизайнер', { exact: true })\n\nCall log:\n\u001b[2m  - waiting for getByLabel('Дизайнер')\u001b[22m\n"
+    }
+  ],
+  "findings": [],
+  "screenshots": [
+    "output/playwright/01-login-admin.png",
+    "output/playwright/02-draft-modal-filled.png",
+    "output/playwright/03-new-product-filtered.png"
+  ]
+}

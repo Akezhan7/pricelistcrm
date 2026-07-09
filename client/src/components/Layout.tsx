@@ -18,6 +18,7 @@ const PAGE_TITLES: Record<string, string> = {
   '/dashboard': 'Главная',
   '/orders': 'Заявки',
   '/products': 'Товары',
+  '/workflow': 'Очередь',
   '/suppliers': 'Поставщики',
   '/price-list': 'Прайс',
   '/stock': 'Остатки на складе',

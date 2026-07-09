@@ -1,5 +1,40 @@
-const { Product, Supplier, ProductSupplier, Category } = require('../models');
+const {
+  Product,
+  ProductMarketplaceListing,
+  Supplier,
+  ProductSupplier,
+  Category,
+} = require('../models');
 const { Op } = require('sequelize');
+
+const KASPI_MARKETPLACE = 'kaspi';
+
+const kaspiListingInclude = {
+  model: ProductMarketplaceListing,
+  as: 'marketplaceListings',
+  required: false,
+  where: { marketplace: KASPI_MARKETPLACE },
+  attributes: ['id', 'marketplace', 'sku', 'marketplaceName', 'price', 'status'],
+};
+
+const getKaspiListing = (product) => {
+  const listings = product.marketplaceListings || [];
+  return listings.find((listing) => listing.marketplace === KASPI_MARKETPLACE) || listings[0] || null;
+};
+
+const getKaspiExportFields = (product) => {
+  const listing = getKaspiListing(product);
+  return {
+    sku: listing?.sku || product.kaspiArticle,
+    name: listing?.marketplaceName || product.kaspiName,
+    price: listing?.price ?? product.sellingPrice,
+  };
+};
+
+const hasKaspiExportData = (product) => {
+  const fields = getKaspiExportFields(product);
+  return Boolean(String(fields.sku || '').trim() && String(fields.name || '').trim());
+};
 
 /**
  * Экспорт товаров для Kaspi/ProfitBot в формате JSON
@@ -39,8 +74,16 @@ const exportKaspiJSON = async (req, res) => {
           as: 'category',
           attributes: ['id', 'name'],
         },
+        kaspiListingInclude,
       ],
       order: [['kaspiName', 'ASC']],
+    });
+
+    products.forEach((product) => {
+      const kaspi = getKaspiExportFields(product);
+      product.setDataValue('kaspiArticle', kaspi.sku);
+      product.setDataValue('kaspiName', kaspi.name);
+      product.setDataValue('sellingPrice', kaspi.price);
     });
 
     // Форматируем данные для Kaspi/ProfitBot
@@ -110,11 +153,19 @@ const exportKaspiCSV = async (req, res) => {
           as: 'category',
           attributes: ['name'],
         },
+        kaspiListingInclude,
       ],
       order: [['kaspiName', 'ASC']],
     });
 
     // Генерируем CSV
+    products.forEach((product) => {
+      const kaspi = getKaspiExportFields(product);
+      product.setDataValue('kaspiArticle', kaspi.sku);
+      product.setDataValue('kaspiName', kaspi.name);
+      product.setDataValue('sellingPrice', kaspi.price);
+    });
+
     let csv = 'SKU,Name,Price,Quantity,Available,Image URL,Category\n';
 
     products

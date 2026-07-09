@@ -8,7 +8,9 @@ export type UserRole =
   | 'purchase_manager' 
   | 'warehouse_operator' 
   | 'driver' 
-  | 'collector';
+  | 'collector'
+  | 'designer'
+  | 'marketplace_manager';
 
 export type User = {
   id: number;

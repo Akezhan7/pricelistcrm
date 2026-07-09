@@ -1,3 +1,21 @@
+export type ProductLifecycleStatus =
+  | 'new'
+  | 'assigned_to_designer'
+  | 'content_created'
+  | 'review'
+  | 'revision'
+  | 'marketplace'
+  | 'purchase'
+  | 'warehouse'
+  | 'in_sale'
+  | 'archived';
+
+export interface LifecycleUserRef {
+  id: number;
+  name: string;
+  email?: string;
+}
+
 export interface Product {
   id: number;
   name: string;
@@ -13,9 +31,113 @@ export interface Product {
   sellingPrice: number;
   image?: string;
   description?: string;
+  lifecycleStatus?: ProductLifecycleStatus;
+  lifecycleStartedAt?: string | null;
+  lifecycleCompletedAt?: string | null;
+  assignedToUserId?: number | null;
+  assignedTo?: LifecycleUserRef;
+  designerId?: number | null;
+  designer?: LifecycleUserRef;
+  marketplaceManagerId?: number | null;
+  marketplaceManager?: LifecycleUserRef;
+  createdByUserId?: number | null;
+  createdByUser?: LifecycleUserRef;
+  reviewedByUserId?: number | null;
+  reviewedByUser?: LifecycleUserRef;
+  kpiWeight?: number | string | null;
+  launchNotes?: string | null;
   isActive: boolean;
   suppliers?: SupplierWithPrice[];
   variations?: ProductVariation[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductWorkflowAction {
+  nextActionKey: string;
+  nextActionLabel: string;
+  nextActionEnabled: boolean;
+  ownerLabel: string;
+}
+
+export interface ProductWorkflowItem extends Product {
+  workflow: ProductWorkflowAction;
+  viewerScope: string;
+}
+
+export type ProductAssetType =
+  | 'product_photo'
+  | 'slide_jpg'
+  | 'psd_source'
+  | 'revision_attachment'
+  | 'patent_file'
+  | 'other';
+
+export interface ProductAsset {
+  id: number;
+  productId: number;
+  uploadedBy?: number | null;
+  uploader?: LifecycleUserRef;
+  revisionRequestId?: number | null;
+  assetType: ProductAssetType;
+  filePath: string;
+  originalName?: string | null;
+  mimeType?: string | null;
+  fileSize?: number | null;
+  sortOrder: number;
+  notes?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ProductRevisionStatus = 'open' | 'resolved' | 'cancelled';
+
+export interface ProductRevisionRequest {
+  id: number;
+  productId: number;
+  requestedBy: number;
+  requester?: LifecycleUserRef;
+  assignedDesignerId?: number | null;
+  assignedDesigner?: LifecycleUserRef;
+  comment: string;
+  status: ProductRevisionStatus;
+  resolvedAt?: string | null;
+  attachments?: ProductAsset[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type MarketplaceKey =
+  | 'kaspi'
+  | 'halyk'
+  | 'forte'
+  | 'ozon'
+  | 'wildberries'
+  | 'other';
+
+export type MarketplaceListingStatus =
+  | 'not_started'
+  | 'placing'
+  | 'moderation'
+  | 'published'
+  | 'in_sale'
+  | 'blocked'
+  | 'removed';
+
+export interface ProductMarketplaceListing {
+  id: number;
+  productId: number;
+  marketplace: MarketplaceKey;
+  status: MarketplaceListingStatus;
+  sku?: string | null;
+  marketplaceArticle?: string | null;
+  marketplaceName?: string | null;
+  price?: string | number | null;
+  url?: string | null;
+  description?: string | null;
+  managedBy?: number | null;
+  manager?: LifecycleUserRef;
   createdAt: string;
   updatedAt: string;
 }

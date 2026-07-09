@@ -34,6 +34,8 @@ interface User {
 
 const ROLES: { value: string; label: string; badge: BadgeVariant }[] = [
   { value: 'admin', label: 'Администратор', badge: 'danger' },
+  { value: 'designer', label: 'Дизайнер', badge: 'success' },
+  { value: 'marketplace_manager', label: 'Менеджер маркетплейсов', badge: 'info' },
   { value: 'purchase_manager', label: 'Менеджер по закупкам', badge: 'info' },
   { value: 'warehouse_operator', label: 'Оператор склада', badge: 'success' },
   { value: 'collector', label: 'Сборщик', badge: 'warning' },

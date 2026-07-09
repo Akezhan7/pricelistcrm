@@ -2,6 +2,18 @@ const { DataTypes } = require('sequelize');
 const bcrypt = require('bcryptjs');
 const sequelize = require('../config/database');
 
+const USER_ROLES = [
+  'admin',
+  'operator',
+  'accountant',
+  'purchase_manager',
+  'warehouse_operator',
+  'driver',
+  'collector',
+  'designer',
+  'marketplace_manager',
+];
+
 const User = sequelize.define('User', {
   id: {
     type: DataTypes.INTEGER,
@@ -32,7 +44,7 @@ const User = sequelize.define('User', {
     },
   },
   role: {
-    type: DataTypes.ENUM('admin', 'operator', 'accountant', 'purchase_manager', 'warehouse_operator', 'driver', 'collector'),
+    type: DataTypes.ENUM(...USER_ROLES),
     allowNull: false,
     defaultValue: 'operator',
     comment: 'Роль: admin, operator, accountant (бухгалтер), purchase_manager (менеджер по закупкам), warehouse_operator (оператор склада), driver (водитель), collector (сборщик)',

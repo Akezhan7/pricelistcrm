@@ -18,6 +18,10 @@ const CollectorTask = require('./CollectorTask');
 const WarehouseReceipt = require('./WarehouseReceipt');
 const WarehouseReceiptItem = require('./WarehouseReceiptItem');
 const StockHistory = require('./StockHistory');
+const ProductActionHistory = require('./ProductActionHistory');
+const ProductAsset = require('./ProductAsset');
+const ProductRevisionRequest = require('./ProductRevisionRequest');
+const ProductMarketplaceListing = require('./ProductMarketplaceListing');
 
 // Связи между рынками и секторами
 Market.hasMany(Sector, {
@@ -295,6 +299,66 @@ Product.belongsTo(Category, {
   as: 'category',
 });
 
+Product.belongsTo(User, {
+  foreignKey: 'assignedToUserId',
+  as: 'assignedTo',
+  onDelete: 'SET NULL',
+  onUpdate: 'CASCADE',
+});
+
+User.hasMany(Product, {
+  foreignKey: 'assignedToUserId',
+  as: 'assignedProducts',
+});
+
+Product.belongsTo(User, {
+  foreignKey: 'designerId',
+  as: 'designer',
+  onDelete: 'SET NULL',
+  onUpdate: 'CASCADE',
+});
+
+User.hasMany(Product, {
+  foreignKey: 'designerId',
+  as: 'designedProducts',
+});
+
+Product.belongsTo(User, {
+  foreignKey: 'marketplaceManagerId',
+  as: 'marketplaceManager',
+  onDelete: 'SET NULL',
+  onUpdate: 'CASCADE',
+});
+
+User.hasMany(Product, {
+  foreignKey: 'marketplaceManagerId',
+  as: 'marketplaceManagedProducts',
+});
+
+Product.belongsTo(User, {
+  foreignKey: 'createdByUserId',
+  as: 'createdByUser',
+  onDelete: 'SET NULL',
+  onUpdate: 'CASCADE',
+});
+
+User.hasMany(Product, {
+  foreignKey: 'createdByUserId',
+  as: 'createdProducts',
+});
+
+Product.belongsTo(User, {
+  foreignKey: 'reviewedByUserId',
+  as: 'reviewedByUser',
+  onDelete: 'SET NULL',
+  onUpdate: 'CASCADE',
+});
+
+User.hasMany(Product, {
+  foreignKey: 'reviewedByUserId',
+  as: 'reviewedProducts',
+});
+
 Category.hasMany(Category, {
   foreignKey: 'parentId',
   as: 'subcategories',
@@ -444,6 +508,130 @@ Order.hasMany(StockHistory, {
   as: 'stockChanges',
 });
 
+// Связи для lifecycle-истории товара
+Product.hasMany(ProductActionHistory, {
+  foreignKey: 'productId',
+  as: 'actionHistory',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE',
+});
+
+ProductActionHistory.belongsTo(Product, {
+  foreignKey: 'productId',
+  as: 'product',
+});
+
+ProductActionHistory.belongsTo(User, {
+  foreignKey: 'actorId',
+  as: 'actor',
+  onDelete: 'SET NULL',
+  onUpdate: 'CASCADE',
+});
+
+User.hasMany(ProductActionHistory, {
+  foreignKey: 'actorId',
+  as: 'productActionHistory',
+});
+
+// Связи для файлов карточки товара
+Product.hasMany(ProductAsset, {
+  foreignKey: 'productId',
+  as: 'assets',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE',
+});
+
+ProductAsset.belongsTo(Product, {
+  foreignKey: 'productId',
+  as: 'product',
+});
+
+ProductAsset.belongsTo(User, {
+  foreignKey: 'uploadedBy',
+  as: 'uploader',
+  onDelete: 'SET NULL',
+  onUpdate: 'CASCADE',
+});
+
+User.hasMany(ProductAsset, {
+  foreignKey: 'uploadedBy',
+  as: 'uploadedProductAssets',
+});
+
+// Revision requests for review corrections
+Product.hasMany(ProductRevisionRequest, {
+  foreignKey: 'productId',
+  as: 'revisionRequests',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE',
+});
+
+ProductRevisionRequest.belongsTo(Product, {
+  foreignKey: 'productId',
+  as: 'product',
+});
+
+ProductRevisionRequest.belongsTo(User, {
+  foreignKey: 'requestedBy',
+  as: 'requester',
+  onDelete: 'RESTRICT',
+  onUpdate: 'CASCADE',
+});
+
+User.hasMany(ProductRevisionRequest, {
+  foreignKey: 'requestedBy',
+  as: 'requestedProductRevisions',
+});
+
+ProductRevisionRequest.belongsTo(User, {
+  foreignKey: 'assignedDesignerId',
+  as: 'assignedDesigner',
+  onDelete: 'SET NULL',
+  onUpdate: 'CASCADE',
+});
+
+User.hasMany(ProductRevisionRequest, {
+  foreignKey: 'assignedDesignerId',
+  as: 'assignedProductRevisions',
+});
+
+ProductRevisionRequest.hasMany(ProductAsset, {
+  foreignKey: 'revisionRequestId',
+  as: 'attachments',
+  onDelete: 'SET NULL',
+  onUpdate: 'CASCADE',
+});
+
+ProductAsset.belongsTo(ProductRevisionRequest, {
+  foreignKey: 'revisionRequestId',
+  as: 'revisionRequest',
+});
+
+// Marketplace listings for Kaspi and future marketplaces
+Product.hasMany(ProductMarketplaceListing, {
+  foreignKey: 'productId',
+  as: 'marketplaceListings',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE',
+});
+
+ProductMarketplaceListing.belongsTo(Product, {
+  foreignKey: 'productId',
+  as: 'product',
+});
+
+ProductMarketplaceListing.belongsTo(User, {
+  foreignKey: 'managedBy',
+  as: 'manager',
+  onDelete: 'SET NULL',
+  onUpdate: 'CASCADE',
+});
+
+User.hasMany(ProductMarketplaceListing, {
+  foreignKey: 'managedBy',
+  as: 'managedMarketplaceListings',
+});
+
 module.exports = {
   Market,
   Sector,
@@ -464,4 +652,8 @@ module.exports = {
   WarehouseReceipt,
   WarehouseReceiptItem,
   StockHistory,
+  ProductActionHistory,
+  ProductAsset,
+  ProductRevisionRequest,
+  ProductMarketplaceListing,
 };

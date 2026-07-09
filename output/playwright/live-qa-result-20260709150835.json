@@ -1,0 +1,51 @@
+{
+  "runId": "20260709150835",
+  "productName": "QA Lifecycle 20260709150835",
+  "productSku": "QA-KASPI-20260709150835",
+  "generatedAt": "2026-07-09T15:08:57.610Z",
+  "fatalError": "locator.click: Error: strict mode violation: getByRole('button', { name: /Передать на проверку/ }) resolved to 2 elements:\n    1) <button type=\"button\" class=\"inline-flex items-center justify-center transition-colors duration-200 ease-product focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none bg-brand-yellow text-brand-black font-semibold hover:bg-brand-yellow-hover active:scale-[0.98] focus-visible:ring-brand-yellow h-8 min-h-8 px-3 text-caption gap-1.5 rounded-lg\">…</button> aka locator('#root').getByRole('button', { name: 'Передать на проверку' })\n    2) <button type=\"button\" class=\"inline-flex items-center justify-center transition-colors duration-200 ease-product focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none bg-brand-yellow text-brand-black font-semibold hover:bg-brand-yellow-hover active:scale-[0.98] focus-visible:ring-brand-yellow h-10 min-h-10 px-4 text-body gap-2 rounded-lg\">…</button> aka getByLabel('Проверка карточки').getByRole('button', { name: 'Передать на проверку' })\n\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /Передать на проверку/ })\u001b[22m\n",
+  "steps": [
+    {
+      "name": "Admin can log in",
+      "status": "passed",
+      "durationMs": 2563
+    },
+    {
+      "name": "Admin can create product draft from UI",
+      "status": "passed",
+      "durationMs": 3362
+    },
+    {
+      "name": "Admin can select new draft and assign designer from UI",
+      "status": "passed",
+      "durationMs": 3740
+    },
+    {
+      "name": "Designer can upload product assets and mark content created",
+      "status": "passed",
+      "durationMs": 10005
+    },
+    {
+      "name": "Designer can send content to review",
+      "status": "failed",
+      "durationMs": 2605,
+      "error": "locator.click: Error: strict mode violation: getByRole('button', { name: /Передать на проверку/ }) resolved to 2 elements:\n    1) <button type=\"button\" class=\"inline-flex items-center justify-center transition-colors duration-200 ease-product focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none bg-brand-yellow text-brand-black font-semibold hover:bg-brand-yellow-hover active:scale-[0.98] focus-visible:ring-brand-yellow h-8 min-h-8 px-3 text-caption gap-1.5 rounded-lg\">…</button> aka locator('#root').getByRole('button', { name: 'Передать на проверку' })\n    2) <button type=\"button\" class=\"inline-flex items-center justify-center transition-colors duration-200 ease-product focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none bg-brand-yellow text-brand-black font-semibold hover:bg-brand-yellow-hover active:scale-[0.98] focus-visible:ring-brand-yellow h-10 min-h-10 px-4 text-body gap-2 rounded-lg\">…</button> aka getByLabel('Проверка карточки').getByRole('button', { name: 'Передать на проверку' })\n\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /Передать на проверку/ })\u001b[22m\n"
+    }
+  ],
+  "findings": [],
+  "screenshots": [
+    "output/playwright/01-login-admin.png",
+    "output/playwright/02-draft-modal-filled.png",
+    "output/playwright/03-new-product-filtered.png",
+    "output/playwright/04-assign-designer-modal.png",
+    "output/playwright/05-login-designer.png",
+    "output/playwright/06-designer-workflow-assigned.png",
+    "output/playwright/07-designer-assets-modal-open.png",
+    "output/playwright/08-asset-photo-selected.png",
+    "output/playwright/09-asset-jpg-selected.png",
+    "output/playwright/10-asset-psd-selected.png",
+    "output/playwright/11-assets-after-uploads.png",
+    "output/playwright/12-designer-workflow-content-created.png",
+    "output/playwright/13-designer-submit-review-modal.png"
+  ]
+}

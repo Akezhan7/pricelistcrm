@@ -1,0 +1,30 @@
+{
+  "runId": "20260709145955",
+  "productName": "QA Lifecycle 20260709145955",
+  "productSku": "QA-KASPI-20260709145955",
+  "generatedAt": "2026-07-09T15:00:02.472Z",
+  "fatalError": "locator.fill: Error: strict mode violation: locator('input[placeholder*=\"Поиск\"]') resolved to 2 elements:\n    1) <input value=\"\" type=\"text\" placeholder=\"Поиск...\" class=\"w-full min-h-11 px-3 py-2.5 text-body rounded-lg bg-brand-white border border-border-input text-brand-black shadow-sm placeholder:text-text-muted transition-[border-color,box-shadow,background-color] duration-200 hover:border-text-muted/60 focus:outline-none focus:border-brand-yellow focus:ring-2 focus:ring-brand-yellow/20 disabled:bg-surface-inset disabled:border-border-subtle disabled:text-text-muted disabled:shadow-none disabled:cursor-not-…/> aka getByRole('textbox', { name: 'Поиск...' })\n    2) <input value=\"\" type=\"text\" placeholder=\"Поиск по названию или артикулу...\" class=\"w-full min-h-11 px-3 py-2.5 text-body rounded-lg bg-brand-white border border-border-input text-brand-black shadow-sm placeholder:text-text-muted transition-[border-color,box-shadow,background-color] duration-200 hover:border-text-muted/60 focus:outline-none focus:border-brand-yellow focus:ring-2 focus:ring-brand-yellow/20 disabled:bg-surface-inset disabled:border-border-subtle disabled:text-text-muted disabled:shadow-…/> aka getByRole('textbox', { name: 'Поиск по названию или артикулу' })\n\nCall log:\n\u001b[2m  - waiting for locator('input[placeholder*=\"Поиск\"]')\u001b[22m\n",
+  "steps": [
+    {
+      "name": "Admin can log in",
+      "status": "passed",
+      "durationMs": 2649
+    },
+    {
+      "name": "Admin can create product draft from UI",
+      "status": "passed",
+      "durationMs": 3383
+    },
+    {
+      "name": "Admin can select new draft and assign designer from UI",
+      "status": "failed",
+      "durationMs": 862,
+      "error": "locator.fill: Error: strict mode violation: locator('input[placeholder*=\"Поиск\"]') resolved to 2 elements:\n    1) <input value=\"\" type=\"text\" placeholder=\"Поиск...\" class=\"w-full min-h-11 px-3 py-2.5 text-body rounded-lg bg-brand-white border border-border-input text-brand-black shadow-sm placeholder:text-text-muted transition-[border-color,box-shadow,background-color] duration-200 hover:border-text-muted/60 focus:outline-none focus:border-brand-yellow focus:ring-2 focus:ring-brand-yellow/20 disabled:bg-surface-inset disabled:border-border-subtle disabled:text-text-muted disabled:shadow-none disabled:cursor-not-…/> aka getByRole('textbox', { name: 'Поиск...' })\n    2) <input value=\"\" type=\"text\" placeholder=\"Поиск по названию или артикулу...\" class=\"w-full min-h-11 px-3 py-2.5 text-body rounded-lg bg-brand-white border border-border-input text-brand-black shadow-sm placeholder:text-text-muted transition-[border-color,box-shadow,background-color] duration-200 hover:border-text-muted/60 focus:outline-none focus:border-brand-yellow focus:ring-2 focus:ring-brand-yellow/20 disabled:bg-surface-inset disabled:border-border-subtle disabled:text-text-muted disabled:shadow-…/> aka getByRole('textbox', { name: 'Поиск по названию или артикулу' })\n\nCall log:\n\u001b[2m  - waiting for locator('input[placeholder*=\"Поиск\"]')\u001b[22m\n"
+    }
+  ],
+  "findings": [],
+  "screenshots": [
+    "output/playwright/01-login-admin.png",
+    "output/playwright/02-draft-modal-filled.png"
+  ]
+}

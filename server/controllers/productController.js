@@ -1,18 +1,222 @@
 const { validationResult } = require('express-validator');
 const { Op } = require('sequelize');
-const { Product, Supplier, ProductSupplier, ProductVariation, PriceHistory, Category, sequelize } = require('../models');
+const {
+  Product,
+  Supplier,
+  ProductSupplier,
+  ProductVariation,
+  PriceHistory,
+  Category,
+  User,
+  ProductActionHistory,
+  ProductAsset,
+  ProductRevisionRequest,
+  ProductMarketplaceListing,
+  sequelize,
+} = require('../models');
 const path = require('path');
 const fs = require('fs').promises;
 const { createPriceHistoryRecord } = require('./priceHistoryController');
+const {
+  PRODUCT_LIFECYCLE_ACTIONS,
+  PRODUCT_LIFECYCLE_STATUS_VALUES,
+} = require('../constants/productLifecycle');
+const {
+  createLifecycleActionUpdate,
+} = require('../services/productLifecycleService');
+const {
+  buildBulkAssignDesignerPlan,
+  buildDesignerAssignedHistoryEntry,
+} = require('../services/productBulkLifecycleService');
+const {
+  buildProductDraftData,
+} = require('../services/productDraftService');
+const {
+  PRODUCT_ASSET_TYPES,
+  buildProductAssetData,
+} = require('../services/productAssetService');
+const {
+  buildProductWorkflowQuery,
+  resolveProductWorkflowItem,
+} = require('../services/productWorkflowService');
+const {
+  PRODUCT_REVISION_STATUSES,
+  buildApproveReviewPlan,
+  buildRequestRevisionPlan,
+  buildResubmitRevisionPlan,
+  buildSubmitReviewPlan,
+} = require('../services/productReviewService');
+const {
+  MARKETPLACE_KEYS,
+  buildKaspiLegacyProductUpdate,
+  buildMarketplaceListingData,
+  buildMarketplaceListingUpdate,
+  buildMarketplacePlacementReadyPlan,
+} = require('../services/productMarketplaceService');
+
+const productUserInclude = [
+  {
+    model: User,
+    as: 'assignedTo',
+    attributes: ['id', 'name', 'email', 'role'],
+    required: false,
+  },
+  {
+    model: User,
+    as: 'designer',
+    attributes: ['id', 'name', 'email', 'role'],
+    required: false,
+  },
+  {
+    model: User,
+    as: 'marketplaceManager',
+    attributes: ['id', 'name', 'email', 'role'],
+    required: false,
+  },
+];
+
+const productAssetInclude = [
+  {
+    model: User,
+    as: 'uploader',
+    attributes: ['id', 'name', 'email', 'role'],
+    required: false,
+  },
+];
+
+const productRevisionInclude = [
+  {
+    model: User,
+    as: 'requester',
+    attributes: ['id', 'name', 'email', 'role'],
+    required: false,
+  },
+  {
+    model: User,
+    as: 'assignedDesigner',
+    attributes: ['id', 'name', 'email', 'role'],
+    required: false,
+  },
+  {
+    model: ProductAsset,
+    as: 'attachments',
+    where: { isActive: true },
+    required: false,
+    include: productAssetInclude,
+  },
+];
+
+const productMarketplaceInclude = [
+  {
+    model: User,
+    as: 'manager',
+    attributes: ['id', 'name', 'email', 'role'],
+    required: false,
+  },
+];
+
+async function removeUploadedFile(file) {
+  if (!file?.path) return;
+
+  try {
+    await fs.unlink(file.path);
+  } catch {
+    // Soft failure: database state is the source of truth, orphan cleanup can be handled separately.
+  }
+}
+
+function canManageProductAssets(user, product) {
+  if (!user || !product) return false;
+  if (user.role === 'admin') return true;
+
+  return user.role === 'designer' && Number(product.designerId) === Number(user.id);
+}
+
+function canManageMarketplaceListings(user) {
+  return user?.role === 'admin' || user?.role === 'marketplace_manager';
+}
+
+async function syncKaspiLegacyFields({
+  product,
+  listingData,
+  actor,
+  transaction,
+  now = new Date(),
+}) {
+  const legacyUpdate = buildKaspiLegacyProductUpdate(listingData);
+  const legacyKeys = Object.keys(legacyUpdate);
+
+  if (legacyKeys.length === 0) return;
+
+  const oldSellingPrice = parseFloat(product.sellingPrice);
+  await product.update(legacyUpdate, { transaction });
+
+  if (
+    Object.prototype.hasOwnProperty.call(legacyUpdate, 'sellingPrice') &&
+    parseFloat(legacyUpdate.sellingPrice) !== oldSellingPrice
+  ) {
+    await PriceHistory.create(
+      {
+        productId: product.id,
+        oldPrice: oldSellingPrice,
+        newPrice: legacyUpdate.sellingPrice,
+        priceType: 'sellingPrice',
+        changeReason: 'Marketplace listing update',
+        changedBy: actor.id,
+        changedAt: now,
+      },
+      { transaction }
+    );
+  }
+}
+
+async function getNextDraftSequenceForDate(date) {
+  const datePrefix = generateDraftDatePrefix(date);
+  const draftPrefix = `DRAFT-${datePrefix}-`;
+
+  const lastDraft = await Product.findOne({
+    where: {
+      article: {
+        [Op.like]: `${draftPrefix}%`,
+      },
+    },
+    order: [['article', 'DESC']],
+    attributes: ['article'],
+  });
+
+  if (!lastDraft) return 1;
+
+  const lastSequence = Number(String(lastDraft.article).replace(draftPrefix, ''));
+  return Number.isInteger(lastSequence) ? lastSequence + 1 : 1;
+}
+
+function generateDraftDatePrefix(date) {
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+
+  return `${year}${month}${day}`;
+}
 
 const getAllProducts = async (req, res) => {
   try {
-    const { search, page = 1, limit = 50, excludeSupplierId } = req.query;
+    const { search, page = 1, limit = 50, excludeSupplierId, lifecycleStatus } = req.query;
     const offset = (page - 1) * limit;
 
     const whereClause = {
       isActive: true,
     };
+
+    if (lifecycleStatus) {
+      if (!PRODUCT_LIFECYCLE_STATUS_VALUES.includes(lifecycleStatus)) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid lifecycle status',
+        });
+      }
+
+      whereClause.lifecycleStatus = lifecycleStatus;
+    }
 
     if (excludeSupplierId) {
       const supplierId = parseInt(excludeSupplierId, 10);
@@ -58,6 +262,7 @@ const getAllProducts = async (req, res) => {
           attributes: ['id', 'name'],
           required: false,
         },
+        ...productUserInclude,
       ],
       distinct: true,
       subQuery: false,
@@ -87,6 +292,84 @@ const getAllProducts = async (req, res) => {
   }
 };
 
+const getProductWorkflowQueue = async (req, res) => {
+  try {
+    const { search, page = 1, limit = 50 } = req.query;
+    const parsedPage = Math.max(parseInt(page, 10) || 1, 1);
+    const parsedLimit = Math.min(Math.max(parseInt(limit, 10) || 50, 1), 100);
+    const offset = (parsedPage - 1) * parsedLimit;
+
+    const workflowQuery = buildProductWorkflowQuery({
+      user: req.user,
+      filters: req.query,
+    });
+
+    const whereClause = { ...workflowQuery.where };
+    if (search) {
+      whereClause[Op.or] = [
+        { name: { [Op.like]: `%${search}%` } },
+        { article: { [Op.like]: `%${search}%` } },
+        { internalName: { [Op.like]: `%${search}%` } },
+        { kaspiName: { [Op.like]: `%${search}%` } },
+        { kaspiArticle: { [Op.like]: `%${search}%` } },
+      ];
+    }
+
+    const products = await Product.findAndCountAll({
+      where: whereClause,
+      include: [
+        {
+          model: Supplier,
+          as: 'suppliers',
+          through: {
+            model: ProductSupplier,
+            attributes: ['supplierPrice', 'quantity', 'isAvailable', 'notes'],
+          },
+          where: { isActive: true },
+          required: false,
+        },
+        {
+          model: Category,
+          as: 'category',
+          attributes: ['id', 'name'],
+          required: false,
+        },
+        ...productUserInclude,
+      ],
+      distinct: true,
+      subQuery: false,
+      limit: parsedLimit,
+      offset,
+      order: [['updatedAt', 'DESC']],
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        products: products.rows.map((product) =>
+          resolveProductWorkflowItem({ product, user: req.user })
+        ),
+        workflow: {
+          scope: workflowQuery.scope,
+          canUseExtendedFilters: workflowQuery.canUseExtendedFilters,
+        },
+        pagination: {
+          total: products.count,
+          page: parsedPage,
+          limit: parsedLimit,
+          totalPages: Math.ceil(products.count / parsedLimit),
+        },
+      },
+    });
+  } catch (error) {
+    console.error('Ошибка получения очереди товаров:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Ошибка сервера при получении очереди товаров',
+    });
+  }
+};
+
 const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -104,6 +387,7 @@ const getProductById = async (req, res) => {
           where: { isActive: true },
           required: false,
         },
+        ...productUserInclude,
       ],
     });
 
@@ -123,6 +407,1455 @@ const getProductById = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Ошибка сервера при получении товара',
+    });
+  }
+};
+
+const getProductAssets = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const product = await Product.findOne({ where: { id, isActive: true } });
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    const assets = await ProductAsset.findAll({
+      where: {
+        productId: product.id,
+        isActive: true,
+      },
+      include: productAssetInclude,
+      order: [
+        ['assetType', 'ASC'],
+        ['sortOrder', 'ASC'],
+        ['createdAt', 'DESC'],
+      ],
+    });
+
+    return res.json({
+      success: true,
+      data: { assets },
+    });
+  } catch (error) {
+    console.error('Error loading product assets:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while loading product assets',
+    });
+  }
+};
+
+const createProductAsset = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
+  try {
+    const { id } = req.params;
+    const { assetType, notes, sortOrder } = req.body;
+
+    const product = await Product.findOne({
+      where: { id, isActive: true },
+      transaction,
+      lock: true,
+    });
+
+    if (!product) {
+      await transaction.rollback();
+      transactionFinished = true;
+      await removeUploadedFile(req.file);
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    if (!canManageProductAssets(req.user, product)) {
+      await transaction.rollback();
+      transactionFinished = true;
+      await removeUploadedFile(req.file);
+      return res.status(403).json({
+        success: false,
+        message: 'Only admin or assigned designer can upload product assets',
+      });
+    }
+
+    const assetData = buildProductAssetData({
+      productId: product.id,
+      uploadedBy: req.user.id,
+      assetType,
+      file: req.file,
+      notes,
+      sortOrder,
+    });
+
+    const asset = await ProductAsset.create(assetData, { transaction });
+
+    if (asset.assetType === PRODUCT_ASSET_TYPES.PRODUCT_PHOTO && !product.image) {
+      await product.update({ image: asset.filePath }, { transaction });
+    }
+
+    await ProductActionHistory.create(
+      {
+        productId: product.id,
+        actorId: req.user.id,
+        actionType: 'content_uploaded',
+        fromStatus: product.lifecycleStatus,
+        toStatus: product.lifecycleStatus,
+        message: 'Product content asset uploaded',
+        metadata: {
+          assetId: asset.id,
+          assetType: asset.assetType,
+          filePath: asset.filePath,
+          originalName: asset.originalName,
+        },
+        createdAt: new Date(),
+      },
+      { transaction }
+    );
+
+    await transaction.commit();
+    transactionFinished = true;
+
+    const createdAsset = await ProductAsset.findOne({
+      where: { id: asset.id },
+      include: productAssetInclude,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Product asset uploaded',
+      data: { asset: createdAsset },
+    });
+  } catch (error) {
+    if (!transactionFinished) {
+      await transaction.rollback();
+      transactionFinished = true;
+    }
+
+    await removeUploadedFile(req.file);
+
+    if (/unsupported asset type|file is required|file type is not allowed|file is too large/i.test(error.message)) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    console.error('Error uploading product asset:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while uploading product asset',
+    });
+  }
+};
+
+const deleteProductAsset = async (req, res) => {
+  try {
+    const { id, assetId } = req.params;
+
+    const product = await Product.findOne({ where: { id, isActive: true } });
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    if (!canManageProductAssets(req.user, product)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Only admin or assigned designer can delete product assets',
+      });
+    }
+
+    const asset = await ProductAsset.findOne({
+      where: {
+        id: assetId,
+        productId: product.id,
+        isActive: true,
+      },
+    });
+
+    if (!asset) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product asset not found',
+      });
+    }
+
+    await asset.update({ isActive: false });
+
+    return res.json({
+      success: true,
+      message: 'Product asset deleted',
+    });
+  } catch (error) {
+    console.error('Error deleting product asset:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while deleting product asset',
+    });
+  }
+};
+
+const assignDesignerToProduct = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(400).json({
+        success: false,
+        message: 'Validation errors',
+        errors: errors.array(),
+      });
+    }
+
+    const { id } = req.params;
+    const { designerId } = req.body;
+
+    const product = await Product.findOne({ where: { id, isActive: true }, transaction });
+    if (!product) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    const designer = await User.findOne({
+      where: {
+        id: designerId,
+        role: 'designer',
+        isActive: true,
+      },
+      transaction,
+    });
+
+    if (!designer) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(404).json({
+        success: false,
+        message: 'Designer not found',
+      });
+    }
+
+    const now = new Date();
+    const updateData = createLifecycleActionUpdate({
+      action: PRODUCT_LIFECYCLE_ACTIONS.ASSIGN_DESIGNER,
+      actor: req.user,
+      product,
+      payload: { designerId },
+      now,
+    });
+
+    await product.update(updateData, { transaction });
+    await ProductActionHistory.create(
+      buildDesignerAssignedHistoryEntry({
+        product,
+        actor: req.user,
+        designer,
+        update: updateData,
+        now,
+        bulk: false,
+      }),
+      { transaction }
+    );
+
+    await transaction.commit();
+    transactionFinished = true;
+
+    const updatedProduct = await Product.findOne({
+      where: { id: product.id },
+      include: [
+        {
+          model: Supplier,
+          as: 'suppliers',
+          through: {
+            model: ProductSupplier,
+            attributes: ['supplierPrice', 'quantity', 'isAvailable', 'notes'],
+          },
+          where: { isActive: true },
+          required: false,
+        },
+        ...productUserInclude,
+      ],
+    });
+
+    return res.json({
+      success: true,
+      message: 'Designer assigned',
+      data: { product: updatedProduct },
+    });
+  } catch (error) {
+    if (!transactionFinished) {
+      await transaction.rollback();
+      transactionFinished = true;
+    }
+
+    if (/not permitted/i.test(error.message)) {
+      return res.status(403).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    if (/not allowed|is required|not supported/i.test(error.message)) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    console.error('Error assigning designer:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while assigning designer',
+    });
+  }
+};
+
+const bulkAssignDesignerToProducts = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(400).json({
+        success: false,
+        message: 'Validation errors',
+        errors: errors.array(),
+      });
+    }
+
+    const { productIds, designerId } = req.body;
+
+    const designer = await User.findOne({
+      where: {
+        id: designerId,
+        role: 'designer',
+        isActive: true,
+      },
+      transaction,
+    });
+
+    const requestedProductIds = Array.from(new Set(productIds.map((id) => Number(id))));
+    const products = await Product.findAll({
+      where: {
+        id: { [Op.in]: requestedProductIds },
+        isActive: true,
+      },
+      transaction,
+      lock: true,
+    });
+
+    const plan = buildBulkAssignDesignerPlan({
+      actor: req.user,
+      designer,
+      productIds,
+      products,
+      now: new Date(),
+    });
+
+    const productsById = new Map(products.map((product) => [Number(product.id), product]));
+    for (const item of plan.updates) {
+      const product = productsById.get(item.productId);
+      await product.update(item.update, { transaction });
+    }
+
+    await ProductActionHistory.bulkCreate(plan.historyEntries, { transaction });
+
+    await transaction.commit();
+    transactionFinished = true;
+
+    const updatedProducts = await Product.findAll({
+      where: { id: { [Op.in]: plan.productIds } },
+      include: [
+        {
+          model: Supplier,
+          as: 'suppliers',
+          through: {
+            model: ProductSupplier,
+            attributes: ['supplierPrice', 'quantity', 'isAvailable', 'notes'],
+          },
+          where: { isActive: true },
+          required: false,
+        },
+        ...productUserInclude,
+      ],
+    });
+
+    const updatedProductsById = new Map(
+      updatedProducts.map((product) => [Number(product.id), product])
+    );
+
+    return res.json({
+      success: true,
+      message: 'Designer assigned to selected products',
+      data: {
+        products: plan.productIds
+          .map((productId) => updatedProductsById.get(productId))
+          .filter(Boolean),
+        assignedCount: plan.productIds.length,
+      },
+    });
+  } catch (error) {
+    if (!transactionFinished) {
+      await transaction.rollback();
+      transactionFinished = true;
+    }
+
+    if (/not permitted/i.test(error.message)) {
+      return res.status(403).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    if (
+      /not allowed|is required|not supported|productIds|designer|not all selected|only products/i.test(
+        error.message
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    console.error('Error assigning designer in bulk:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while assigning designer in bulk',
+    });
+  }
+};
+
+const submitProductContent = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
+  try {
+    const { id } = req.params;
+
+    const product = await Product.findOne({
+      where: { id, isActive: true },
+      transaction,
+      lock: true,
+    });
+
+    if (!product) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    const assetsCount = await ProductAsset.count({
+      where: {
+        productId: product.id,
+        isActive: true,
+      },
+      transaction,
+    });
+
+    if (assetsCount === 0) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(400).json({
+        success: false,
+        message: 'Upload at least one product asset before marking content as created',
+      });
+    }
+
+    const now = new Date();
+    const updateData = createLifecycleActionUpdate({
+      action: PRODUCT_LIFECYCLE_ACTIONS.SUBMIT_CONTENT,
+      actor: req.user,
+      product,
+      now,
+    });
+
+    await product.update(updateData, { transaction });
+    await ProductActionHistory.create(
+      {
+        productId: product.id,
+        actorId: req.user.id,
+        actionType: 'content_created',
+        fromStatus: product.lifecycleStatus,
+        toStatus: updateData.lifecycleStatus,
+        message: 'Product content marked as created',
+        metadata: { assetsCount },
+        createdAt: now,
+      },
+      { transaction }
+    );
+
+    await transaction.commit();
+    transactionFinished = true;
+
+    const updatedProduct = await Product.findOne({
+      where: { id: product.id },
+      include: [
+        {
+          model: Supplier,
+          as: 'suppliers',
+          through: {
+            model: ProductSupplier,
+            attributes: ['supplierPrice', 'quantity', 'isAvailable', 'notes'],
+          },
+          where: { isActive: true },
+          required: false,
+        },
+        ...productUserInclude,
+      ],
+    });
+
+    return res.json({
+      success: true,
+      message: 'Product content created',
+      data: { product: updatedProduct },
+    });
+  } catch (error) {
+    if (!transactionFinished) {
+      await transaction.rollback();
+      transactionFinished = true;
+    }
+
+    if (/not permitted|assigned designer/i.test(error.message)) {
+      return res.status(403).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    if (/not allowed|is required|not supported/i.test(error.message)) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    console.error('Error submitting product content:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while submitting product content',
+    });
+  }
+};
+
+const submitProductReview = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(400).json({
+        success: false,
+        message: 'Validation errors',
+        errors: errors.array(),
+      });
+    }
+
+    const { id } = req.params;
+    const product = await Product.findOne({
+      where: { id, isActive: true },
+      transaction,
+      lock: true,
+    });
+
+    if (!product) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    const plan = buildSubmitReviewPlan({
+      actor: req.user,
+      product,
+      now: new Date(),
+    });
+
+    await product.update(plan.productUpdate, { transaction });
+    await ProductActionHistory.create(plan.historyEntry, { transaction });
+
+    await transaction.commit();
+    transactionFinished = true;
+
+    const updatedProduct = await Product.findOne({
+      where: { id: product.id },
+      include: productUserInclude,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Product submitted for review',
+      data: { product: updatedProduct },
+    });
+  } catch (error) {
+    if (!transactionFinished) {
+      await transaction.rollback();
+      transactionFinished = true;
+    }
+
+    if (/not permitted|assigned designer/i.test(error.message)) {
+      return res.status(403).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    if (/not allowed|is required|not supported/i.test(error.message)) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    console.error('Error submitting product review:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while submitting product review',
+    });
+  }
+};
+
+const approveProductReview = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(400).json({
+        success: false,
+        message: 'Validation errors',
+        errors: errors.array(),
+      });
+    }
+
+    const { id } = req.params;
+    const product = await Product.findOne({
+      where: { id, isActive: true },
+      transaction,
+      lock: true,
+    });
+
+    if (!product) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    const plan = buildApproveReviewPlan({
+      actor: req.user,
+      product,
+      now: new Date(),
+    });
+
+    await product.update(plan.productUpdate, { transaction });
+    await ProductActionHistory.create(plan.historyEntry, { transaction });
+
+    await transaction.commit();
+    transactionFinished = true;
+
+    const updatedProduct = await Product.findOne({
+      where: { id: product.id },
+      include: productUserInclude,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Product review approved',
+      data: { product: updatedProduct },
+    });
+  } catch (error) {
+    if (!transactionFinished) {
+      await transaction.rollback();
+      transactionFinished = true;
+    }
+
+    if (/not permitted/i.test(error.message)) {
+      return res.status(403).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    if (/not allowed|is required|not supported/i.test(error.message)) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    console.error('Error approving product review:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while approving product review',
+    });
+  }
+};
+
+const requestProductRevision = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      await transaction.rollback();
+      transactionFinished = true;
+      await removeUploadedFile(req.file);
+      return res.status(400).json({
+        success: false,
+        message: 'Validation errors',
+        errors: errors.array(),
+      });
+    }
+
+    const { id } = req.params;
+    const { comment } = req.body;
+    const product = await Product.findOne({
+      where: { id, isActive: true },
+      transaction,
+      lock: true,
+    });
+
+    if (!product) {
+      await transaction.rollback();
+      transactionFinished = true;
+      await removeUploadedFile(req.file);
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    const now = new Date();
+    const plan = buildRequestRevisionPlan({
+      actor: req.user,
+      product,
+      comment,
+      now,
+    });
+
+    await product.update(plan.productUpdate, { transaction });
+    const revisionRequest = await ProductRevisionRequest.create(plan.revisionRequestData, {
+      transaction,
+    });
+
+    let attachment = null;
+    if (req.file) {
+      const assetData = buildProductAssetData({
+        productId: product.id,
+        uploadedBy: req.user.id,
+        assetType: PRODUCT_ASSET_TYPES.REVISION_ATTACHMENT,
+        file: req.file,
+        notes: plan.revisionRequestData.comment,
+        revisionRequestId: revisionRequest.id,
+      });
+      attachment = await ProductAsset.create(assetData, { transaction });
+    }
+
+    await ProductActionHistory.create(
+      {
+        ...plan.historyEntry,
+        metadata: {
+          ...plan.historyEntry.metadata,
+          revisionRequestId: revisionRequest.id,
+          attachmentAssetId: attachment?.id || null,
+        },
+      },
+      { transaction }
+    );
+
+    await transaction.commit();
+    transactionFinished = true;
+
+    const updatedProduct = await Product.findOne({
+      where: { id: product.id },
+      include: productUserInclude,
+    });
+    const createdRevision = await ProductRevisionRequest.findOne({
+      where: { id: revisionRequest.id },
+      include: productRevisionInclude,
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Product revision requested',
+      data: {
+        product: updatedProduct,
+        revisionRequest: createdRevision,
+      },
+    });
+  } catch (error) {
+    if (!transactionFinished) {
+      await transaction.rollback();
+      transactionFinished = true;
+    }
+
+    await removeUploadedFile(req.file);
+
+    if (/not permitted/i.test(error.message)) {
+      return res.status(403).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    if (/not allowed|is required|not supported|file type is not allowed|file is too large/i.test(error.message)) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    console.error('Error requesting product revision:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while requesting product revision',
+    });
+  }
+};
+
+const resubmitProductRevision = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
+  try {
+    const { id } = req.params;
+    const product = await Product.findOne({
+      where: { id, isActive: true },
+      transaction,
+      lock: true,
+    });
+
+    if (!product) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    const openRevisionRequest = await ProductRevisionRequest.findOne({
+      where: {
+        productId: product.id,
+        status: PRODUCT_REVISION_STATUSES.OPEN,
+      },
+      order: [['createdAt', 'DESC']],
+      transaction,
+      lock: true,
+    });
+
+    if (!openRevisionRequest) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(400).json({
+        success: false,
+        message: 'No open revision request found for this product',
+      });
+    }
+
+    const plan = buildResubmitRevisionPlan({
+      actor: req.user,
+      product,
+      openRevisionRequest,
+      now: new Date(),
+    });
+
+    await product.update(plan.productUpdate, { transaction });
+    await openRevisionRequest.update(plan.revisionUpdate, { transaction });
+    await ProductActionHistory.create(plan.historyEntry, { transaction });
+
+    await transaction.commit();
+    transactionFinished = true;
+
+    const updatedProduct = await Product.findOne({
+      where: { id: product.id },
+      include: productUserInclude,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Product revision resubmitted',
+      data: { product: updatedProduct },
+    });
+  } catch (error) {
+    if (!transactionFinished) {
+      await transaction.rollback();
+      transactionFinished = true;
+    }
+
+    if (/not permitted|assigned designer/i.test(error.message)) {
+      return res.status(403).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    if (/not allowed|is required|not supported/i.test(error.message)) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    console.error('Error resubmitting product revision:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while resubmitting product revision',
+    });
+  }
+};
+
+const getProductRevisionRequests = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const product = await Product.findOne({ where: { id, isActive: true } });
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    const revisionRequests = await ProductRevisionRequest.findAll({
+      where: { productId: product.id },
+      include: productRevisionInclude,
+      order: [['createdAt', 'DESC']],
+    });
+
+    return res.json({
+      success: true,
+      data: { revisionRequests },
+    });
+  } catch (error) {
+    console.error('Error loading product revision requests:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while loading product revision requests',
+    });
+  }
+};
+
+const getProductMarketplaceListings = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const product = await Product.findOne({ where: { id, isActive: true } });
+
+    if (!product) {
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    const listings = await ProductMarketplaceListing.findAll({
+      where: { productId: product.id },
+      include: productMarketplaceInclude,
+      order: [['marketplace', 'ASC']],
+    });
+
+    return res.json({
+      success: true,
+      data: { listings },
+    });
+  } catch (error) {
+    console.error('Error loading marketplace listings:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while loading marketplace listings',
+    });
+  }
+};
+
+const saveProductMarketplaceListing = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(400).json({
+        success: false,
+        message: 'Validation errors',
+        errors: errors.array(),
+      });
+    }
+
+    const { id } = req.params;
+    const product = await Product.findOne({
+      where: { id, isActive: true },
+      transaction,
+      lock: true,
+    });
+
+    if (!product) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    if (!canManageMarketplaceListings(req.user)) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(403).json({
+        success: false,
+        message: 'Only admin or marketplace manager can edit marketplace listings',
+      });
+    }
+
+    const listingData = buildMarketplaceListingData({
+      productId: product.id,
+      actor: req.user,
+      payload: req.body,
+    });
+
+    const existingListing = await ProductMarketplaceListing.findOne({
+      where: {
+        productId: product.id,
+        marketplace: listingData.marketplace,
+      },
+      transaction,
+      lock: true,
+    });
+
+    const now = new Date();
+    let listing;
+    if (existingListing) {
+      await existingListing.update(listingData, { transaction });
+      listing = existingListing;
+    } else {
+      listing = await ProductMarketplaceListing.create(listingData, { transaction });
+    }
+
+    await syncKaspiLegacyFields({
+      product,
+      listingData,
+      actor: req.user,
+      transaction,
+      now,
+    });
+
+    await ProductActionHistory.create(
+      {
+        productId: product.id,
+        actorId: req.user.id,
+        actionType: 'marketplace_updated',
+        fromStatus: product.lifecycleStatus,
+        toStatus: product.lifecycleStatus,
+        message: 'Marketplace listing updated',
+        metadata: {
+          marketplaceListingId: listing.id,
+          marketplace: listing.marketplace,
+          status: listing.status,
+          sku: listing.sku,
+        },
+        createdAt: now,
+      },
+      { transaction }
+    );
+
+    await transaction.commit();
+    transactionFinished = true;
+
+    const savedListing = await ProductMarketplaceListing.findOne({
+      where: { id: listing.id },
+      include: productMarketplaceInclude,
+    });
+
+    return res.status(existingListing ? 200 : 201).json({
+      success: true,
+      message: 'Marketplace listing saved',
+      data: { listing: savedListing },
+    });
+  } catch (error) {
+    if (!transactionFinished) {
+      await transaction.rollback();
+      transactionFinished = true;
+    }
+
+    if (/not permitted|Only admin/i.test(error.message)) {
+      return res.status(403).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    if (/Unsupported|must be|is required/i.test(error.message)) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    console.error('Error saving marketplace listing:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while saving marketplace listing',
+    });
+  }
+};
+
+const updateProductMarketplaceListing = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(400).json({
+        success: false,
+        message: 'Validation errors',
+        errors: errors.array(),
+      });
+    }
+
+    const { id, listingId } = req.params;
+    const product = await Product.findOne({
+      where: { id, isActive: true },
+      transaction,
+      lock: true,
+    });
+
+    if (!product) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    if (!canManageMarketplaceListings(req.user)) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(403).json({
+        success: false,
+        message: 'Only admin or marketplace manager can edit marketplace listings',
+      });
+    }
+
+    const listing = await ProductMarketplaceListing.findOne({
+      where: {
+        id: listingId,
+        productId: product.id,
+      },
+      transaction,
+      lock: true,
+    });
+
+    if (!listing) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(404).json({
+        success: false,
+        message: 'Marketplace listing not found',
+      });
+    }
+
+    const updateData = buildMarketplaceListingUpdate({
+      actor: req.user,
+      payload: req.body,
+    });
+
+    await listing.update(updateData, { transaction });
+    const mergedListingData = {
+      ...listing.toJSON(),
+      ...updateData,
+    };
+    const now = new Date();
+
+    await syncKaspiLegacyFields({
+      product,
+      listingData: mergedListingData,
+      actor: req.user,
+      transaction,
+      now,
+    });
+
+    await ProductActionHistory.create(
+      {
+        productId: product.id,
+        actorId: req.user.id,
+        actionType: 'marketplace_updated',
+        fromStatus: product.lifecycleStatus,
+        toStatus: product.lifecycleStatus,
+        message: 'Marketplace listing updated',
+        metadata: {
+          marketplaceListingId: listing.id,
+          marketplace: listing.marketplace,
+          status: listing.status,
+          sku: listing.sku,
+        },
+        createdAt: now,
+      },
+      { transaction }
+    );
+
+    await transaction.commit();
+    transactionFinished = true;
+
+    const updatedListing = await ProductMarketplaceListing.findOne({
+      where: { id: listing.id },
+      include: productMarketplaceInclude,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Marketplace listing updated',
+      data: { listing: updatedListing },
+    });
+  } catch (error) {
+    if (!transactionFinished) {
+      await transaction.rollback();
+      transactionFinished = true;
+    }
+
+    if (/not permitted|Only admin/i.test(error.message)) {
+      return res.status(403).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    if (/Unsupported|must be|is required/i.test(error.message)) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    console.error('Error updating marketplace listing:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while updating marketplace listing',
+    });
+  }
+};
+
+const markProductPlacementReady = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
+  try {
+    const { id } = req.params;
+    const product = await Product.findOne({
+      where: { id, isActive: true },
+      transaction,
+      lock: true,
+    });
+
+    if (!product) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    const kaspiListing = await ProductMarketplaceListing.findOne({
+      where: {
+        productId: product.id,
+        marketplace: MARKETPLACE_KEYS.KASPI,
+      },
+      transaction,
+      lock: true,
+    });
+
+    const now = new Date();
+    const plan = buildMarketplacePlacementReadyPlan({
+      actor: req.user,
+      product,
+      kaspiListing,
+      now,
+    });
+
+    await product.update(plan.productUpdate, { transaction });
+    await ProductActionHistory.create(plan.historyEntry, { transaction });
+
+    await transaction.commit();
+    transactionFinished = true;
+
+    const updatedProduct = await Product.findOne({
+      where: { id: product.id },
+      include: productUserInclude,
+    });
+
+    return res.json({
+      success: true,
+      message: 'Marketplace placement marked as ready',
+      data: { product: updatedProduct },
+    });
+  } catch (error) {
+    if (!transactionFinished) {
+      await transaction.rollback();
+      transactionFinished = true;
+    }
+
+    if (/not permitted/i.test(error.message)) {
+      return res.status(403).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    if (/not allowed|required|published|SKU|price|name/i.test(error.message)) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    console.error('Error marking marketplace placement ready:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while marking marketplace placement ready',
+    });
+  }
+};
+
+const createProductDraft = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(400).json({
+        success: false,
+        message: 'Validation errors',
+        errors: errors.array(),
+      });
+    }
+
+    const { name, costPrice, supplierId, supplierPrice, comment } = req.body;
+    const now = new Date();
+    const sequence = await getNextDraftSequenceForDate(now);
+
+    const draftData = buildProductDraftData({
+      name,
+      costPrice,
+      comment,
+      imagePath: req.file ? `/uploads/${req.file.filename}` : null,
+      actorId: req.user.id,
+      now,
+      sequence,
+    });
+
+    const product = await Product.create(draftData, { transaction });
+
+    if (supplierId) {
+      const supplier = await Supplier.findOne({
+        where: {
+          id: supplierId,
+          isActive: true,
+        },
+        transaction,
+      });
+
+      if (!supplier) {
+        await transaction.rollback();
+        transactionFinished = true;
+        return res.status(404).json({
+          success: false,
+          message: 'Supplier not found',
+        });
+      }
+
+      await ProductSupplier.create({
+        productId: product.id,
+        supplierId: supplier.id,
+        supplierPrice: supplierPrice !== undefined && supplierPrice !== ''
+          ? Number(supplierPrice)
+          : product.costPrice,
+        quantity: 0,
+        isAvailable: true,
+        notes: comment || '',
+      }, { transaction });
+    }
+
+    await transaction.commit();
+    transactionFinished = true;
+
+    const createdProduct = await Product.findOne({
+      where: { id: product.id },
+      include: [
+        {
+          model: Supplier,
+          as: 'suppliers',
+          through: {
+            model: ProductSupplier,
+            attributes: ['supplierPrice', 'quantity', 'isAvailable', 'notes'],
+          },
+          where: { isActive: true },
+          required: false,
+        },
+        ...productUserInclude,
+      ],
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Product draft created',
+      data: { product: createdProduct },
+    });
+  } catch (error) {
+    if (!transactionFinished) {
+      await transaction.rollback();
+    }
+
+    if (/name is required|costPrice must/i.test(error.message)) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    console.error('Error creating product draft:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while creating product draft',
     });
   }
 };
@@ -1268,8 +3001,25 @@ const getPurchaseSuggestions = async (req, res) => {
 
 module.exports = {
   getAllProducts,
+  getProductWorkflowQueue,
   getProductById,
+  getProductAssets,
+  createProductAsset,
+  deleteProductAsset,
+  createProductDraft,
   createProduct,
+  assignDesignerToProduct,
+  bulkAssignDesignerToProducts,
+  submitProductContent,
+  submitProductReview,
+  approveProductReview,
+  requestProductRevision,
+  resubmitProductRevision,
+  getProductRevisionRequests,
+  getProductMarketplaceListings,
+  saveProductMarketplaceListing,
+  updateProductMarketplaceListing,
+  markProductPlacementReady,
   updateProduct,
   deleteProduct,
   addSupplierToProduct,

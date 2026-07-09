@@ -1,9 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Layout } from '../components/Layout';
 import { ProductList } from '../components/ProductList';
 import { useAuth } from '../context/AuthContext';
 import { useUI } from '../context/UIContext';
-import { Product } from '../types';
+import { Product, ProductLifecycleStatus } from '../types';
 import api from '../utils/api';
 import { Package, RefreshCw } from 'lucide-react';
 import { IconButton, Spinner } from '../components/ui';
@@ -17,11 +17,17 @@ export const ProductsPage: React.FC = () => {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [totalProducts, setTotalProducts] = useState(0);
+  const [lifecycleStatusFilter, setLifecycleStatusFilter] = useState<ProductLifecycleStatus | ''>('');
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await api.get(`/products?limit=${API_LIST_LIMIT}`);
+      const params = new URLSearchParams({ limit: String(API_LIST_LIMIT) });
+      if (lifecycleStatusFilter) {
+        params.set('lifecycleStatus', lifecycleStatusFilter);
+      }
+
+      const res = await api.get(`/products?${params.toString()}`);
       setProducts(res.data.data.products);
       setTotalProducts(res.data.data.pagination?.total || res.data.data.products.length);
     } catch (error) {
@@ -29,11 +35,11 @@ export const ProductsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [lifecycleStatusFilter]);
 
   useEffect(() => {
     fetchProducts();
-  }, []);
+  }, [fetchProducts]);
 
   const countLabel =
     totalProducts === 1 ? 'позиция' : totalProducts < 5 ? 'позиции' : 'позиций';
@@ -102,6 +108,10 @@ export const ProductsPage: React.FC = () => {
             onSelectProduct={setSelectedProduct}
             onRefresh={fetchProducts}
             canEdit={user?.role === 'admin' || user?.role === 'purchase_manager'}
+            canCreateDraft={user?.role === 'admin'}
+            canAssignDesigner={user?.role === 'admin'}
+            lifecycleStatusFilter={lifecycleStatusFilter}
+            onLifecycleStatusFilterChange={setLifecycleStatusFilter}
           />
         </div>
       </div>

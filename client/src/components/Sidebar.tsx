@@ -19,6 +19,7 @@ import {
   FolderTree,
   Warehouse,
   ClipboardList,
+  ListChecks,
   PackageCheck,
   Tag,
   X,
@@ -84,6 +85,20 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
       label: 'Товары',
       icon: <Package className="w-5 h-5 flex-shrink-0" />,
       path: '/products',
+    },
+    {
+      id: 'workflow',
+      label: 'Очередь',
+      icon: <ListChecks className="w-5 h-5 flex-shrink-0" />,
+      path: '/workflow',
+      requiredRole: [
+        'admin',
+        'designer',
+        'marketplace_manager',
+        'purchase_manager',
+        'warehouse_operator',
+        'accountant',
+      ],
     },
     {
       id: 'suppliers',

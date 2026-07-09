@@ -1,0 +1,90 @@
+{
+  "runId": "20260709150911",
+  "productName": "QA Lifecycle 20260709150911",
+  "productSku": "QA-KASPI-20260709150911",
+  "generatedAt": "2026-07-09T15:10:03.521Z",
+  "steps": [
+    {
+      "name": "Admin can log in",
+      "status": "passed",
+      "durationMs": 2448
+    },
+    {
+      "name": "Admin can create product draft from UI",
+      "status": "passed",
+      "durationMs": 3524
+    },
+    {
+      "name": "Admin can select new draft and assign designer from UI",
+      "status": "passed",
+      "durationMs": 3821
+    },
+    {
+      "name": "Designer can upload product assets and mark content created",
+      "status": "passed",
+      "durationMs": 9981
+    },
+    {
+      "name": "Designer can send content to review",
+      "status": "passed",
+      "durationMs": 4258
+    },
+    {
+      "name": "Admin can request revision with attachment",
+      "status": "passed",
+      "durationMs": 6361
+    },
+    {
+      "name": "Designer can resubmit revision",
+      "status": "passed",
+      "durationMs": 5715
+    },
+    {
+      "name": "Admin can approve card to marketplace",
+      "status": "passed",
+      "durationMs": 5772
+    },
+    {
+      "name": "Marketplace manager can fill Kaspi and move product to purchase",
+      "status": "passed",
+      "durationMs": 6970
+    },
+    {
+      "name": "Purchase manager can see product in purchase queue",
+      "status": "passed",
+      "durationMs": 2717
+    }
+  ],
+  "findings": [],
+  "screenshots": [
+    "output/playwright/01-login-admin.png",
+    "output/playwright/02-draft-modal-filled.png",
+    "output/playwright/03-new-product-filtered.png",
+    "output/playwright/04-assign-designer-modal.png",
+    "output/playwright/05-login-designer.png",
+    "output/playwright/06-designer-workflow-assigned.png",
+    "output/playwright/07-designer-assets-modal-open.png",
+    "output/playwright/08-asset-photo-selected.png",
+    "output/playwright/09-asset-jpg-selected.png",
+    "output/playwright/10-asset-psd-selected.png",
+    "output/playwright/11-assets-after-uploads.png",
+    "output/playwright/12-designer-workflow-content-created.png",
+    "output/playwright/13-designer-submit-review-modal.png",
+    "output/playwright/14-login-admin-review.png",
+    "output/playwright/15-admin-workflow-review.png",
+    "output/playwright/16-admin-review-modal-open.png",
+    "output/playwright/17-revision-request-filled.png",
+    "output/playwright/18-login-designer-revision.png",
+    "output/playwright/19-designer-workflow-revision.png",
+    "output/playwright/20-designer-revision-modal.png",
+    "output/playwright/21-login-admin-approve.png",
+    "output/playwright/22-admin-workflow-review-resubmitted.png",
+    "output/playwright/23-admin-approve-modal.png",
+    "output/playwright/24-login-marketplace.png",
+    "output/playwright/25-marketplace-workflow.png",
+    "output/playwright/26-kaspi-panel-initial.png",
+    "output/playwright/27-kaspi-panel-filled.png",
+    "output/playwright/28-login-purchase.png",
+    "output/playwright/29-purchase-workflow-final.png"
+  ]
+}
