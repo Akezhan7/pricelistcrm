@@ -4,6 +4,7 @@ const { Order, OrderItem, OrderStatusHistory, Product, Supplier, User, Payment, 
 const { recalculateSupplierDebt } = require('./paymentController');
 const { createPriceHistoryRecord } = require('./priceHistoryController');
 const { formatOrderMessage, generateWhatsAppLink } = require('../utils/whatsappFormatter');
+const { generateOrderNumber } = require('../services/orderNumberService');
 
 /**
  * Автоматический расчет статуса оплаты на основе сумм
@@ -21,78 +22,6 @@ const calculatePaymentStatus = (order) => {
   } else {
     return 'Частично оплачено';
   }
-};
-
-/** Часовой пояс для даты в номере заявки (можно переопределить в .env) */
-const ORDER_NUMBER_TIMEZONE = process.env.ORDER_NUMBER_TIMEZONE || 'Asia/Almaty';
-
-/**
- * Ключ даты для номера: ГГММДД (например 260521)
- */
-const getOrderDateKey = (date = new Date()) => {
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: ORDER_NUMBER_TIMEZONE,
-    year: '2-digit',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-
-  const year = parts.find((p) => p.type === 'year')?.value ?? '00';
-  const month = parts.find((p) => p.type === 'month')?.value ?? '01';
-  const day = parts.find((p) => p.type === 'day')?.value ?? '01';
-
-  return `${year}${month}${day}`;
-};
-
-/**
- * Следующий порядковый номер за день: ORD-ГГММДД-NNN (например ORD-260521-003).
- * Возвраты используют тот же формат.
- */
-const buildNextOrderNumberCandidate = async () => {
-  const dateKey = getOrderDateKey();
-  const prefix = `ORD-${dateKey}-`;
-
-  const lastOrder = await Order.findOne({
-    where: {
-      orderNumber: {
-        [Op.like]: `${prefix}%`,
-      },
-    },
-    order: [['orderNumber', 'DESC']],
-    attributes: ['orderNumber'],
-  });
-
-  let nextNumber = 1;
-  if (lastOrder?.orderNumber) {
-    const seqPart = lastOrder.orderNumber.slice(prefix.length);
-    const lastSeq = parseInt(seqPart, 10);
-    if (!Number.isNaN(lastSeq)) {
-      nextNumber = lastSeq + 1;
-    }
-  }
-
-  if (nextNumber > 999) {
-    throw new Error('Превышен лимит номеров заявок за день (999)');
-  }
-
-  return `${prefix}${String(nextNumber).padStart(3, '0')}`;
-};
-
-const generateOrderNumber = async () => {
-  const maxAttempts = 5;
-
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const candidate = await buildNextOrderNumberCandidate();
-    const exists = await Order.findOne({
-      where: { orderNumber: candidate },
-      attributes: ['id'],
-    });
-    if (!exists) {
-      return candidate;
-    }
-  }
-
-  throw new Error('Не удалось сгенерировать уникальный номер заявки');
 };
 
 /**

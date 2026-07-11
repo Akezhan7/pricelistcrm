@@ -1,6 +1,7 @@
 const express = require('express');
 const { body, query } = require('express-validator');
 const { auth, requireRole } = require('../middleware/auth');
+const { USER_ROLES } = require('../constants/userRoles');
 const {
   register,
   login,
@@ -27,8 +28,8 @@ const registerValidation = [
     .withMessage('Пароль должен содержать минимум 6 символов'),
   body('role')
     .optional()
-    .isIn(['admin', 'operator', 'accountant', 'purchase_manager', 'warehouse_operator', 'collector', 'driver'])
-    .withMessage('Недопустимая роль'),
+    .custom((value) => value === undefined)
+    .withMessage('Роль назначается администратором после регистрации'),
 ];
 
 const loginValidation = [
@@ -79,7 +80,7 @@ const createUserValidation = [
   body('role')
     .notEmpty()
     .withMessage('Роль обязательна')
-    .isIn(['admin', 'operator', 'accountant', 'purchase_manager', 'warehouse_operator', 'collector', 'driver'])
+    .isIn(USER_ROLES)
     .withMessage('Недопустимая роль'),
 ];
 

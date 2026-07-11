@@ -9,6 +9,7 @@ const {
   assertKaspiPlacementReady,
   buildKaspiLegacyProductUpdate,
   buildMarketplaceListingData,
+  buildMarketplaceOwnershipUpdate,
   buildMarketplacePlacementReadyPlan,
 } = require('../services/productMarketplaceService');
 
@@ -55,6 +56,24 @@ function testBuildsLegacyProductUpdateForKaspi() {
     kaspiName: 'Kaspi Product 2',
     sellingPrice: 15990,
   });
+}
+
+function testMarketplaceEditClaimsCurrentMarketplaceWork() {
+  assert.deepStrictEqual(
+    buildMarketplaceOwnershipUpdate({
+      actor: { id: 7, role: 'marketplace_manager' },
+      product: { lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE },
+    }),
+    { marketplaceManagerId: 7, assignedToUserId: 7 }
+  );
+
+  assert.deepStrictEqual(
+    buildMarketplaceOwnershipUpdate({
+      actor: { id: 7, role: 'marketplace_manager' },
+      product: { lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.PURCHASE },
+    }),
+    { marketplaceManagerId: 7 }
+  );
 }
 
 function testPlacementRequiresPublishedKaspiListing() {
@@ -123,6 +142,8 @@ function testBuildsPlacementReadyPlan() {
   assert.deepStrictEqual(plan.productUpdate, {
     lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.PURCHASE,
     lifecycleCompletedAt: null,
+    marketplaceManagerId: 8,
+    assignedToUserId: null,
   });
   assert.deepStrictEqual(plan.historyEntry, {
     productId: product.id,
@@ -142,6 +163,7 @@ function testBuildsPlacementReadyPlan() {
 
 testBuildsMarketplaceListingData();
 testBuildsLegacyProductUpdateForKaspi();
+testMarketplaceEditClaimsCurrentMarketplaceWork();
 testPlacementRequiresPublishedKaspiListing();
 testBuildsPlacementReadyPlan();
 

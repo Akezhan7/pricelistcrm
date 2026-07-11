@@ -9,6 +9,7 @@ const {
   getStockAnalytics,
   getPurchaseSuggestions,
   getLowStockProducts,
+  getDesignerKpiReport,
 } = require('../controllers/analyticsController');
 
 const router = express.Router();
@@ -26,6 +27,7 @@ const requireAnalyticsAccess = requireRole('admin', 'purchase_manager', 'account
 
 // Аналитика остатков (новый endpoint для фронтенда)
 router.get('/stock-analytics', auth, requireAnalyticsAccess, getStockAnalytics);
+router.get('/designer-kpi', auth, requireRole('admin'), getDesignerKpiReport);
 
 // Рекомендации для закупки
 router.get('/purchase-suggestions', auth, requireAnalyticsAccess, getPurchaseSuggestions);

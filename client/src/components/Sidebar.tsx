@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useUI } from '../context/UIContext';
 import { Input } from './ui/Input';
 import { cn } from '../utils/cn';
+import { USER_ROLE_LABELS, type UserRole } from '../constants/userRoles';
 import {
   Home,
   Package,
@@ -21,6 +22,7 @@ import {
   ClipboardList,
   ListChecks,
   PackageCheck,
+  BarChart3,
   Tag,
   X,
 } from 'lucide-react';
@@ -97,7 +99,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
         'marketplace_manager',
         'purchase_manager',
         'warehouse_operator',
-        'accountant',
       ],
     },
     {
@@ -148,6 +149,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
 
   const adminMenuItems: MenuItem[] = [
     {
+      id: 'designer-kpi',
+      label: 'KPI дизайнеров',
+      icon: <BarChart3 className="w-5 h-5 flex-shrink-0" />,
+      path: '/reports/designer-kpi',
+      requiredRole: ['admin'],
+    },
+    {
       id: 'users',
       label: 'Пользователи',
       icon: <Users className="w-5 h-5 flex-shrink-0" />,
@@ -168,16 +176,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
   };
 
   const getRoleLabel = (role?: string) => {
-    const roles: Record<string, string> = {
-      admin: 'Администратор',
-      operator: 'Оператор',
-      purchase_manager: 'Менеджер по закупкам',
-      accountant: 'Бухгалтер',
-      warehouse_operator: 'Оператор склада',
-      collector: 'Сборщик',
-      driver: 'Водитель',
-    };
-    return roles[role || ''] || 'Пользователь';
+    return role && role in USER_ROLE_LABELS
+      ? USER_ROLE_LABELS[role as UserRole]
+      : 'Пользователь';
   };
 
   const filteredMenuItems = menuItems.filter(

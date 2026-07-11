@@ -12,15 +12,25 @@ const {
   ProductAsset,
   ProductRevisionRequest,
   ProductMarketplaceListing,
+  ProductLifecyclePurchase,
+  ProductWarehouseDetails,
+  ProductLaunchFlags,
+  ProductDesignerKpiEntry,
+  StockHistory,
   sequelize,
 } = require('../models');
 const path = require('path');
 const fs = require('fs').promises;
-const { createPriceHistoryRecord } = require('./priceHistoryController');
 const {
   PRODUCT_LIFECYCLE_ACTIONS,
   PRODUCT_LIFECYCLE_STATUS_VALUES,
 } = require('../constants/productLifecycle');
+const {
+  PRODUCT_PERMISSION_ACTIONS,
+  assertProductFieldsAllowed,
+  getProductPermissions,
+  getProductResponsibility,
+} = require('../constants/productPermissions');
 const {
   createLifecycleActionUpdate,
 } = require('../services/productLifecycleService');
@@ -40,6 +50,13 @@ const {
   resolveProductWorkflowItem,
 } = require('../services/productWorkflowService');
 const {
+  buildProductActionEntry,
+  buildProductUpdateDiff,
+} = require('../services/productHistoryService');
+const {
+  PRODUCT_ACTION_TYPES,
+} = require('../constants/productHistory');
+const {
   PRODUCT_REVISION_STATUSES,
   buildApproveReviewPlan,
   buildRequestRevisionPlan,
@@ -51,6 +68,7 @@ const {
   buildKaspiLegacyProductUpdate,
   buildMarketplaceListingData,
   buildMarketplaceListingUpdate,
+  buildMarketplaceOwnershipUpdate,
   buildMarketplacePlacementReadyPlan,
 } = require('../services/productMarketplaceService');
 
@@ -126,14 +144,22 @@ async function removeUploadedFile(file) {
 }
 
 function canManageProductAssets(user, product) {
-  if (!user || !product) return false;
-  if (user.role === 'admin') return true;
-
-  return user.role === 'designer' && Number(product.designerId) === Number(user.id);
+  return getProductPermissions({ user, product }).allowedActions
+    .includes(PRODUCT_PERMISSION_ACTIONS.MANAGE_ASSETS);
 }
 
-function canManageMarketplaceListings(user) {
-  return user?.role === 'admin' || user?.role === 'marketplace_manager';
+function canManageMarketplaceListings(user, product) {
+  return getProductPermissions({ user, product }).allowedActions
+    .includes(PRODUCT_PERMISSION_ACTIONS.MANAGE_MARKETPLACE);
+}
+
+function serializeProductForUser(product, user) {
+  const plainProduct = product?.toJSON ? product.toJSON() : product;
+  return {
+    ...plainProduct,
+    permissions: getProductPermissions({ user, product: plainProduct }),
+    responsibility: getProductResponsibility(plainProduct),
+  };
 }
 
 async function syncKaspiLegacyFields({
@@ -262,6 +288,21 @@ const getAllProducts = async (req, res) => {
           attributes: ['id', 'name'],
           required: false,
         },
+        {
+          model: ProductLifecyclePurchase,
+          as: 'lifecyclePurchase',
+          required: false,
+        },
+        {
+          model: ProductWarehouseDetails,
+          as: 'warehouseDetails',
+          required: false,
+        },
+        {
+          model: ProductLaunchFlags,
+          as: 'launchFlags',
+          required: false,
+        },
         ...productUserInclude,
       ],
       distinct: true,
@@ -274,7 +315,7 @@ const getAllProducts = async (req, res) => {
     res.json({
       success: true,
       data: {
-        products: products.rows,
+        products: products.rows.map((product) => serializeProductForUser(product, req.user)),
         pagination: {
           total: products.count,
           page: parseInt(page),
@@ -334,6 +375,16 @@ const getProductWorkflowQueue = async (req, res) => {
           attributes: ['id', 'name'],
           required: false,
         },
+        {
+          model: ProductLifecyclePurchase,
+          as: 'lifecyclePurchase',
+          required: false,
+        },
+        {
+          model: ProductLaunchFlags,
+          as: 'launchFlags',
+          required: false,
+        },
         ...productUserInclude,
       ],
       distinct: true,
@@ -352,6 +403,8 @@ const getProductWorkflowQueue = async (req, res) => {
         workflow: {
           scope: workflowQuery.scope,
           canUseExtendedFilters: workflowQuery.canUseExtendedFilters,
+          workflowView: workflowQuery.workflowView || 'tasks',
+          canUseSalesView: Boolean(workflowQuery.canUseSalesView),
         },
         pagination: {
           total: products.count,
@@ -387,6 +440,21 @@ const getProductById = async (req, res) => {
           where: { isActive: true },
           required: false,
         },
+        {
+          model: ProductLifecyclePurchase,
+          as: 'lifecyclePurchase',
+          required: false,
+        },
+        {
+          model: ProductWarehouseDetails,
+          as: 'warehouseDetails',
+          required: false,
+        },
+        {
+          model: ProductLaunchFlags,
+          as: 'launchFlags',
+          required: false,
+        },
         ...productUserInclude,
       ],
     });
@@ -400,7 +468,7 @@ const getProductById = async (req, res) => {
 
     res.json({
       success: true,
-      data: { product },
+      data: { product: serializeProductForUser(product, req.user) },
     });
   } catch (error) {
     console.error('Ошибка получения товара:', error);
@@ -554,11 +622,20 @@ const createProductAsset = async (req, res) => {
 };
 
 const deleteProductAsset = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
   try {
     const { id, assetId } = req.params;
 
-    const product = await Product.findOne({ where: { id, isActive: true } });
+    const product = await Product.findOne({
+      where: { id, isActive: true },
+      transaction,
+      lock: true,
+    });
     if (!product) {
+      await transaction.rollback();
+      transactionFinished = true;
       return res.status(404).json({
         success: false,
         message: 'Product not found',
@@ -566,6 +643,8 @@ const deleteProductAsset = async (req, res) => {
     }
 
     if (!canManageProductAssets(req.user, product)) {
+      await transaction.rollback();
+      transactionFinished = true;
       return res.status(403).json({
         success: false,
         message: 'Only admin or assigned designer can delete product assets',
@@ -578,22 +657,42 @@ const deleteProductAsset = async (req, res) => {
         productId: product.id,
         isActive: true,
       },
+      transaction,
+      lock: true,
     });
 
     if (!asset) {
+      await transaction.rollback();
+      transactionFinished = true;
       return res.status(404).json({
         success: false,
         message: 'Product asset not found',
       });
     }
 
-    await asset.update({ isActive: false });
+    await asset.update({ isActive: false }, { transaction });
+    await ProductActionHistory.create(buildProductActionEntry({
+      productId: product.id,
+      actorId: req.user.id,
+      actionType: PRODUCT_ACTION_TYPES.CONTENT_ASSET_DELETED,
+      fromStatus: product.lifecycleStatus,
+      toStatus: product.lifecycleStatus,
+      metadata: {
+        assetId: asset.id,
+        assetType: asset.assetType,
+        originalName: asset.originalName,
+      },
+    }), { transaction });
+
+    await transaction.commit();
+    transactionFinished = true;
 
     return res.json({
       success: true,
       message: 'Product asset deleted',
     });
   } catch (error) {
+    if (!transactionFinished) await transaction.rollback();
     console.error('Error deleting product asset:', error);
     return res.status(500).json({
       success: false,
@@ -1057,6 +1156,7 @@ const approveProductReview = async (req, res) => {
     }
 
     const { id } = req.params;
+    const { kpiWeight } = req.body;
     const product = await Product.findOne({
       where: { id, isActive: true },
       transaction,
@@ -1075,10 +1175,12 @@ const approveProductReview = async (req, res) => {
     const plan = buildApproveReviewPlan({
       actor: req.user,
       product,
+      kpiWeight,
       now: new Date(),
     });
 
     await product.update(plan.productUpdate, { transaction });
+    await ProductDesignerKpiEntry.create(plan.kpiEntry, { transaction });
     await ProductActionHistory.create(plan.historyEntry, { transaction });
 
     await transaction.commit();
@@ -1431,7 +1533,7 @@ const saveProductMarketplaceListing = async (req, res) => {
       });
     }
 
-    if (!canManageMarketplaceListings(req.user)) {
+    if (!canManageMarketplaceListings(req.user, product)) {
       await transaction.rollback();
       transactionFinished = true;
       return res.status(403).json({
@@ -1470,6 +1572,9 @@ const saveProductMarketplaceListing = async (req, res) => {
       actor: req.user,
       transaction,
       now,
+    });
+    await product.update(buildMarketplaceOwnershipUpdate({ actor: req.user, product }), {
+      transaction,
     });
 
     await ProductActionHistory.create(
@@ -1564,7 +1669,7 @@ const updateProductMarketplaceListing = async (req, res) => {
       });
     }
 
-    if (!canManageMarketplaceListings(req.user)) {
+    if (!canManageMarketplaceListings(req.user, product)) {
       await transaction.rollback();
       transactionFinished = true;
       return res.status(403).json({
@@ -1609,6 +1714,9 @@ const updateProductMarketplaceListing = async (req, res) => {
       actor: req.user,
       transaction,
       now,
+    });
+    await product.update(buildMarketplaceOwnershipUpdate({ actor: req.user, product }), {
+      transaction,
     });
 
     await ProductActionHistory.create(
@@ -1815,6 +1923,20 @@ const createProductDraft = async (req, res) => {
       }, { transaction });
     }
 
+    await ProductActionHistory.create(buildProductActionEntry({
+      productId: product.id,
+      actorId: req.user.id,
+      actionType: PRODUCT_ACTION_TYPES.PRODUCT_CREATED,
+      fromStatus: null,
+      toStatus: product.lifecycleStatus,
+      metadata: {
+        draft: true,
+        supplierId: supplierId ? Number(supplierId) : null,
+        article: product.article,
+      },
+      now,
+    }), { transaction });
+
     await transaction.commit();
     transactionFinished = true;
 
@@ -1861,9 +1983,15 @@ const createProductDraft = async (req, res) => {
 };
 
 const createProduct = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      await transaction.rollback();
+      transactionFinished = true;
+      await removeUploadedFile(req.file);
       return res.status(400).json({
         success: false,
         message: 'Ошибки валидации',
@@ -1883,8 +2011,11 @@ const createProduct = async (req, res) => {
     }
 
     // Проверка уникальности артикула
-    const existingProduct = await Product.findOne({ where: { article } });
+    const existingProduct = await Product.findOne({ where: { article }, transaction });
     if (existingProduct) {
+      await transaction.rollback();
+      transactionFinished = true;
+      await removeUploadedFile(req.file);
       return res.status(400).json({
         success: false,
         message: 'Товар с таким артикулом уже существует',
@@ -1893,8 +2024,11 @@ const createProduct = async (req, res) => {
 
     // Проверяем существование категории
     if (categoryId) {
-      const category = await Category.findByPk(categoryId);
+      const category = await Category.findByPk(categoryId, { transaction });
       if (!category) {
+        await transaction.rollback();
+        transactionFinished = true;
+        await removeUploadedFile(req.file);
         return res.status(404).json({
           success: false,
           message: 'Категория не найдена',
@@ -1915,7 +2049,8 @@ const createProduct = async (req, res) => {
       minStock: minStock !== undefined ? parseInt(minStock) : 0,
       categoryId: categoryId || null,
       image: req.file ? `/uploads/${req.file.filename}` : null,
-    });
+      createdByUserId: req.user.id,
+    }, { transaction });
 
     // Добавление поставщиков, если они указаны
     if (suppliers && Array.isArray(suppliers)) {
@@ -1928,8 +2063,24 @@ const createProduct = async (req, res) => {
         notes: s.notes || '',
       }));
 
-      await ProductSupplier.bulkCreate(supplierData);
+      await ProductSupplier.bulkCreate(supplierData, { transaction });
     }
+
+    await ProductActionHistory.create(buildProductActionEntry({
+      productId: product.id,
+      actorId: req.user.id,
+      actionType: PRODUCT_ACTION_TYPES.PRODUCT_CREATED,
+      fromStatus: null,
+      toStatus: product.lifecycleStatus,
+      metadata: {
+        draft: false,
+        article: product.article,
+        supplierIds: Array.isArray(suppliers) ? suppliers.map((supplier) => Number(supplier.id)) : [],
+      },
+    }), { transaction });
+
+    await transaction.commit();
+    transactionFinished = true;
 
     // Получение созданного товара с поставщиками
     const createdProduct = await Product.findOne({
@@ -1952,8 +2103,12 @@ const createProduct = async (req, res) => {
       data: { product: createdProduct },
     });
   } catch (error) {
+    if (!transactionFinished) {
+      await transaction.rollback();
+      await removeUploadedFile(req.file);
+    }
     console.error('Ошибка создания товара:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Ошибка сервера при создании товара',
     });
@@ -1961,9 +2116,16 @@ const createProduct = async (req, res) => {
 };
 
 const updateProduct = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+  let oldImagePath = null;
+
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      await transaction.rollback();
+      transactionFinished = true;
+      await removeUploadedFile(req.file);
       return res.status(400).json({
         success: false,
         message: 'Ошибки валидации',
@@ -1976,8 +2138,6 @@ const updateProduct = async (req, res) => {
       name, 
       article, 
       internalName,
-      kaspiName,
-      kaspiArticle,
       costPrice, 
       sellingPrice, 
       currentStock,
@@ -1995,18 +2155,44 @@ const updateProduct = async (req, res) => {
       }
     }
 
-    const product = await Product.findOne({ where: { id, isActive: true } });
+    const product = await Product.findOne({
+      where: { id, isActive: true },
+      transaction,
+      lock: true,
+    });
     if (!product) {
+      await transaction.rollback();
+      transactionFinished = true;
+      await removeUploadedFile(req.file);
       return res.status(404).json({
         success: false,
         message: 'Товар не найден',
       });
     }
 
+    const submittedFields = Object.keys(req.body || {});
+    if (req.file) submittedFields.push('image');
+    if (submittedFields.length === 0) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(400).json({
+        success: false,
+        message: 'Нет данных для обновления',
+      });
+    }
+    assertProductFieldsAllowed({
+      user: req.user,
+      product,
+      fields: submittedFields,
+    });
+
     // Проверка уникальности артикула (кроме текущего товара)
     if (article && article !== product.article) {
-      const existingProduct = await Product.findOne({ where: { article } });
+      const existingProduct = await Product.findOne({ where: { article }, transaction });
       if (existingProduct) {
+        await transaction.rollback();
+        transactionFinished = true;
+        await removeUploadedFile(req.file);
         return res.status(400).json({
           success: false,
           message: 'Товар с таким артикулом уже существует',
@@ -2018,8 +2204,6 @@ const updateProduct = async (req, res) => {
     if (name) updateData.name = name;
     if (article) updateData.article = article;
     if (internalName !== undefined) updateData.internalName = internalName;
-    if (kaspiName !== undefined) updateData.kaspiName = kaspiName;
-    if (kaspiArticle !== undefined) updateData.kaspiArticle = kaspiArticle;
     if (costPrice !== undefined) updateData.costPrice = costPrice;
     if (sellingPrice !== undefined) updateData.sellingPrice = sellingPrice;
     if (currentStock !== undefined) updateData.currentStock = parseInt(currentStock) || 0;
@@ -2029,17 +2213,8 @@ const updateProduct = async (req, res) => {
 
     // Обработка загрузки нового изображения
     if (req.file) {
-      // Удаление старого изображения
       if (product.image) {
-        try {
-          // product.image хранится как '/uploads/filename'.
-          // path.join с абсолютным путём может привести к неверному результату,
-          // поэтому используем process.cwd() и формируем относительный путь.
-          const oldImagePath = path.resolve(process.cwd(), '.' + product.image);
-          await fs.unlink(oldImagePath);
-        } catch (error) {
-          console.log('Не удалось удалить старое изображение:', error.message);
-        }
+        oldImagePath = path.resolve(process.cwd(), `.${product.image}`);
       }
       updateData.image = `/uploads/${req.file.filename}`;
     }
@@ -2053,35 +2228,38 @@ const updateProduct = async (req, res) => {
     const sellingPriceChanged = sellingPrice !== undefined && parseFloat(sellingPrice) !== oldSellingPrice;
 
     // Обновление товара
-    await product.update(updateData);
+    const productBeforeUpdate = product.toJSON();
+    await product.update(updateData, { transaction });
 
     // Создание записей в истории цен ПОСЛЕ обновления (используем сохранённые старые цены)
     if (costPriceChanged) {
-      await createPriceHistoryRecord({
+      await PriceHistory.create({
         productId: product.id,
         oldPrice: oldCostPrice,
         newPrice: costPrice,
         priceType: 'costPrice',
         changeReason: 'Ручное обновление через редактирование товара',
         changedBy: req.user.id,
-      });
+        changedAt: new Date(),
+      }, { transaction });
     }
 
     if (sellingPriceChanged) {
-      await createPriceHistoryRecord({
+      await PriceHistory.create({
         productId: product.id,
         oldPrice: oldSellingPrice,
         newPrice: sellingPrice,
         priceType: 'sellingPrice',
         changeReason: 'Ручное обновление через редактирование товара',
         changedBy: req.user.id,
-      });
+        changedAt: new Date(),
+      }, { transaction });
     }
 
     // Обновление поставщиков
     if (suppliers && Array.isArray(suppliers)) { // ИСПРАВЛЕНО: Управил отступ
       // Удаление существующих связей
-      await ProductSupplier.destroy({ where: { productId: id } });
+      await ProductSupplier.destroy({ where: { productId: id }, transaction });
 
       // Создание новых связей
       const supplierData = suppliers.map(s => ({
@@ -2093,7 +2271,34 @@ const updateProduct = async (req, res) => {
         notes: s.notes || '',
       }));
 
-      await ProductSupplier.bulkCreate(supplierData);
+      await ProductSupplier.bulkCreate(supplierData, { transaction });
+    }
+
+    const productDiff = buildProductUpdateDiff({
+      before: productBeforeUpdate,
+      after: { ...productBeforeUpdate, ...updateData },
+      fields: Object.keys(updateData),
+    });
+    if (productDiff.changedFields.length > 0) {
+      await ProductActionHistory.create(buildProductActionEntry({
+        productId: product.id,
+        actorId: req.user.id,
+        actionType: PRODUCT_ACTION_TYPES.PRODUCT_UPDATED,
+        fromStatus: product.lifecycleStatus,
+        toStatus: product.lifecycleStatus,
+        metadata: productDiff,
+      }), { transaction });
+    }
+
+    await transaction.commit();
+    transactionFinished = true;
+
+    if (oldImagePath) {
+      try {
+        await fs.unlink(oldImagePath);
+      } catch (error) {
+        console.log('Не удалось удалить старое изображение:', error.message);
+      }
     }
 
     // Получение обновленного товара
@@ -2114,11 +2319,22 @@ const updateProduct = async (req, res) => {
     res.json({
       success: true,
       message: 'Товар успешно обновлен',
-      data: { product: updatedProduct },
+      data: { product: serializeProductForUser(updatedProduct, req.user) },
     });
   } catch (error) {
+    if (!transactionFinished) {
+      await transaction.rollback();
+      await removeUploadedFile(req.file);
+    }
+    if (error.statusCode === 403) {
+      return res.status(403).json({
+        success: false,
+        message: error.message,
+        forbiddenFields: error.forbiddenFields || [],
+      });
+    }
     console.error('Ошибка обновления товара:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: 'Ошибка сервера при обновлении товара',
     });
@@ -2126,11 +2342,20 @@ const updateProduct = async (req, res) => {
 };
 
 const deleteProduct = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
   try {
     const { id } = req.params;
 
-    const product = await Product.findOne({ where: { id, isActive: true } });
+    const product = await Product.findOne({
+      where: { id, isActive: true },
+      transaction,
+      lock: true,
+    });
     if (!product) {
+      await transaction.rollback();
+      transactionFinished = true;
       return res.status(404).json({
         success: false,
         message: 'Товар не найден',
@@ -2138,13 +2363,24 @@ const deleteProduct = async (req, res) => {
     }
 
     // Мягкое удаление
-    await product.update({ isActive: false });
+    await ProductActionHistory.create(buildProductActionEntry({
+      productId: product.id,
+      actorId: req.user.id,
+      actionType: PRODUCT_ACTION_TYPES.PRODUCT_ARCHIVED,
+      fromStatus: product.lifecycleStatus,
+      toStatus: product.lifecycleStatus,
+      metadata: { article: product.article },
+    }), { transaction });
+    await product.update({ isActive: false }, { transaction });
+    await transaction.commit();
+    transactionFinished = true;
 
     res.json({
       success: true,
       message: 'Товар успешно удален',
     });
   } catch (error) {
+    if (!transactionFinished) await transaction.rollback();
     console.error('Ошибка удаления товара:', error);
     res.status(500).json({
       success: false,
@@ -2155,13 +2391,22 @@ const deleteProduct = async (req, res) => {
 
 // Добавить поставщика к товару
 const addSupplierToProduct = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
   try {
     const { productId } = req.params;
     const { supplierId, supplierPrice, quantity = 0, isAvailable = true, notes = '' } = req.body;
 
     // Проверяем существование товара
-    const product = await Product.findOne({ where: { id: productId, isActive: true } });
+    const product = await Product.findOne({
+      where: { id: productId, isActive: true },
+      transaction,
+      lock: true,
+    });
     if (!product) {
+      await transaction.rollback();
+      transactionFinished = true;
       return res.status(404).json({
         success: false,
         message: 'Товар не найден',
@@ -2169,8 +2414,13 @@ const addSupplierToProduct = async (req, res) => {
     }
 
     // Проверяем существование поставщика
-    const supplier = await Supplier.findOne({ where: { id: supplierId, isActive: true } });
+    const supplier = await Supplier.findOne({
+      where: { id: supplierId, isActive: true },
+      transaction,
+    });
     if (!supplier) {
+      await transaction.rollback();
+      transactionFinished = true;
       return res.status(404).json({
         success: false,
         message: 'Поставщик не найден',
@@ -2180,9 +2430,12 @@ const addSupplierToProduct = async (req, res) => {
     // Проверяем, не существует ли уже такая связь
     const existingRelation = await ProductSupplier.findOne({
       where: { productId, supplierId },
+      transaction,
     });
     
     if (existingRelation) {
+      await transaction.rollback();
+      transactionFinished = true;
       return res.status(400).json({
         success: false,
         message: 'Этот поставщик уже привязан к товару',
@@ -2197,7 +2450,23 @@ const addSupplierToProduct = async (req, res) => {
       quantity,
       isAvailable,
       notes,
-    });
+    }, { transaction });
+
+    await ProductActionHistory.create(buildProductActionEntry({
+      productId: product.id,
+      actorId: req.user.id,
+      actionType: PRODUCT_ACTION_TYPES.SUPPLIER_LINKED,
+      fromStatus: product.lifecycleStatus,
+      toStatus: product.lifecycleStatus,
+      metadata: {
+        supplierId: Number(supplierId),
+        supplierName: supplier.name,
+        supplierPrice: Number(supplierPrice),
+      },
+    }), { transaction });
+
+    await transaction.commit();
+    transactionFinished = true;
 
     // Получаем обновленный товар с поставщиками
     const updatedProduct = await Product.findOne({
@@ -2222,6 +2491,7 @@ const addSupplierToProduct = async (req, res) => {
       data: { product: updatedProduct },
     });
   } catch (error) {
+    if (!transactionFinished) await transaction.rollback();
     console.error('Ошибка добавления поставщика к товару:', error);
     res.status(500).json({
       success: false,
@@ -2232,15 +2502,33 @@ const addSupplierToProduct = async (req, res) => {
 
 // Удалить поставщика из товара (только связь, не самого поставщика)
 const removeSupplierFromProduct = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
   try {
     const { productId, supplierId } = req.params;
+
+    const product = await Product.findOne({
+      where: { id: productId, isActive: true },
+      transaction,
+      lock: true,
+    });
+    if (!product) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(404).json({ success: false, message: 'Товар не найден' });
+    }
 
     // Проверяем существование связи
     const relation = await ProductSupplier.findOne({
       where: { productId, supplierId },
+      transaction,
+      lock: true,
     });
 
     if (!relation) {
+      await transaction.rollback();
+      transactionFinished = true;
       return res.status(404).json({
         success: false,
         message: 'Связь между товаром и поставщиком не найдена',
@@ -2248,7 +2536,18 @@ const removeSupplierFromProduct = async (req, res) => {
     }
 
     // Удаляем связь
-    await relation.destroy();
+    await relation.destroy({ transaction });
+    await ProductActionHistory.create(buildProductActionEntry({
+      productId: product.id,
+      actorId: req.user.id,
+      actionType: PRODUCT_ACTION_TYPES.SUPPLIER_UNLINKED,
+      fromStatus: product.lifecycleStatus,
+      toStatus: product.lifecycleStatus,
+      metadata: { supplierId: Number(supplierId) },
+    }), { transaction });
+
+    await transaction.commit();
+    transactionFinished = true;
 
     // Получаем обновленный товар
     const updatedProduct = await Product.findOne({
@@ -2273,6 +2572,7 @@ const removeSupplierFromProduct = async (req, res) => {
       data: { product: updatedProduct },
     });
   } catch (error) {
+    if (!transactionFinished) await transaction.rollback();
     console.error('Ошибка удаления поставщика из товара:', error);
     res.status(500).json({
       success: false,
@@ -2283,16 +2583,34 @@ const removeSupplierFromProduct = async (req, res) => {
 
 // Обновить данные поставщика для товара
 const updateProductSupplier = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
   try {
     const { productId, supplierId } = req.params;
     const { supplierPrice, quantity, isAvailable, notes } = req.body;
 
+    const product = await Product.findOne({
+      where: { id: productId, isActive: true },
+      transaction,
+      lock: true,
+    });
+    if (!product) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(404).json({ success: false, message: 'Товар не найден' });
+    }
+
     // Найти связь
     const relation = await ProductSupplier.findOne({
       where: { productId, supplierId },
+      transaction,
+      lock: true,
     });
 
     if (!relation) {
+      await transaction.rollback();
+      transactionFinished = true;
       return res.status(404).json({
         success: false,
         message: 'Связь между товаром и поставщиком не найдена',
@@ -2306,7 +2624,29 @@ const updateProductSupplier = async (req, res) => {
     if (isAvailable !== undefined) updateData.isAvailable = isAvailable;
     if (notes !== undefined) updateData.notes = notes;
 
-    await relation.update(updateData);
+    const beforeUpdate = relation.toJSON();
+    await relation.update(updateData, { transaction });
+    const relationDiff = buildProductUpdateDiff({
+      before: beforeUpdate,
+      after: { ...beforeUpdate, ...updateData },
+      fields: Object.keys(updateData),
+    });
+    if (relationDiff.changedFields.length > 0) {
+      await ProductActionHistory.create(buildProductActionEntry({
+        productId: product.id,
+        actorId: req.user.id,
+        actionType: PRODUCT_ACTION_TYPES.SUPPLIER_UPDATED,
+        fromStatus: product.lifecycleStatus,
+        toStatus: product.lifecycleStatus,
+        metadata: {
+          supplierId: Number(supplierId),
+          ...relationDiff,
+        },
+      }), { transaction });
+    }
+
+    await transaction.commit();
+    transactionFinished = true;
 
     // Получаем обновленный товар
     const updatedProduct = await Product.findOne({
@@ -2331,6 +2671,7 @@ const updateProductSupplier = async (req, res) => {
       data: { product: updatedProduct },
     });
   } catch (error) {
+    if (!transactionFinished) await transaction.rollback();
     console.error('Ошибка обновления данных поставщика:', error);
     res.status(500).json({
       success: false,
@@ -2744,13 +3085,22 @@ const getStockAnalytics = async (req, res) => {
  * PUT /api/products/:id/stock
  */
 const updateProductStock = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
   try {
     const { id } = req.params;
     const { currentStock, minStock, notes } = req.body;
 
-    const product = await Product.findByPk(id);
+    const product = await Product.findOne({
+      where: { id, isActive: true },
+      transaction,
+      lock: true,
+    });
 
     if (!product) {
+      await transaction.rollback();
+      transactionFinished = true;
       return res.status(404).json({
         success: false,
         message: 'Товар не найден',
@@ -2759,6 +3109,8 @@ const updateProductStock = async (req, res) => {
 
     // Валидация
     if (currentStock !== undefined && (currentStock < 0 || !Number.isInteger(Number(currentStock)))) {
+      await transaction.rollback();
+      transactionFinished = true;
       return res.status(400).json({
         success: false,
         message: 'Текущий остаток должен быть неотрицательным целым числом',
@@ -2766,27 +3118,57 @@ const updateProductStock = async (req, res) => {
     }
 
     if (minStock !== undefined && (minStock < 0 || !Number.isInteger(Number(minStock)))) {
+      await transaction.rollback();
+      transactionFinished = true;
       return res.status(400).json({
         success: false,
         message: 'Минимальный остаток должен быть неотрицательным целым числом',
       });
     }
 
-    const oldStock = product.currentStock;
+    const oldStock = Number(product.currentStock);
+    const oldMinStock = Number(product.minStock);
     const updateData = {};
 
     if (currentStock !== undefined) {
-      updateData.currentStock = currentStock;
+      updateData.currentStock = Number(currentStock);
     }
 
     if (minStock !== undefined) {
-      updateData.minStock = minStock;
+      updateData.minStock = Number(minStock);
     }
 
-    await product.update(updateData);
+    await product.update(updateData, { transaction });
 
-    // Логируем изменение (можно добавить таблицу StockHistory)
-    console.log(`[STOCK UPDATE] Product #${id}: ${oldStock} -> ${product.currentStock} by User #${req.user.id}`);
+    if (updateData.currentStock !== undefined && updateData.currentStock !== oldStock) {
+      await StockHistory.create({
+        productId: product.id,
+        oldStock,
+        newStock: updateData.currentStock,
+        changeAmount: updateData.currentStock - oldStock,
+        changeType: updateData.currentStock > oldStock ? 'manual_increase' : 'manual_decrease',
+        userId: req.user.id,
+        reason: notes || 'Ручное изменение остатка',
+        notes: notes || null,
+      }, { transaction });
+    }
+
+    if (updateData.minStock !== undefined && updateData.minStock !== oldMinStock) {
+      await ProductActionHistory.create(buildProductActionEntry({
+        productId: product.id,
+        actorId: req.user.id,
+        actionType: PRODUCT_ACTION_TYPES.STOCK_UPDATED,
+        fromStatus: product.lifecycleStatus,
+        toStatus: product.lifecycleStatus,
+        metadata: {
+          changedFields: ['minStock'],
+          changes: { minStock: { from: oldMinStock, to: updateData.minStock } },
+        },
+      }), { transaction });
+    }
+
+    await transaction.commit();
+    transactionFinished = true;
 
     res.json({
       success: true,
@@ -2802,6 +3184,7 @@ const updateProductStock = async (req, res) => {
       },
     });
   } catch (error) {
+    if (!transactionFinished) await transaction.rollback();
     console.error('Ошибка обновления остатка:', error);
     res.status(500).json({
       success: false,

@@ -4,6 +4,9 @@ const {
 const {
   createLifecycleActionUpdate,
 } = require('./productLifecycleService');
+const {
+  buildApproveReviewKpiPlan,
+} = require('./productDesignerKpiService');
 
 const PRODUCT_REVISION_STATUSES = Object.freeze({
   OPEN: 'open',
@@ -68,8 +71,14 @@ function buildSubmitReviewPlan({ actor, product, now = new Date() }) {
   };
 }
 
-function buildApproveReviewPlan({ actor, product, now = new Date() }) {
+function buildApproveReviewPlan({ actor, product, kpiWeight, now = new Date() }) {
   const fromStatus = product.lifecycleStatus;
+  const kpiPlan = buildApproveReviewKpiPlan({
+    actor,
+    product,
+    kpiWeight,
+    now,
+  });
   const productUpdate = {
     ...createLifecycleActionUpdate({
       action: PRODUCT_LIFECYCLE_ACTIONS.APPROVE,
@@ -79,10 +88,12 @@ function buildApproveReviewPlan({ actor, product, now = new Date() }) {
     }),
     reviewedByUserId: actor.id,
     assignedToUserId: product.marketplaceManagerId || null,
+    ...kpiPlan.productUpdate,
   };
 
   return {
     productUpdate,
+    kpiEntry: kpiPlan.kpiEntry,
     historyEntry: buildHistoryEntry({
       product,
       actor,
@@ -90,6 +101,7 @@ function buildApproveReviewPlan({ actor, product, now = new Date() }) {
       fromStatus,
       toStatus: productUpdate.lifecycleStatus,
       message: 'Product review approved',
+      metadata: kpiPlan.historyMetadata,
       now,
     }),
   };

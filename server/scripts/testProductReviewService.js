@@ -27,6 +27,7 @@ function testSubmitReviewPlan() {
   assert.deepStrictEqual(plan.productUpdate, {
     lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.REVIEW,
     lifecycleCompletedAt: null,
+    assignedToUserId: null,
   });
   assert.deepStrictEqual(plan.historyEntry, {
     productId: product.id,
@@ -46,19 +47,47 @@ function testApproveReviewPlan() {
     id: 102,
     lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.REVIEW,
     assignedToUserId: designer.id,
+    designerId: designer.id,
   };
 
-  const plan = buildApproveReviewPlan({ actor: admin, product, now });
+  const plan = buildApproveReviewPlan({ actor: admin, product, kpiWeight: '1.5', now });
 
   assert.deepStrictEqual(plan.productUpdate, {
     lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE,
     lifecycleCompletedAt: null,
     reviewedByUserId: admin.id,
     assignedToUserId: null,
+    kpiWeight: 1.5,
+  });
+  assert.deepStrictEqual(plan.kpiEntry, {
+    productId: product.id,
+    designerId: designer.id,
+    reviewedByUserId: admin.id,
+    weight: 1.5,
+    creditedAt: now,
   });
   assert.strictEqual(plan.historyEntry.actionType, 'approved');
   assert.strictEqual(plan.historyEntry.fromStatus, PRODUCT_LIFECYCLE_STATUSES.REVIEW);
   assert.strictEqual(plan.historyEntry.toStatus, PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE);
+  assert.deepStrictEqual(plan.historyEntry.metadata, {
+    kpiWeight: 1.5,
+    designerId: designer.id,
+  });
+}
+
+function testApproveReviewPlanRequiresKpiWeight() {
+  assert.throws(
+    () =>
+      buildApproveReviewPlan({
+        actor: admin,
+        product: {
+          id: 106,
+          lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.REVIEW,
+          designerId: designer.id,
+        },
+      }),
+    /KPI weight is required/i
+  );
 }
 
 function testRequestRevisionRequiresComment() {
@@ -131,6 +160,7 @@ function testResubmitRevisionPlan() {
   assert.deepStrictEqual(plan.productUpdate, {
     lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.REVIEW,
     lifecycleCompletedAt: null,
+    assignedToUserId: null,
   });
   assert.deepStrictEqual(plan.revisionUpdate, {
     status: PRODUCT_REVISION_STATUSES.RESOLVED,
@@ -142,6 +172,7 @@ function testResubmitRevisionPlan() {
 
 testSubmitReviewPlan();
 testApproveReviewPlan();
+testApproveReviewPlanRequiresKpiWeight();
 testRequestRevisionRequiresComment();
 testRequestRevisionPlan();
 testResubmitRevisionPlan();

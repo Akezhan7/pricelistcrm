@@ -23,6 +23,7 @@ import {
 import api from '../utils/api';
 import { toast } from '../context/ToastContext';
 import type { BadgeVariant } from '../components/ui/Badge';
+import { USER_ROLE_LABELS, USER_ROLE_VALUES, type UserRole } from '../constants/userRoles';
 
 interface User {
   id: number;
@@ -32,17 +33,23 @@ interface User {
   createdAt: string;
 }
 
-const ROLES: { value: string; label: string; badge: BadgeVariant }[] = [
-  { value: 'admin', label: 'Администратор', badge: 'danger' },
-  { value: 'designer', label: 'Дизайнер', badge: 'success' },
-  { value: 'marketplace_manager', label: 'Менеджер маркетплейсов', badge: 'info' },
-  { value: 'purchase_manager', label: 'Менеджер по закупкам', badge: 'info' },
-  { value: 'warehouse_operator', label: 'Оператор склада', badge: 'success' },
-  { value: 'collector', label: 'Сборщик', badge: 'warning' },
-  { value: 'driver', label: 'Водитель', badge: 'outline' },
-  { value: 'operator', label: 'Оператор', badge: 'default' },
-  { value: 'accountant', label: 'Бухгалтер', badge: 'info' },
-];
+const ROLE_BADGES: Record<UserRole, BadgeVariant> = {
+  admin: 'danger',
+  designer: 'success',
+  marketplace_manager: 'info',
+  purchase_manager: 'info',
+  warehouse_operator: 'success',
+  collector: 'warning',
+  driver: 'outline',
+  operator: 'default',
+  accountant: 'info',
+};
+
+const ROLES = USER_ROLE_VALUES.map((value) => ({
+  value,
+  label: USER_ROLE_LABELS[value],
+  badge: ROLE_BADGES[value],
+}));
 
 export const Users: React.FC = () => {
   const [users, setUsers] = useState<User[]>([]);

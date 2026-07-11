@@ -16,6 +16,60 @@ export interface LifecycleUserRef {
   email?: string;
 }
 
+export interface ProductPermissions {
+  allowedActions: string[];
+  editableFields: string[];
+  canEditCard: boolean;
+  responsibleRoleLabel?: string | null;
+}
+
+export interface ProductResponsibility {
+  user?: LifecycleUserRef | null;
+  roleLabel?: string | null;
+}
+
+export type ProductHistorySource = 'action' | 'price' | 'stock';
+
+export interface ProductHistoryAttachment {
+  id: number;
+  originalName?: string | null;
+  filePath: string;
+  mimeType?: string | null;
+}
+
+export interface ProductHistoryRevision {
+  id: number;
+  comment: string;
+  status: string;
+  resolvedAt?: string | null;
+  attachments: ProductHistoryAttachment[];
+}
+
+export interface ProductHistoryEvent {
+  id: string;
+  source: ProductHistorySource;
+  productId: number;
+  actionType: string;
+  category: string;
+  actor?: LifecycleUserRef | null;
+  occurredAt: string;
+  fromStatus?: ProductLifecycleStatus | null;
+  toStatus?: ProductLifecycleStatus | null;
+  message?: string | null;
+  metadata?: Record<string, unknown> | null;
+  revision?: ProductHistoryRevision | null;
+}
+
+export interface ProductHistoryPage {
+  events: ProductHistoryEvent[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
 export interface Product {
   id: number;
   name: string;
@@ -40,12 +94,17 @@ export interface Product {
   designer?: LifecycleUserRef;
   marketplaceManagerId?: number | null;
   marketplaceManager?: LifecycleUserRef;
+  lifecyclePurchase?: ProductLifecyclePurchase | null;
+  warehouseDetails?: ProductWarehouseDetails | null;
+  launchFlags?: ProductLaunchFlags | null;
   createdByUserId?: number | null;
   createdByUser?: LifecycleUserRef;
   reviewedByUserId?: number | null;
   reviewedByUser?: LifecycleUserRef;
   kpiWeight?: number | string | null;
   launchNotes?: string | null;
+  permissions?: ProductPermissions;
+  responsibility?: ProductResponsibility;
   isActive: boolean;
   suppliers?: SupplierWithPrice[];
   variations?: ProductVariation[];
@@ -63,6 +122,45 @@ export interface ProductWorkflowAction {
 export interface ProductWorkflowItem extends Product {
   workflow: ProductWorkflowAction;
   viewerScope: string;
+}
+
+export interface DesignerKpiEntry {
+  id: number;
+  weight: number;
+  creditedAt: string;
+  product: {
+    id: number;
+    name: string;
+    article: string;
+  } | null;
+  reviewer: {
+    id: number;
+    name: string;
+  } | null;
+}
+
+export interface DesignerKpiRow {
+  designer: {
+    id: number;
+    name: string;
+    email?: string | null;
+  };
+  totalCards: number;
+  totalWeight: number;
+  entries: DesignerKpiEntry[];
+}
+
+export interface DesignerKpiReport {
+  period: {
+    from: string;
+    to: string;
+  };
+  summary: {
+    totalCards: number;
+    totalWeight: number;
+    designerCount: number;
+  };
+  designers: DesignerKpiRow[];
 }
 
 export type ProductAssetType =
@@ -140,6 +238,57 @@ export interface ProductMarketplaceListing {
   manager?: LifecycleUserRef;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProductLifecyclePurchase {
+  id: number;
+  productId: number;
+  supplierId: number;
+  supplier?: { id: number; name: string };
+  orderId: number;
+  order?: { id: number; orderNumber: string; status: OrderStatus };
+  orderItemId: number;
+  warehouseReceiptId?: number | null;
+  quantity: number;
+  purchasePrice: string | number;
+  purchasedAt: string;
+  purchasedBy: number;
+  receivedQuantity?: number | null;
+  arrivedAt?: string | null;
+  arrivedBy?: number | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductWarehouseDetails {
+  id: number;
+  productId: number;
+  sector: string;
+  shelf: string;
+  cell: string;
+  weight: string | number;
+  length: string | number;
+  width: string | number;
+  height: string | number;
+  notes?: string | null;
+  updatedBy?: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProductLaunchFlags {
+  id?: number;
+  productId: number;
+  advertisingStarted: boolean;
+  promotionStarted: boolean;
+  reviewBonusEnabled: boolean;
+  notes?: string | null;
+  updatedBy?: number | null;
+  completedBy?: number | null;
+  completedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Category {

@@ -38,6 +38,18 @@ const {
   getPurchaseSuggestions,
 } = require('../controllers/productController');
 const { getProductPriceHistory } = require('../controllers/priceHistoryController');
+const { getProductHistory } = require('../controllers/productHistoryController');
+const {
+  completeProductWarehouse,
+  getLifecycleOperations,
+  markProductArrived,
+  markProductPurchased,
+} = require('../controllers/productLifecyclePurchaseController');
+const {
+  completeProductSaleLaunch,
+  getProductLaunchFlags,
+  updateProductLaunchFlags,
+} = require('../controllers/productSaleLaunchController');
 
 const router = express.Router();
 
@@ -85,6 +97,31 @@ const productDraftValidation = [
     .withMessage('Comment must not exceed 1000 characters'),
 ];
 
+const productUpdateValidation = [
+  body('name')
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 200 })
+    .withMessage('Название товара должно содержать от 1 до 200 символов'),
+  body('article')
+    .optional()
+    .trim()
+    .isLength({ min: 1, max: 50 })
+    .withMessage('Артикул должен содержать от 1 до 50 символов'),
+  body('costPrice')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Себестоимость должна быть положительным числом'),
+  body('sellingPrice')
+    .optional()
+    .isFloat({ min: 0 })
+    .withMessage('Цена продажи должна быть положительным числом'),
+  body('currentStock').optional().isInt({ min: 0 }),
+  body('minStock').optional().isInt({ min: 0 }),
+  body('categoryId').optional({ values: 'falsy' }).isInt({ min: 1 }),
+  body('description').optional().isLength({ max: 1000 }),
+];
+
 // Публичные маршруты (для всех авторизованных пользователей)
 router.get('/', auth, getAllProducts);
 router.get('/low-stock', auth, getLowStockProducts);
@@ -94,6 +131,9 @@ router.get('/workflow', auth, getProductWorkflowQueue);
 router.get('/:id/assets', auth, getProductAssets);
 router.get('/:id/revisions', auth, getProductRevisionRequests);
 router.get('/:id/marketplaces', auth, getProductMarketplaceListings);
+router.get('/:id/lifecycle/operations', auth, getLifecycleOperations);
+router.get('/:id/launch-flags', auth, getProductLaunchFlags);
+router.get('/:id/history', auth, getProductHistory);
 router.get('/:id', auth, getProductById);
 
 // Маршруты для администраторов и менеджеров по закупкам
@@ -117,9 +157,9 @@ router.post('/',
 
 router.put('/:id', 
   auth, 
-  requireRole('admin', 'purchase_manager'), 
+  requireRole('admin'),
   upload.single('image'),
-  productValidation,
+  productUpdateValidation,
   handleUploadError,
   updateProduct
 );
@@ -155,6 +195,11 @@ router.post('/:id/lifecycle/submit-review',
 router.post('/:id/lifecycle/approve',
   auth,
   requireRole('admin'),
+  [
+    body('kpiWeight')
+      .isFloat({ gt: 0, max: 99.99 })
+      .withMessage('kpiWeight must be a positive number up to 99.99'),
+  ],
   approveProductReview
 );
 
@@ -182,6 +227,68 @@ router.post('/:id/lifecycle/mark-placement-ready',
   auth,
   requireRole('admin', 'marketplace_manager'),
   markProductPlacementReady
+);
+
+router.post('/:id/lifecycle/mark-purchased',
+  auth,
+  requireRole('admin', 'purchase_manager'),
+  [
+    body('supplierId').isInt({ min: 1 }),
+    body('quantity').isInt({ min: 1 }),
+    body('purchasePrice').isFloat({ min: 0 }),
+    body('expectedDeliveryDate').optional({ values: 'falsy' }).isISO8601(),
+    body('deliveryLocation').optional({ values: 'falsy' }).isLength({ max: 200 }),
+    body('notes').optional({ values: 'falsy' }).isLength({ max: 2000 }),
+  ],
+  markProductPurchased
+);
+
+router.post('/:id/lifecycle/mark-arrived',
+  auth,
+  requireRole('admin', 'purchase_manager'),
+  [
+    body('receivedQuantity').isInt({ min: 1 }),
+    body('notes').optional({ values: 'falsy' }).isLength({ max: 2000 }),
+  ],
+  markProductArrived
+);
+
+router.post('/:id/lifecycle/complete-warehouse',
+  auth,
+  requireRole('admin', 'warehouse_operator'),
+  [
+    body('sector').trim().isLength({ min: 1, max: 80 }),
+    body('shelf').trim().isLength({ min: 1, max: 80 }),
+    body('cell').trim().isLength({ min: 1, max: 80 }),
+    body('weight').isFloat({ gt: 0 }),
+    body('length').isFloat({ gt: 0 }),
+    body('width').isFloat({ gt: 0 }),
+    body('height').isFloat({ gt: 0 }),
+    body('costPrice').optional({ values: 'falsy' }).isFloat({ min: 0 }),
+    body('notes').optional({ values: 'falsy' }).isLength({ max: 2000 }),
+  ],
+  completeProductWarehouse
+);
+
+const saleLaunchValidation = [
+  body('advertisingStarted').isBoolean(),
+  body('promotionStarted').isBoolean(),
+  body('reviewBonusEnabled').isBoolean(),
+  body('notes').optional({ nullable: true }).isLength({ max: 2000 }),
+];
+
+router.post('/:id/lifecycle/complete-sale-launch',
+  auth,
+  requireRole('admin', 'marketplace_manager'),
+  saleLaunchValidation,
+  completeProductSaleLaunch
+);
+
+router.put('/:id/launch-flags',
+  auth,
+  requireRole('admin', 'marketplace_manager'),
+  saleLaunchValidation,
+  updateProductLaunchFlags
 );
 
 router.post('/bulk/assign-designer',

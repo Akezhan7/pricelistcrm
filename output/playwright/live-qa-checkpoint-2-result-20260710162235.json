@@ -1,0 +1,129 @@
+{
+  "runId": "20260710162235",
+  "productId": 79,
+  "productName": "QA Checkpoint 2 20260710162235",
+  "productSku": "QA2-KASPI-20260710162235",
+  "generatedAt": "2026-07-10T16:23:27.133Z",
+  "steps": [
+    {
+      "name": "Admin prepares a linked product for lifecycle QA",
+      "status": "passed",
+      "durationMs": 5470
+    },
+    {
+      "name": "Designer creates content and submits it for review",
+      "status": "passed",
+      "durationMs": 9391
+    },
+    {
+      "name": "Admin approves the product for marketplace placement",
+      "status": "passed",
+      "durationMs": 5432
+    },
+    {
+      "name": "Marketplace manager publishes Kaspi listing and sends product to purchase",
+      "status": "passed",
+      "durationMs": 6069
+    },
+    {
+      "name": "Purchase manager creates the official initial purchase order",
+      "status": "passed",
+      "durationMs": 5256
+    },
+    {
+      "name": "Purchase manager confirms a partial warehouse arrival",
+      "status": "passed",
+      "durationMs": 4193
+    },
+    {
+      "name": "Warehouse operator fills the permanent warehouse passport",
+      "status": "passed",
+      "durationMs": 5370
+    },
+    {
+      "name": "Marketplace manager completes the sale launch with optional flags",
+      "status": "passed",
+      "durationMs": 5496
+    },
+    {
+      "name": "Completed product appears in sales view and remains editable",
+      "status": "passed",
+      "durationMs": 4051
+    },
+    {
+      "name": "Database state matches the completed live workflow",
+      "status": "passed",
+      "durationMs": 767
+    }
+  ],
+  "findings": [],
+  "screenshots": [
+    "output/playwright/checkpoint-2-20260710162235/01-login-admin.png",
+    "output/playwright/checkpoint-2-20260710162235/02-draft-filled.png",
+    "output/playwright/checkpoint-2-20260710162235/03-login-designer.png",
+    "output/playwright/checkpoint-2-20260710162235/04-designer-assigned.png",
+    "output/playwright/checkpoint-2-20260710162235/05-designer-content-created.png",
+    "output/playwright/checkpoint-2-20260710162235/06-login-admin-review.png",
+    "output/playwright/checkpoint-2-20260710162235/07-admin-review.png",
+    "output/playwright/checkpoint-2-20260710162235/08-admin-review-modal.png",
+    "output/playwright/checkpoint-2-20260710162235/09-login-marketplace-kaspi.png",
+    "output/playwright/checkpoint-2-20260710162235/10-marketplace-queue.png",
+    "output/playwright/checkpoint-2-20260710162235/11-kaspi-panel-empty.png",
+    "output/playwright/checkpoint-2-20260710162235/12-kaspi-panel-filled.png",
+    "output/playwright/checkpoint-2-20260710162235/13-login-purchase-order.png",
+    "output/playwright/checkpoint-2-20260710162235/14-purchase-queue-before-order.png",
+    "output/playwright/checkpoint-2-20260710162235/15-purchase-panel-initial.png",
+    "output/playwright/checkpoint-2-20260710162235/16-purchase-panel-filled.png",
+    "output/playwright/checkpoint-2-20260710162235/17-purchase-queue-after-order.png",
+    "output/playwright/checkpoint-2-20260710162235/18-arrival-panel-initial.png",
+    "output/playwright/checkpoint-2-20260710162235/19-arrival-panel-filled.png",
+    "output/playwright/checkpoint-2-20260710162235/20-login-warehouse.png",
+    "output/playwright/checkpoint-2-20260710162235/21-warehouse-queue.png",
+    "output/playwright/checkpoint-2-20260710162235/22-warehouse-panel-empty.png",
+    "output/playwright/checkpoint-2-20260710162235/23-warehouse-panel-filled.png",
+    "output/playwright/checkpoint-2-20260710162235/24-login-marketplace-sale-launch.png",
+    "output/playwright/checkpoint-2-20260710162235/25-sale-launch-task-queue.png",
+    "output/playwright/checkpoint-2-20260710162235/26-sale-launch-panel-initial.png",
+    "output/playwright/checkpoint-2-20260710162235/27-sale-launch-panel-filled.png",
+    "output/playwright/checkpoint-2-20260710162235/28-completed-product-sales-view.png",
+    "output/playwright/checkpoint-2-20260710162235/29-completed-sale-panel.png",
+    "output/playwright/checkpoint-2-20260710162235/30-completed-sale-panel-updated.png",
+    "output/playwright/checkpoint-2-20260710162235/31-completed-sale-panel-saved.png"
+  ],
+  "databaseVerification": {
+    "productId": 79,
+    "lifecycleStatus": "in_sale",
+    "lifecycleCompletedAt": "2026-07-10T16:23:20.799Z",
+    "currentStock": 4,
+    "costPrice": 1300,
+    "orderId": 37,
+    "purchasedQuantity": 5,
+    "receivedQuantity": 4,
+    "receiptType": "partial",
+    "warehouseLocation": "QA-A/03/12",
+    "launchFlags": {
+      "advertisingStarted": true,
+      "promotionStarted": true,
+      "reviewBonusEnabled": true,
+      "completedAt": "2026-07-10T16:23:20.799Z"
+    },
+    "kaspiStatus": "in_sale",
+    "stockHistoryRecorded": true,
+    "priceHistoryRecorded": true,
+    "actions": [
+      "designer_assigned",
+      "content_uploaded",
+      "content_created",
+      "submitted_for_review",
+      "approved",
+      "marketplace_updated",
+      "marketplace_placement_ready",
+      "purchase_marked",
+      "warehouse_arrival_marked",
+      "warehouse_completed",
+      "sale_launch_completed",
+      "sale_flags_updated"
+    ],
+    "missingActions": []
+  }
+}

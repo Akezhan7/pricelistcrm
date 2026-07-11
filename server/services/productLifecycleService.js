@@ -85,6 +85,18 @@ function createLifecycleActionUpdate({ action, actor, product, payload = {}, now
     update.assignedToUserId = designerId;
   }
 
+  if (
+    normalizedAction === PRODUCT_LIFECYCLE_ACTIONS.SUBMIT_REVIEW
+    || normalizedAction === PRODUCT_LIFECYCLE_ACTIONS.RESUBMIT_REVISION
+  ) {
+    update.assignedToUserId = null;
+  }
+
+  if (normalizedAction === PRODUCT_LIFECYCLE_ACTIONS.MARK_PLACEMENT_READY) {
+    update.marketplaceManagerId = actor.id;
+    update.assignedToUserId = null;
+  }
+
   return update;
 }
 

@@ -5,6 +5,8 @@ import {
   BriefcaseBusiness,
   CheckCircle2,
   Image as ImageIcon,
+  History,
+  Pencil,
   RefreshCw,
   Search,
   UserRound,
@@ -14,6 +16,7 @@ import {
   Badge,
   Button,
   EmptyState,
+  FilterChip,
   IconButton,
   Input,
   Modal,
@@ -24,6 +27,10 @@ import {
 import { ProductAssetsPanel } from '../components/ProductAssetsPanel';
 import { ProductMarketplacePanel } from '../components/ProductMarketplacePanel';
 import { ProductReviewActions } from '../components/ProductReviewActions';
+import { ProductPurchaseActions } from '../components/ProductPurchaseActions';
+import { ProductWarehousePanel } from '../components/ProductWarehousePanel';
+import { ProductSaleLaunchPanel } from '../components/ProductSaleLaunchPanel';
+import { ProductHistoryModal } from '../components/ProductHistoryModal';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import getImageUrl from '../utils/image';
@@ -33,10 +40,13 @@ import {
   PRODUCT_LIFECYCLE_ALL_FILTERS,
   getProductLifecycleLabel,
 } from '../constants/productLifecycle';
+import { useProductEditor } from '../hooks/useProductEditor';
 
 type WorkflowMeta = {
   scope: string;
   canUseExtendedFilters: boolean;
+  workflowView?: 'tasks' | 'sales';
+  canUseSalesView?: boolean;
 };
 
 type WorkflowUser = {
@@ -54,7 +64,6 @@ const roleQueueLabels: Record<string, string> = {
   marketplace_manager: 'Очередь маркетплейса',
   purchase_manager: 'Очередь закупа',
   warehouse_operator: 'Очередь склада',
-  accountant: 'Очередь учета',
   empty: 'Нет назначенной очереди',
 };
 
@@ -86,6 +95,11 @@ export const ProductWorkflowPage: React.FC = () => {
   const [assetProduct, setAssetProduct] = useState<ProductWorkflowItem | null>(null);
   const [reviewProduct, setReviewProduct] = useState<ProductWorkflowItem | null>(null);
   const [marketplaceProduct, setMarketplaceProduct] = useState<ProductWorkflowItem | null>(null);
+  const [purchaseProduct, setPurchaseProduct] = useState<ProductWorkflowItem | null>(null);
+  const [warehouseProduct, setWarehouseProduct] = useState<ProductWorkflowItem | null>(null);
+  const [saleProduct, setSaleProduct] = useState<ProductWorkflowItem | null>(null);
+  const [historyProduct, setHistoryProduct] = useState<ProductWorkflowItem | null>(null);
+  const [queueView, setQueueView] = useState<'tasks' | 'sales'>('tasks');
 
   const canUseExtendedFilters = workflow.canUseExtendedFilters;
 
@@ -97,6 +111,7 @@ export const ProductWorkflowPage: React.FC = () => {
       if (canUseExtendedFilters && statusFilter) params.set('lifecycleStatus', statusFilter);
       if (canUseExtendedFilters && designerFilter) params.set('designerId', designerFilter);
       if (canUseExtendedFilters && assignedFilter) params.set('assignedToUserId', assignedFilter);
+      if (user?.role === 'marketplace_manager') params.set('view', queueView);
 
       const response = await api.get(`/products/workflow?${params.toString()}`);
       setProducts(response.data.data.products || []);
@@ -112,7 +127,7 @@ export const ProductWorkflowPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [assignedFilter, canUseExtendedFilters, designerFilter, searchQuery, statusFilter, user?.role]);
+  }, [assignedFilter, canUseExtendedFilters, designerFilter, queueView, searchQuery, statusFilter, user?.role]);
 
   const fetchUsers = useCallback(async () => {
     if (user?.role !== 'admin') return;
@@ -127,6 +142,10 @@ export const ProductWorkflowPage: React.FC = () => {
       setLoadingUsers(false);
     }
   }, [user?.role]);
+
+  const { openEdit, loadingProductId, editorModals } = useProductEditor({
+    onUpdated: fetchProducts,
+  });
 
   useEffect(() => {
     fetchProducts();
@@ -153,13 +172,13 @@ export const ProductWorkflowPage: React.FC = () => {
   const countLabel =
     totalProducts === 1 ? 'задача' : totalProducts > 1 && totalProducts < 5 ? 'задачи' : 'задач';
 
-  const canEditAssets =
-    assetProduct &&
-    (user?.role === 'admin' ||
-      (user?.role === 'designer' && Number(assetProduct.designerId) === Number(user.id)));
+  const canEditAssets = assetProduct?.permissions?.allowedActions.includes('manage_assets');
 
   const canSubmitContent =
-    Boolean(canEditAssets) && assetProduct?.lifecycleStatus === 'assigned_to_designer';
+    Boolean(
+      canEditAssets
+      && assetProduct?.permissions?.allowedActions.includes('submit_content')
+    );
 
   const handleContentSubmitted = async () => {
     setAssetProduct(null);
@@ -169,6 +188,9 @@ export const ProductWorkflowPage: React.FC = () => {
   const handleWorkflowChanged = async () => {
     setReviewProduct(null);
     setMarketplaceProduct(null);
+    setPurchaseProduct(null);
+    setWarehouseProduct(null);
+    setSaleProduct(null);
     await fetchProducts();
   };
 
@@ -190,6 +212,17 @@ export const ProductWorkflowPage: React.FC = () => {
             />
           }
         />
+
+        {(user?.role === 'marketplace_manager' || workflow.canUseSalesView) && (
+          <div className="flex flex-wrap gap-2">
+            <FilterChip active={queueView === 'tasks'} onClick={() => setQueueView('tasks')}>
+              Требуют действия
+            </FilterChip>
+            <FilterChip active={queueView === 'sales'} onClick={() => setQueueView('sales')}>
+              В продаже
+            </FilterChip>
+          </div>
+        )}
 
         <div className="rounded-xl border border-border-subtle bg-brand-white shadow-sm overflow-hidden flex flex-col min-h-0 flex-1">
           <div className="border-b border-border-subtle bg-surface-muted px-4 py-3 flex flex-col gap-3 lg:flex-row lg:items-end">
@@ -276,8 +309,12 @@ export const ProductWorkflowPage: React.FC = () => {
             ) : products.length === 0 ? (
               <EmptyState
                 icon={CheckCircle2}
-                title="Очередь пуста"
-                description="Для вашей роли сейчас нет товаров, ожидающих действия."
+                title={queueView === 'sales' ? 'Нет товаров в продаже' : 'Очередь пуста'}
+                description={
+                  queueView === 'sales'
+                    ? 'Завершенные запуски появятся здесь.'
+                    : 'Для вашей роли сейчас нет товаров, ожидающих действия.'
+                }
               />
             ) : (
               <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
@@ -328,7 +365,9 @@ export const ProductWorkflowPage: React.FC = () => {
                           <div className="rounded-lg bg-surface-inset px-2.5 py-2">
                             <span className="block">Ответственный</span>
                             <span className="text-brand-black">
-                              {formatUserLabel(product.assignedTo)}
+                              {product.responsibility?.user
+                                ? formatUserLabel(product.responsibility.user)
+                                : product.responsibility?.roleLabel || 'Не назначен'}
                             </span>
                           </div>
                         </div>
@@ -344,13 +383,39 @@ export const ProductWorkflowPage: React.FC = () => {
                               })}
                             </span>
                           </div>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={product.workflow.nextActionEnabled ? 'primary' : 'secondary'}
-                            rightIcon={ArrowRight}
-                            disabled={!product.workflow.nextActionEnabled}
-                            onClick={() => {
+                          <div className="flex items-center gap-2">
+                            {product.permissions?.allowedActions.includes('view_product_history') && (
+                              <IconButton
+                                icon={History}
+                                title="История товара"
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setHistoryProduct(product)}
+                              />
+                            )}
+                            {product.permissions?.canEditCard && (
+                              <IconButton
+                                icon={Pencil}
+                                title="Редактировать карточку"
+                                size="sm"
+                                variant="ghost"
+                                disabled={loadingProductId === product.id}
+                                onClick={() => {
+                                  if (product.permissions?.allowedActions.includes('edit_product_card')) {
+                                    openEdit(product);
+                                  } else if (product.permissions?.allowedActions.includes('manage_marketplace')) {
+                                    setMarketplaceProduct(product);
+                                  }
+                                }}
+                              />
+                            )}
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant={product.workflow.nextActionEnabled ? 'primary' : 'secondary'}
+                              rightIcon={ArrowRight}
+                              disabled={!product.workflow.nextActionEnabled}
+                              onClick={() => {
                               if (product.workflow.nextActionKey === 'upload_content_assets') {
                                 setAssetProduct(product);
                               } else if (
@@ -361,13 +426,26 @@ export const ProductWorkflowPage: React.FC = () => {
                                 setReviewProduct(product);
                               } else if (product.workflow.nextActionKey === 'marketplace_placement') {
                                 setMarketplaceProduct(product);
+                              } else if (
+                                product.workflow.nextActionKey === 'purchase_product'
+                                || product.workflow.nextActionKey === 'receive_product'
+                              ) {
+                                setPurchaseProduct(product);
+                              } else if (product.workflow.nextActionKey === 'complete_warehouse') {
+                                setWarehouseProduct(product);
+                              } else if (
+                                product.workflow.nextActionKey === 'complete_sale_launch'
+                                || product.workflow.nextActionKey === 'manage_sale_launch'
+                              ) {
+                                setSaleProduct(product);
                               } else {
                                 navigate('/products');
                               }
-                            }}
-                          >
-                            {product.workflow.nextActionLabel}
-                          </Button>
+                              }}
+                            >
+                              {product.workflow.nextActionLabel}
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -395,6 +473,13 @@ export const ProductWorkflowPage: React.FC = () => {
           )}
         </Modal>
 
+        {editorModals}
+
+        <ProductHistoryModal
+          product={historyProduct}
+          onClose={() => setHistoryProduct(null)}
+        />
+
         <Modal
           isOpen={!!reviewProduct}
           onClose={() => setReviewProduct(null)}
@@ -404,7 +489,6 @@ export const ProductWorkflowPage: React.FC = () => {
           {reviewProduct && (
             <ProductReviewActions
               product={reviewProduct}
-              currentUser={user}
               onChanged={handleWorkflowChanged}
               onOpenAssets={() => {
                 setAssetProduct(reviewProduct);
@@ -423,7 +507,48 @@ export const ProductWorkflowPage: React.FC = () => {
           {marketplaceProduct && (
             <ProductMarketplacePanel
               product={marketplaceProduct}
-              currentUser={user}
+              onChanged={handleWorkflowChanged}
+            />
+          )}
+        </Modal>
+
+        <Modal
+          isOpen={!!purchaseProduct}
+          onClose={() => setPurchaseProduct(null)}
+          title="Закуп и поступление"
+          size="xl"
+        >
+          {purchaseProduct && (
+            <ProductPurchaseActions
+              product={purchaseProduct}
+              onChanged={handleWorkflowChanged}
+            />
+          )}
+        </Modal>
+
+        <Modal
+          isOpen={!!warehouseProduct}
+          onClose={() => setWarehouseProduct(null)}
+          title="Размещение на складе"
+          size="xl"
+        >
+          {warehouseProduct && (
+            <ProductWarehousePanel
+              product={warehouseProduct}
+              onChanged={handleWorkflowChanged}
+            />
+          )}
+        </Modal>
+
+        <Modal
+          isOpen={!!saleProduct}
+          onClose={() => setSaleProduct(null)}
+          title="Запуск продаж"
+          size="lg"
+        >
+          {saleProduct && (
+            <ProductSaleLaunchPanel
+              product={saleProduct}
               onChanged={handleWorkflowChanged}
             />
           )}

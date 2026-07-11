@@ -7,12 +7,10 @@ import type {
   ProductMarketplaceListing,
   ProductWorkflowItem,
 } from '../types';
-import type { User } from '../context/AuthContext';
 import { Alert, Badge, Button, Input, Select, Spinner, Textarea } from './ui';
 
 type ProductMarketplacePanelProps = {
   product: ProductWorkflowItem;
-  currentUser?: User | null;
   onChanged: () => void;
 };
 
@@ -69,7 +67,6 @@ function buildFormState(listing?: ProductMarketplaceListing | null): Marketplace
 
 export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = ({
   product,
-  currentUser,
   onChanged,
 }) => {
   const [listing, setListing] = useState<ProductMarketplaceListing | null>(null);
@@ -79,7 +76,10 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
   const [markingReady, setMarkingReady] = useState(false);
   const [error, setError] = useState('');
 
-  const canEdit = currentUser?.role === 'admin' || currentUser?.role === 'marketplace_manager';
+  const canEdit = Boolean(product.permissions?.allowedActions.includes('manage_marketplace'));
+  const canMarkPlacementReady = Boolean(
+    product.permissions?.allowedActions.includes('mark_placement_ready')
+  );
   const priceNumber = Number(form.price);
   const isPlacementReady = useMemo(
     () =>
@@ -275,9 +275,11 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
         )}
       </div>
 
-      <Alert variant={isPlacementReady ? 'success' : 'info'}>
-        Для передачи в закуп нужны статус "Опубликовано", SKU, название и цена больше 0.
-      </Alert>
+      {canMarkPlacementReady && (
+        <Alert variant={isPlacementReady ? 'success' : 'info'}>
+          Для передачи в закуп нужны статус "Опубликовано", SKU, название и цена больше 0.
+        </Alert>
+      )}
 
       {canEdit && (
         <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
@@ -291,16 +293,18 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
           >
             Сохранить
           </Button>
-          <Button
-            type="button"
-            variant="primary"
-            leftIcon={Send}
-            loading={markingReady}
-            disabled={saving || markingReady || !isPlacementReady}
-            onClick={handleMarkReady}
-          >
-            Передать в закуп
-          </Button>
+          {canMarkPlacementReady && (
+            <Button
+              type="button"
+              variant="primary"
+              leftIcon={Send}
+              loading={markingReady}
+              disabled={saving || markingReady || !isPlacementReady}
+              onClick={handleMarkReady}
+            >
+              Передать в закуп
+            </Button>
+          )}
         </div>
       )}
     </div>

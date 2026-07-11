@@ -1,0 +1,63 @@
+{
+  "runId": "20260710162135",
+  "productId": 78,
+  "productName": "QA Checkpoint 2 20260710162135",
+  "productSku": "QA2-KASPI-20260710162135",
+  "generatedAt": "2026-07-10T16:22:15.860Z",
+  "fatalError": "locator.click: Error: strict mode violation: getByRole('button', { name: /Подтвердить поступление/ }) resolved to 2 elements:\n    1) <button type=\"button\" class=\"inline-flex items-center justify-center transition-colors duration-200 ease-product focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none bg-brand-yellow text-brand-black font-semibold hover:bg-brand-yellow-hover active:scale-[0.98] focus-visible:ring-brand-yellow h-8 min-h-8 px-3 text-caption gap-1.5 rounded-lg\">…</button> aka locator('#root').getByRole('button', { name: 'Подтвердить поступление' })\n    2) <button type=\"button\" class=\"inline-flex items-center justify-center transition-colors duration-200 ease-product focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none bg-brand-yellow text-brand-black font-semibold hover:bg-brand-yellow-hover active:scale-[0.98] focus-visible:ring-brand-yellow h-10 min-h-10 px-4 text-body gap-2 rounded-lg\">…</button> aka getByLabel('Закуп и поступление').getByRole('button', { name: 'Подтвердить поступление' })\n\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /Подтвердить поступление/ })\u001b[22m\n",
+  "steps": [
+    {
+      "name": "Admin prepares a linked product for lifecycle QA",
+      "status": "passed",
+      "durationMs": 9252
+    },
+    {
+      "name": "Designer creates content and submits it for review",
+      "status": "passed",
+      "durationMs": 9498
+    },
+    {
+      "name": "Admin approves the product for marketplace placement",
+      "status": "passed",
+      "durationMs": 5241
+    },
+    {
+      "name": "Marketplace manager publishes Kaspi listing and sends product to purchase",
+      "status": "passed",
+      "durationMs": 6221
+    },
+    {
+      "name": "Purchase manager creates the official initial purchase order",
+      "status": "passed",
+      "durationMs": 5411
+    },
+    {
+      "name": "Purchase manager confirms a partial warehouse arrival",
+      "status": "failed",
+      "durationMs": 2598,
+      "error": "locator.click: Error: strict mode violation: getByRole('button', { name: /Подтвердить поступление/ }) resolved to 2 elements:\n    1) <button type=\"button\" class=\"inline-flex items-center justify-center transition-colors duration-200 ease-product focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none bg-brand-yellow text-brand-black font-semibold hover:bg-brand-yellow-hover active:scale-[0.98] focus-visible:ring-brand-yellow h-8 min-h-8 px-3 text-caption gap-1.5 rounded-lg\">…</button> aka locator('#root').getByRole('button', { name: 'Подтвердить поступление' })\n    2) <button type=\"button\" class=\"inline-flex items-center justify-center transition-colors duration-200 ease-product focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none bg-brand-yellow text-brand-black font-semibold hover:bg-brand-yellow-hover active:scale-[0.98] focus-visible:ring-brand-yellow h-10 min-h-10 px-4 text-body gap-2 rounded-lg\">…</button> aka getByLabel('Закуп и поступление').getByRole('button', { name: 'Подтвердить поступление' })\n\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /Подтвердить поступление/ })\u001b[22m\n"
+    }
+  ],
+  "findings": [],
+  "screenshots": [
+    "output/playwright/checkpoint-2-20260710162135/01-login-admin.png",
+    "output/playwright/checkpoint-2-20260710162135/02-draft-filled.png",
+    "output/playwright/checkpoint-2-20260710162135/03-login-designer.png",
+    "output/playwright/checkpoint-2-20260710162135/04-designer-assigned.png",
+    "output/playwright/checkpoint-2-20260710162135/05-designer-content-created.png",
+    "output/playwright/checkpoint-2-20260710162135/06-login-admin-review.png",
+    "output/playwright/checkpoint-2-20260710162135/07-admin-review.png",
+    "output/playwright/checkpoint-2-20260710162135/08-admin-review-modal.png",
+    "output/playwright/checkpoint-2-20260710162135/09-login-marketplace-kaspi.png",
+    "output/playwright/checkpoint-2-20260710162135/10-marketplace-queue.png",
+    "output/playwright/checkpoint-2-20260710162135/11-kaspi-panel-empty.png",
+    "output/playwright/checkpoint-2-20260710162135/12-kaspi-panel-filled.png",
+    "output/playwright/checkpoint-2-20260710162135/13-login-purchase-order.png",
+    "output/playwright/checkpoint-2-20260710162135/14-purchase-queue-before-order.png",
+    "output/playwright/checkpoint-2-20260710162135/15-purchase-panel-initial.png",
+    "output/playwright/checkpoint-2-20260710162135/16-purchase-panel-filled.png",
+    "output/playwright/checkpoint-2-20260710162135/17-purchase-queue-after-order.png",
+    "output/playwright/checkpoint-2-20260710162135/18-arrival-panel-initial.png",
+    "output/playwright/checkpoint-2-20260710162135/19-arrival-panel-filled.png"
+  ]
+}

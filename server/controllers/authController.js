@@ -19,7 +19,7 @@ const register = async (req, res) => {
       });
     }
 
-    const { name, email, password, role } = req.body;
+    const { name, email, password } = req.body;
 
     // Проверка, что пользователь с таким email не существует
     const existingUser = await User.findOne({ where: { email } });
@@ -30,19 +30,11 @@ const register = async (req, res) => {
       });
     }
 
-    // Только админ может создавать других админов
-    if (role === 'admin' && (!req.user || req.user.role !== 'admin')) {
-      return res.status(403).json({
-        success: false,
-        message: 'Только администратор может создавать других администраторов',
-      });
-    }
-
     const user = await User.create({
       name,
       email,
       password,
-      role: role || 'operator',
+      role: 'operator',
     });
 
     const token = generateToken(user.id);

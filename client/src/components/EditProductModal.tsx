@@ -79,8 +79,6 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
       data.append('name', formData.name);
       data.append('article', formData.article);
       data.append('internalName', formData.internalName);
-      data.append('kaspiName', formData.kaspiName);
-      data.append('kaspiArticle', formData.kaspiArticle);
       data.append('costPrice', formData.costPrice);
       data.append('sellingPrice', formData.sellingPrice);
       data.append('currentStock', formData.currentStock);

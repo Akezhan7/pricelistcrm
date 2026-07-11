@@ -593,10 +593,79 @@ Approved implementation defaults:
 - Add separate tables for history, assets, revisions, marketplace listings, warehouse details, patent, and sale flags.
 - Start Stage 1 with lifecycle foundation only, not the full product passport.
 
+## Stage 8 Purchase And Warehouse Decision
+
+Implemented on 2026-07-10.
+
+- Lifecycle remains the workflow layer; `Order`, `WarehouseReceipt`, `StockHistory`, and `PriceHistory` remain the operational sources of truth.
+- The initial launch purchase uses a dedicated `ProductLifecyclePurchase` bridge and a single-product `Order`. This keeps it distinct from normal replenishment orders and makes receipt completion unambiguous.
+- Arrival confirmation creates the warehouse receipt, receipt item, stock history, order status history, lifecycle history, and stock/status updates in one database transaction.
+- Stable warehouse passport data lives in `ProductWarehouseDetails`, not in stock history or temporary `Product` fields.
+- Sector, shelf, cell, weight, length, width, and height are required before the product can leave `warehouse` for `in_sale`.
+- Cost price may be refined during warehouse completion; an actual change always creates a `PriceHistory` record.
+- Full browser QA for the path from Kaspi through sale remains a checkpoint after Stage 9.
+
+## Stage 9 Sale Launch Decision
+
+Implemented on 2026-07-10.
+
+- `in_sale` is the final working stage. Entering it after warehouse completion does not by itself complete the launch.
+- `Product.lifecycleCompletedAt` is set only when an admin or marketplace manager explicitly completes the sale launch.
+- Product-level `ProductLaunchFlags` stores advertising, promotion, review bonus, notes, updater, completer, and completion time.
+- All three activity flags may remain false because the client specification says they are enabled when needed. `completedAt` records the manager's explicit decision.
+- Sale launch completion updates the Kaspi listing to `in_sale`, product completion time, launch flags, and product action history in one transaction.
+- Later flag edits use a separate update endpoint and never restart or move the lifecycle.
+- Marketplace managers use separate task and completed-sales views so the active queue stays operationally small.
+- Migration backfill treats legacy `in_sale` products as completed and products with `warehouse_completed` history as pending final sale launch.
+- Full browser QA Checkpoint 2 passed on 2026-07-10. See `docs/qa/2026-07-10-live-qa-checkpoint-2.md`.
 
 
 
-Сейчас: QA Checkpoint 1 уже сделан, этапы 1-7 подтверждены.
-После этапов 8-9: QA Checkpoint 2 — полный путь от Kaspi до продажи.
+
+Сейчас: QA Checkpoint 1 подтвердил этапы 1-7. QA Checkpoint 2 выполнен 2026-07-10 и подтвердил этапы 8-9: полный путь от Kaspi до завершенного запуска продаж.
 После этапов 10-13: QA Checkpoint 3 — права, история, KPI, Казпатент.
 После этапа 14: финальный MVP QA перед показом клиенту.
+
+## Stage 10 Permissions Decision
+
+Approved and implemented on 2026-07-10. Implementation is tracked in `docs/superpowers/plans/2026-07-10-product-permissions-implementation.md`.
+
+- Keep `admin` as the MVP project lead and administrator; do not add `project_manager` yet.
+- Use one backend product-permission policy for actions, assignment constraints, and editable fields.
+- Treat routes as coarse protection and service/controller policy checks as authoritative protection.
+- Return actor-specific capabilities to the frontend so controls do not maintain a second role matrix.
+- Reject forbidden submitted fields with `403`; never silently accept or discard them.
+- Keep marketplace fields in `ProductMarketplaceListing` and synchronize legacy Kaspi fields through marketplace services only.
+- Use `assignedToUserId` only for an explicit current employee and show a responsible role when work belongs to an unassigned role queue.
+- Synchronize marketplace ownership between `managedBy`, `marketplaceManagerId`, and the current assignee.
+- Public self-registration always creates `operator`; lifecycle and administrative roles can only be assigned through the admin-only user endpoint.
+- Keep the full browser QA checkpoint after Stage 13; Stage 10 receives focused permission tests and build verification only.
+- Focused permission and affected lifecycle tests pass; API smoke confirms an allowed partial update and a `403` for a forbidden legacy Kaspi field.
+
+## Stage 11 Unified Product History Decision
+
+Approved and implemented on 2026-07-11. Design: `docs/superpowers/specs/2026-07-11-product-history-design.md`.
+
+- `ProductActionHistory` remains the immutable lifecycle and product-card event store.
+- `PriceHistory` and `StockHistory` remain operational sources of truth and are not copied into lifecycle history.
+- `ProductRevisionRequest` and linked assets enrich revision events with comment, state, and attachments.
+- `GET /api/products/:id/history` fetches bounded source windows in parallel, normalizes them into one DTO, merges them newest-first, and returns pagination metadata.
+- Authenticated product viewers receive `view_product_history`; no history mutation endpoint exists.
+- Future product creation, card edits, asset deletion, supplier changes, manual stock changes, and archive actions now create the appropriate immutable source record.
+- Business mutations and their new history records use the same database transaction.
+- Existing products are not given fabricated backfill events because the original actor and exact change time cannot be reconstructed reliably.
+- `ProductActionTimeline` is reusable from workflow and catalog now and can later be embedded in the product passport.
+- API smoke on product `79` returned 15 events from action, price, and stock sources in correct descending order.
+
+## Stage 12 Designer KPI Decision
+
+Approved and implemented on 2026-07-11. Design: `docs/superpowers/specs/2026-07-11-product-designer-kpi-design.md`.
+
+- `Product.kpiWeight` remains the visible product-level KPI value.
+- `ProductDesignerKpiEntry` is the reporting ledger and stores product, designer, reviewer, credited weight, and credited date.
+- Review approval now requires a KPI weight and credits it to the assigned designer in the same transaction as the lifecycle approval and action history event.
+- Preset values are `0.5`, `1`, and `2`; custom positive decimal values are allowed up to `99.99`.
+- KPI reports read `ProductDesignerKpiEntry.creditedAt`, not mutable product update timestamps.
+- Existing products do not receive fabricated KPI entries because historical designer credit cannot be reconstructed reliably.
+- Variation grouping is deferred out of MVP; one approved product card creates one KPI credit.
+- Admins can view the basic designer KPI report by period and optional designer filter.

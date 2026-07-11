@@ -1,18 +1,7 @@
 const { DataTypes } = require('sequelize');
 const bcrypt = require('bcryptjs');
 const sequelize = require('../config/database');
-
-const USER_ROLES = [
-  'admin',
-  'operator',
-  'accountant',
-  'purchase_manager',
-  'warehouse_operator',
-  'driver',
-  'collector',
-  'designer',
-  'marketplace_manager',
-];
+const { USER_ROLES } = require('../constants/userRoles');
 
 const User = sequelize.define('User', {
   id: {
@@ -47,7 +36,7 @@ const User = sequelize.define('User', {
     type: DataTypes.ENUM(...USER_ROLES),
     allowNull: false,
     defaultValue: 'operator',
-    comment: 'Роль: admin, operator, accountant (бухгалтер), purchase_manager (менеджер по закупкам), warehouse_operator (оператор склада), driver (водитель), collector (сборщик)',
+    comment: 'Системная роль пользователя CRM',
   },
   isActive: {
     type: DataTypes.BOOLEAN,

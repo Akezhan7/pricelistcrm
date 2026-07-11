@@ -126,6 +126,8 @@ export const ProductFormFields: React.FC<ProductFormFieldsProps> = ({
 
     mode === 'edit' ? 'text-xs text-danger ml-1' : 'text-xs text-text-muted ml-1';
 
+  const showLegacyKaspiFields = mode === 'create';
+
 
 
   return (
@@ -164,7 +166,7 @@ export const ProductFormFields: React.FC<ProductFormFieldsProps> = ({
 
         </FormField>
 
-        <FormField label="Название для Kaspi">
+        {showLegacyKaspiFields && <FormField label="Название для Kaspi">
 
           <Input
 
@@ -178,9 +180,9 @@ export const ProductFormFields: React.FC<ProductFormFieldsProps> = ({
 
           <p className={kaspiWarningClass + ' mt-1'}>НЕ менять после выгрузки!</p>
 
-        </FormField>
+        </FormField>}
 
-        <FormField label="Артикул Kaspi">
+        {showLegacyKaspiFields && <FormField label="Артикул Kaspi">
 
           <Input
 
@@ -194,7 +196,7 @@ export const ProductFormFields: React.FC<ProductFormFieldsProps> = ({
 
           <p className={kaspiWarningClass + ' mt-1'}>НЕ менять после выгрузки!</p>
 
-        </FormField>
+        </FormField>}
 
       </FormSection>
 

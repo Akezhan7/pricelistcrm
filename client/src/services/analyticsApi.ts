@@ -2,7 +2,8 @@ import api from '../utils/api';
 import type {
   StockAnalytics,
   PurchaseSuggestions,
-  ApiResponse
+  ApiResponse,
+  DesignerKpiReport,
 } from '../types';
 
 class AnalyticsApi {
@@ -89,6 +90,30 @@ class AnalyticsApi {
 
     if (!response.data.success || !response.data.data) {
       throw new Error(response.data.message || 'Ошибка получения товаров с низким остатком');
+    }
+
+    return response.data.data;
+  }
+
+  async getDesignerKpiReport(params?: {
+    from?: string;
+    to?: string;
+    designerId?: number;
+  }): Promise<DesignerKpiReport> {
+    const queryParams = new URLSearchParams();
+
+    if (params?.from) queryParams.append('from', params.from);
+    if (params?.to) queryParams.append('to', params.to);
+    if (params?.designerId) queryParams.append('designerId', String(params.designerId));
+
+    const url = queryParams.toString()
+      ? `${this.baseUrl}/designer-kpi?${queryParams}`
+      : `${this.baseUrl}/designer-kpi`;
+
+    const response = await api.get<ApiResponse<DesignerKpiReport>>(url);
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.message || 'Ошибка получения KPI дизайнеров');
     }
 
     return response.data.data;

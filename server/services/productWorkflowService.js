@@ -2,6 +2,11 @@ const {
   PRODUCT_LIFECYCLE_STATUSES,
   PRODUCT_LIFECYCLE_STATUS_VALUES,
 } = require('../constants/productLifecycle');
+const { Op } = require('sequelize');
+const {
+  getProductPermissions,
+  getProductResponsibility,
+} = require('../constants/productPermissions');
 
 const WORKFLOW_STATUS_BY_ROLE = Object.freeze({
   designer: Object.freeze([
@@ -12,7 +17,6 @@ const WORKFLOW_STATUS_BY_ROLE = Object.freeze({
   marketplace_manager: Object.freeze([PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE]),
   purchase_manager: Object.freeze([PRODUCT_LIFECYCLE_STATUSES.PURCHASE]),
   warehouse_operator: Object.freeze([PRODUCT_LIFECYCLE_STATUSES.WAREHOUSE]),
-  accountant: Object.freeze([PRODUCT_LIFECYCLE_STATUSES.WAREHOUSE]),
 });
 
 const WORKFLOW_ACTION_BY_STATUS = Object.freeze({
@@ -55,13 +59,13 @@ const WORKFLOW_ACTION_BY_STATUS = Object.freeze({
   [PRODUCT_LIFECYCLE_STATUSES.PURCHASE]: Object.freeze({
     nextActionKey: 'purchase_product',
     nextActionLabel: 'Отметить закуп',
-    nextActionEnabled: false,
+    nextActionEnabled: true,
     ownerLabel: 'Закуп',
   }),
   [PRODUCT_LIFECYCLE_STATUSES.WAREHOUSE]: Object.freeze({
     nextActionKey: 'complete_warehouse',
     nextActionLabel: 'Заполнить склад',
-    nextActionEnabled: false,
+    nextActionEnabled: true,
     ownerLabel: 'Склад',
   }),
   [PRODUCT_LIFECYCLE_STATUSES.IN_SALE]: Object.freeze({
@@ -76,6 +80,20 @@ const WORKFLOW_ACTION_BY_STATUS = Object.freeze({
     nextActionEnabled: false,
     ownerLabel: 'Архив',
   }),
+});
+
+const WORKFLOW_PERMISSION_ACTIONS = Object.freeze({
+  assign_designer: Object.freeze(['assign_designer']),
+  upload_content_assets: Object.freeze(['manage_assets']),
+  submit_review: Object.freeze(['submit_review']),
+  review_content: Object.freeze(['approve', 'request_revision']),
+  fix_revision: Object.freeze(['manage_assets', 'resubmit_revision']),
+  marketplace_placement: Object.freeze(['manage_marketplace']),
+  purchase_product: Object.freeze(['manage_purchase']),
+  receive_product: Object.freeze(['manage_purchase']),
+  complete_warehouse: Object.freeze(['manage_warehouse']),
+  complete_sale_launch: Object.freeze(['manage_sale_launch']),
+  manage_sale_launch: Object.freeze(['manage_sale_launch']),
 });
 
 function toPositiveIntegerOrNull(value) {
@@ -97,6 +115,8 @@ function buildProductWorkflowQuery({ user, filters = {} }) {
       where: { ...baseWhere, id: null },
       scope: 'empty',
       canUseExtendedFilters: false,
+      workflowView: 'tasks',
+      canUseSalesView: false,
     };
   }
 
@@ -116,6 +136,8 @@ function buildProductWorkflowQuery({ user, filters = {} }) {
       where,
       scope: 'admin',
       canUseExtendedFilters: true,
+      workflowView: 'tasks',
+      canUseSalesView: false,
     };
   }
 
@@ -128,6 +150,35 @@ function buildProductWorkflowQuery({ user, filters = {} }) {
       },
       scope: 'designer',
       canUseExtendedFilters: false,
+      workflowView: 'tasks',
+      canUseSalesView: false,
+    };
+  }
+
+  if (user.role === 'marketplace_manager') {
+    const salesView = filters.view === 'sales';
+
+    return {
+      where: salesView
+        ? {
+            ...baseWhere,
+            lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
+            lifecycleCompletedAt: { [Op.ne]: null },
+          }
+        : {
+            ...baseWhere,
+            [Op.or]: [
+              { lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE },
+              {
+                lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
+                lifecycleCompletedAt: null,
+              },
+            ],
+          },
+      scope: 'marketplace_manager',
+      workflowView: salesView ? 'sales' : 'tasks',
+      canUseExtendedFilters: false,
+      canUseSalesView: true,
     };
   }
 
@@ -140,6 +191,8 @@ function buildProductWorkflowQuery({ user, filters = {} }) {
       },
       scope: user.role,
       canUseExtendedFilters: false,
+      workflowView: 'tasks',
+      canUseSalesView: false,
     };
   }
 
@@ -147,6 +200,8 @@ function buildProductWorkflowQuery({ user, filters = {} }) {
     where: { ...baseWhere, id: null },
     scope: 'empty',
     canUseExtendedFilters: false,
+    workflowView: 'tasks',
+    canUseSalesView: false,
   };
 }
 
@@ -161,11 +216,48 @@ function resolveWorkflowAction(status) {
 
 function resolveProductWorkflowItem({ product, user }) {
   const plainProduct = product?.toJSON ? product.toJSON() : product;
+  const permissions = getProductPermissions({ user, product: plainProduct });
+  let workflow = plainProduct.lifecycleStatus === PRODUCT_LIFECYCLE_STATUSES.PURCHASE
+    && plainProduct.lifecyclePurchase?.purchasedAt
+    ? {
+        nextActionKey: 'receive_product',
+        nextActionLabel: 'Подтвердить поступление',
+        nextActionEnabled: true,
+        ownerLabel: 'Закуп',
+      }
+    : resolveWorkflowAction(plainProduct.lifecycleStatus);
+
+  if (plainProduct.lifecycleStatus === PRODUCT_LIFECYCLE_STATUSES.IN_SALE) {
+    workflow = plainProduct.lifecycleCompletedAt || plainProduct.launchFlags?.completedAt
+      ? {
+          nextActionKey: 'manage_sale_launch',
+          nextActionLabel: 'Параметры продаж',
+          nextActionEnabled: true,
+          ownerLabel: 'Продажи',
+        }
+      : {
+          nextActionKey: 'complete_sale_launch',
+          nextActionLabel: 'Настроить продажи',
+          nextActionEnabled: true,
+          ownerLabel: 'Маркетплейс',
+        };
+  }
+
+  const requiredActions = WORKFLOW_PERMISSION_ACTIONS[workflow.nextActionKey] || [];
+  workflow = {
+    ...workflow,
+    nextActionEnabled:
+      workflow.nextActionEnabled
+      && (requiredActions.length === 0
+        || requiredActions.some((action) => permissions.allowedActions.includes(action))),
+  };
 
   return {
     ...plainProduct,
-    workflow: resolveWorkflowAction(plainProduct.lifecycleStatus),
+    workflow,
     viewerScope: user?.role || 'anonymous',
+    permissions,
+    responsibility: getProductResponsibility(plainProduct),
   };
 }
 

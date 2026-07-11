@@ -26,6 +26,10 @@ export function useProductEditor(options: UseProductEditorOptions = {}) {
       setLoadingProductId(product.id);
       try {
         const full = await loadFullProduct(product.id);
+        if (!full.permissions?.allowedActions.includes('edit_product_card')) {
+          toast.info('Для вашей роли редактирование основной карточки недоступно');
+          return;
+        }
         setEditingProduct(full);
       } catch (err) {
         console.error('Ошибка загрузки товара:', err);

@@ -24,6 +24,10 @@ const ProductActionHistory = require('./ProductActionHistory');
 const ProductAsset = require('./ProductAsset');
 const ProductRevisionRequest = require('./ProductRevisionRequest');
 const ProductMarketplaceListing = require('./ProductMarketplaceListing');
+const ProductLifecyclePurchase = require('./ProductLifecyclePurchase');
+const ProductWarehouseDetails = require('./ProductWarehouseDetails');
+const ProductLaunchFlags = require('./ProductLaunchFlags');
+const ProductDesignerKpiEntry = require('./ProductDesignerKpiEntry');
 
 // Импортируем связи (все связи определены в associations.js)
 require('./associations');
@@ -54,4 +58,8 @@ module.exports = {
   ProductAsset,
   ProductRevisionRequest,
   ProductMarketplaceListing,
+  ProductLifecyclePurchase,
+  ProductWarehouseDetails,
+  ProductLaunchFlags,
+  ProductDesignerKpiEntry,
 };

@@ -1,16 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import api from '../utils/api';
+import type { UserRole } from '../constants/userRoles';
 
-export type UserRole = 
-  | 'admin' 
-  | 'operator' 
-  | 'accountant' 
-  | 'purchase_manager' 
-  | 'warehouse_operator' 
-  | 'driver' 
-  | 'collector'
-  | 'designer'
-  | 'marketplace_manager';
+export type { UserRole } from '../constants/userRoles';
 
 export type User = {
   id: number;

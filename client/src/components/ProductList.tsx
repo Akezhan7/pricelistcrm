@@ -9,6 +9,7 @@ import {
   Users,
   Settings,
   TrendingUp,
+  History,
   Package,
   Search,
   X,
@@ -34,6 +35,7 @@ import { useProductEditor } from '../hooks/useProductEditor';
 import { ProductVariationsModal } from './ProductVariationsModal';
 
 import { PriceHistoryModal } from './PriceHistoryModal';
+import { ProductHistoryModal } from './ProductHistoryModal';
 
 import api from '../utils/api';
 import { PRODUCT_LIFECYCLE_FILTERS } from '../constants/productLifecycle';
@@ -75,6 +77,7 @@ export const ProductList: React.FC<ProductListProps> = ({
     onUpdated: onRefresh,
   });
   const [productForPriceHistory, setProductForPriceHistory] = useState<Product | null>(null);
+  const [productForHistory, setProductForHistory] = useState<Product | null>(null);
   const [localSearchQuery, setLocalSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 30;
@@ -375,64 +378,87 @@ export const ProductList: React.FC<ProductListProps> = ({
                   ) : undefined
                 }
                 footer={
-                  canEdit ? (
+                  canEdit || product.permissions?.allowedActions.includes('view_product_history') ? (
                     <div className="flex justify-end">
                       <div className="inline-flex items-center gap-1 rounded-lg border border-border-subtle bg-surface-inset/60 p-1">
-                        <IconButton
-                          icon={TrendingUp}
-                          title="История цен"
-                          size="md"
-                          variant="ghost"
-                          className="h-8 w-8 min-h-8 min-w-8"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setProductForPriceHistory(product);
-                          }}
-                        />
-                        <IconButton
-                          icon={Users}
-                          title="Управление поставщиками"
-                          size="md"
-                          variant="ghost"
-                          className="h-8 w-8 min-h-8 min-w-8"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openSuppliers(product);
-                          }}
-                        />
-                        <IconButton
-                          icon={Settings}
-                          title="Управление вариациями"
-                          size="md"
-                          variant="ghost"
-                          className="h-8 w-8 min-h-8 min-w-8"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setProductForVariations(product);
-                          }}
-                        />
-                        <IconButton
-                          icon={Edit}
-                          title="Редактировать товар"
-                          size="md"
-                          variant="ghost"
-                          className="h-8 w-8 min-h-8 min-w-8"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            openEdit(product);
-                          }}
-                        />
-                        <IconButton
-                          icon={Trash2}
-                          title="Удалить товар"
-                          size="md"
-                          variant="danger"
-                          className="h-8 w-8 min-h-8 min-w-8"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setProductToDelete(product);
-                          }}
-                        />
+                        {product.permissions?.allowedActions.includes('view_product_history') && (
+                          <IconButton
+                            icon={History}
+                            title="История товара"
+                            size="md"
+                            variant="ghost"
+                            className="h-8 w-8 min-h-8 min-w-8"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setProductForHistory(product);
+                            }}
+                          />
+                        )}
+                        {canEdit && (
+                          <IconButton
+                            icon={TrendingUp}
+                            title="История цен"
+                            size="md"
+                            variant="ghost"
+                            className="h-8 w-8 min-h-8 min-w-8"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setProductForPriceHistory(product);
+                            }}
+                          />
+                        )}
+                        {product.permissions?.allowedActions.includes('manage_product_suppliers') && (
+                          <IconButton
+                            icon={Users}
+                            title="Управление поставщиками"
+                            size="md"
+                            variant="ghost"
+                            className="h-8 w-8 min-h-8 min-w-8"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openSuppliers(product);
+                            }}
+                          />
+                        )}
+                        {product.permissions?.allowedActions.includes('manage_product_variations') && (
+                          <IconButton
+                            icon={Settings}
+                            title="Управление вариациями"
+                            size="md"
+                            variant="ghost"
+                            className="h-8 w-8 min-h-8 min-w-8"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setProductForVariations(product);
+                            }}
+                          />
+                        )}
+                        {product.permissions?.allowedActions.includes('edit_product_card') && (
+                          <IconButton
+                            icon={Edit}
+                            title="Редактировать товар"
+                            size="md"
+                            variant="ghost"
+                            className="h-8 w-8 min-h-8 min-w-8"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openEdit(product);
+                            }}
+                          />
+                        )}
+                        {product.permissions?.allowedActions.includes('delete_product') && (
+                          <IconButton
+                            icon={Trash2}
+                            title="Удалить товар"
+                            size="md"
+                            variant="danger"
+                            className="h-8 w-8 min-h-8 min-w-8"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setProductToDelete(product);
+                            }}
+                          />
+                        )}
                       </div>
                     </div>
                   ) : undefined
@@ -501,6 +527,11 @@ export const ProductList: React.FC<ProductListProps> = ({
         onClose={() => setProductForPriceHistory(null)}
         productId={productForPriceHistory?.id || 0}
         productName={productForPriceHistory?.name || ''}
+      />
+
+      <ProductHistoryModal
+        product={productForHistory}
+        onClose={() => setProductForHistory(null)}
       />
     </div>
   );

@@ -1,5 +1,6 @@
 const {
   PRODUCT_LIFECYCLE_ACTIONS,
+  PRODUCT_LIFECYCLE_STATUSES,
 } = require('../constants/productLifecycle');
 const {
   createLifecycleActionUpdate,
@@ -127,6 +128,20 @@ function buildKaspiLegacyProductUpdate(listing) {
   return update;
 }
 
+function buildMarketplaceOwnershipUpdate({ actor, product }) {
+  if (!actor?.id || !['admin', 'marketplace_manager'].includes(actor.role)) {
+    throw new Error('Marketplace ownership update is not permitted for this role');
+  }
+
+  const update = { marketplaceManagerId: Number(actor.id) };
+  if ([PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE, PRODUCT_LIFECYCLE_STATUSES.IN_SALE]
+    .includes(product?.lifecycleStatus)) {
+    update.assignedToUserId = Number(actor.id);
+  }
+
+  return update;
+}
+
 function assertKaspiPlacementReady(kaspiListing) {
   if (!kaspiListing) {
     throw new Error('Kaspi listing is required before moving product to purchase');
@@ -189,5 +204,6 @@ module.exports = {
   buildKaspiLegacyProductUpdate,
   buildMarketplaceListingData,
   buildMarketplaceListingUpdate,
+  buildMarketplaceOwnershipUpdate,
   buildMarketplacePlacementReadyPlan,
 };

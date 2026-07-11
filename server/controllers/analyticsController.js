@@ -1,8 +1,43 @@
 const sequelize = require('../config/database');
-const { Product, Category, Supplier, ProductSupplier, StockHistory, Order, OrderItem } = require('../models');
+const {
+  Product,
+  Category,
+  Supplier,
+  ProductSupplier,
+  StockHistory,
+  Order,
+  OrderItem,
+  User,
+  ProductDesignerKpiEntry,
+} = require('../models');
 const { Op } = require('sequelize');
 const { getStockStatus } = require('./productController');
 const { formatStockAnalyticsMessage, formatStockSummary } = require('../utils/whatsappFormatter');
+const { buildDesignerKpiReport } = require('../services/productDesignerKpiService');
+
+function parseDateFilter(value, fallback) {
+  if (!value) return fallback;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.getTime())) {
+    const error = new Error('Invalid date filter');
+    error.status = 400;
+    throw error;
+  }
+  return parsed;
+}
+
+function addUtcDays(date, days) {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+function getDefaultKpiPeriod(now = new Date()) {
+  return {
+    from: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)),
+    toExclusive: addUtcDays(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())), 1),
+  };
+}
 
 /**
  * Общая аналитика по остаткам товаров
@@ -650,6 +685,93 @@ const getLowStockProducts = async (req, res) => {
   }
 };
 
+/**
+ * Designer KPI report for approved product cards.
+ * GET /api/analytics/designer-kpi
+ */
+const getDesignerKpiReport = async (req, res) => {
+  try {
+    const defaults = getDefaultKpiPeriod();
+    const from = parseDateFilter(req.query.from, defaults.from);
+    const toInput = parseDateFilter(req.query.to, addUtcDays(defaults.toExclusive, -1));
+    const toExclusive = addUtcDays(toInput, 1);
+
+    if (from >= toExclusive) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid KPI report period',
+      });
+    }
+
+    const where = {
+      creditedAt: {
+        [Op.gte]: from,
+        [Op.lt]: toExclusive,
+      },
+    };
+
+    if (req.query.designerId) {
+      const designerId = Number(req.query.designerId);
+      if (!Number.isInteger(designerId) || designerId <= 0) {
+        return res.status(400).json({
+          success: false,
+          message: 'designerId must be a positive integer',
+        });
+      }
+      where.designerId = designerId;
+    }
+
+    const entries = await ProductDesignerKpiEntry.findAll({
+      where,
+      include: [
+        {
+          model: Product,
+          as: 'product',
+          attributes: ['id', 'name', 'article'],
+          required: false,
+        },
+        {
+          model: User,
+          as: 'designer',
+          attributes: ['id', 'name', 'email'],
+          required: false,
+        },
+        {
+          model: User,
+          as: 'reviewer',
+          attributes: ['id', 'name'],
+          required: false,
+        },
+      ],
+      order: [['creditedAt', 'DESC']],
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        period: {
+          from: from.toISOString().slice(0, 10),
+          to: addUtcDays(toExclusive, -1).toISOString().slice(0, 10),
+        },
+        ...buildDesignerKpiReport(entries),
+      },
+    });
+  } catch (error) {
+    if (error.status === 400) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    console.error('Error loading designer KPI report:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while loading designer KPI report',
+    });
+  }
+};
+
 module.exports = {
   getStockOverview,
   getStockByCategory,
@@ -659,4 +781,5 @@ module.exports = {
   getStockAnalytics,
   getPurchaseSuggestions,
   getLowStockProducts,
+  getDesignerKpiReport,
 };

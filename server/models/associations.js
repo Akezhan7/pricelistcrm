@@ -22,6 +22,10 @@ const ProductActionHistory = require('./ProductActionHistory');
 const ProductAsset = require('./ProductAsset');
 const ProductRevisionRequest = require('./ProductRevisionRequest');
 const ProductMarketplaceListing = require('./ProductMarketplaceListing');
+const ProductLifecyclePurchase = require('./ProductLifecyclePurchase');
+const ProductWarehouseDetails = require('./ProductWarehouseDetails');
+const ProductLaunchFlags = require('./ProductLaunchFlags');
+const ProductDesignerKpiEntry = require('./ProductDesignerKpiEntry');
 
 // Связи между рынками и секторами
 Market.hasMany(Sector, {
@@ -632,6 +636,56 @@ User.hasMany(ProductMarketplaceListing, {
   as: 'managedMarketplaceListings',
 });
 
+Product.hasOne(ProductLifecyclePurchase, {
+  foreignKey: 'productId',
+  as: 'lifecyclePurchase',
+  onDelete: 'CASCADE',
+});
+ProductLifecyclePurchase.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+ProductLifecyclePurchase.belongsTo(Supplier, { foreignKey: 'supplierId', as: 'supplier' });
+ProductLifecyclePurchase.belongsTo(Order, { foreignKey: 'orderId', as: 'order' });
+ProductLifecyclePurchase.belongsTo(OrderItem, { foreignKey: 'orderItemId', as: 'orderItem' });
+ProductLifecyclePurchase.belongsTo(WarehouseReceipt, {
+  foreignKey: 'warehouseReceiptId',
+  as: 'warehouseReceipt',
+});
+ProductLifecyclePurchase.belongsTo(User, { foreignKey: 'purchasedBy', as: 'purchaser' });
+ProductLifecyclePurchase.belongsTo(User, { foreignKey: 'arrivedBy', as: 'arrivalConfirmer' });
+
+Product.hasOne(ProductWarehouseDetails, {
+  foreignKey: 'productId',
+  as: 'warehouseDetails',
+  onDelete: 'CASCADE',
+});
+ProductWarehouseDetails.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+ProductWarehouseDetails.belongsTo(User, { foreignKey: 'updatedBy', as: 'updater' });
+
+Product.hasOne(ProductLaunchFlags, {
+  foreignKey: 'productId',
+  as: 'launchFlags',
+  onDelete: 'CASCADE',
+});
+ProductLaunchFlags.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+ProductLaunchFlags.belongsTo(User, { foreignKey: 'updatedBy', as: 'updater' });
+ProductLaunchFlags.belongsTo(User, { foreignKey: 'completedBy', as: 'completer' });
+
+Product.hasOne(ProductDesignerKpiEntry, {
+  foreignKey: 'productId',
+  as: 'designerKpiEntry',
+  onDelete: 'CASCADE',
+});
+ProductDesignerKpiEntry.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+ProductDesignerKpiEntry.belongsTo(User, { foreignKey: 'designerId', as: 'designer' });
+ProductDesignerKpiEntry.belongsTo(User, { foreignKey: 'reviewedByUserId', as: 'reviewer' });
+User.hasMany(ProductDesignerKpiEntry, {
+  foreignKey: 'designerId',
+  as: 'designerKpiEntries',
+});
+User.hasMany(ProductDesignerKpiEntry, {
+  foreignKey: 'reviewedByUserId',
+  as: 'reviewedDesignerKpiEntries',
+});
+
 module.exports = {
   Market,
   Sector,
@@ -656,4 +710,8 @@ module.exports = {
   ProductAsset,
   ProductRevisionRequest,
   ProductMarketplaceListing,
+  ProductLifecyclePurchase,
+  ProductWarehouseDetails,
+  ProductLaunchFlags,
+  ProductDesignerKpiEntry,
 };

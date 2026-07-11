@@ -37,6 +37,7 @@ const PRODUCT_LIFECYCLE_ACTIONS = Object.freeze({
   MARK_PURCHASED: 'mark_purchased',
   MARK_ARRIVED: 'mark_arrived',
   COMPLETE_WAREHOUSE: 'complete_warehouse',
+  COMPLETE_SALE_LAUNCH: 'complete_sale_launch',
   ARCHIVE: 'archive',
 });
 
@@ -93,6 +94,11 @@ const PRODUCT_LIFECYCLE_ACTION_CONFIG = Object.freeze({
     from: [PRODUCT_LIFECYCLE_STATUSES.WAREHOUSE],
     to: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
     roles: ['admin', 'warehouse_operator'],
+  }),
+  [PRODUCT_LIFECYCLE_ACTIONS.COMPLETE_SALE_LAUNCH]: Object.freeze({
+    from: [PRODUCT_LIFECYCLE_STATUSES.IN_SALE],
+    to: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
+    roles: ['admin', 'marketplace_manager'],
   }),
   [PRODUCT_LIFECYCLE_ACTIONS.ARCHIVE]: Object.freeze({
     from: PRODUCT_LIFECYCLE_STATUS_VALUES.filter((status) => status !== PRODUCT_LIFECYCLE_STATUSES.ARCHIVED),
