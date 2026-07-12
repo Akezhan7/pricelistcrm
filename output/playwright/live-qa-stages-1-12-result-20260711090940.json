@@ -1,0 +1,53 @@
+{
+  "runId": "20260711090940",
+  "productId": 80,
+  "productName": "QA Full Lifecycle 20260711090940",
+  "productSku": "QA-FULL-KASPI-20260711090940",
+  "generatedAt": "2026-07-11T09:10:15.097Z",
+  "fatalError": "PUT /products/80 expected 403, got 401: {\"success\":false,\"message\":\"Недействительный токен\"}",
+  "steps": [
+    {
+      "name": "Admin prepares QA users, product draft, supplier link, and designer assignment",
+      "status": "passed",
+      "durationMs": 5691
+    },
+    {
+      "name": "Designer uploads content, marks content ready, and submits for review",
+      "status": "passed",
+      "durationMs": 9961
+    },
+    {
+      "name": "Admin requests revision with attachment, designer resubmits",
+      "status": "passed",
+      "durationMs": 12279
+    },
+    {
+      "name": "Admin approves with KPI weight and product moves to marketplace",
+      "status": "passed",
+      "durationMs": 6063
+    },
+    {
+      "name": "Permission probes reject forbidden lifecycle/card actions",
+      "status": "failed",
+      "durationMs": 51,
+      "error": "PUT /products/80 expected 403, got 401: {\"success\":false,\"message\":\"Недействительный токен\"}"
+    }
+  ],
+  "findings": [],
+  "screenshots": [
+    "output/playwright/stages-1-12-20260711090940/01-login-admin.png",
+    "output/playwright/stages-1-12-20260711090940/02-draft-filled.png",
+    "output/playwright/stages-1-12-20260711090940/03-login-designer.png",
+    "output/playwright/stages-1-12-20260711090940/04-designer-assigned.png",
+    "output/playwright/stages-1-12-20260711090940/05-designer-content-created.png",
+    "output/playwright/stages-1-12-20260711090940/06-login-admin-revision.png",
+    "output/playwright/stages-1-12-20260711090940/07-admin-review-before-revision.png",
+    "output/playwright/stages-1-12-20260711090940/08-revision-request-filled.png",
+    "output/playwright/stages-1-12-20260711090940/09-login-designer-revision.png",
+    "output/playwright/stages-1-12-20260711090940/10-designer-revision-task.png",
+    "output/playwright/stages-1-12-20260711090940/11-revision-resubmit-panel.png",
+    "output/playwright/stages-1-12-20260711090940/12-login-admin-approve-kpi.png",
+    "output/playwright/stages-1-12-20260711090940/13-admin-review-after-revision.png",
+    "output/playwright/stages-1-12-20260711090940/14-approve-with-kpi-weight.png"
+  ]
+}

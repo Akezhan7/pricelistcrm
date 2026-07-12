@@ -143,6 +143,24 @@ async function removeUploadedFile(file) {
   }
 }
 
+function getUploadedProductAssetFiles(req) {
+  const files = [];
+
+  if (req.file) files.push(req.file);
+  if (Array.isArray(req.files)) files.push(...req.files);
+  if (req.files && !Array.isArray(req.files)) {
+    Object.values(req.files).forEach((value) => {
+      if (Array.isArray(value)) files.push(...value);
+    });
+  }
+
+  return files;
+}
+
+async function removeUploadedFiles(files) {
+  await Promise.all(files.map((file) => removeUploadedFile(file)));
+}
+
 function canManageProductAssets(user, product) {
   return getProductPermissions({ user, product }).allowedActions
     .includes(PRODUCT_PERMISSION_ACTIONS.MANAGE_ASSETS);
@@ -356,6 +374,21 @@ const getProductWorkflowQueue = async (req, res) => {
       ];
     }
 
+    const countWhereClause = { ...whereClause };
+    const statusCountRows = await Product.findAll({
+      attributes: [
+        'lifecycleStatus',
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+      ],
+      where: countWhereClause,
+      group: ['lifecycleStatus'],
+      raw: true,
+    });
+    const statusCounts = statusCountRows.reduce((acc, row) => {
+      if (row.lifecycleStatus) acc[row.lifecycleStatus] = Number(row.count) || 0;
+      return acc;
+    }, {});
+
     const products = await Product.findAndCountAll({
       where: whereClause,
       include: [
@@ -412,6 +445,7 @@ const getProductWorkflowQueue = async (req, res) => {
           limit: parsedLimit,
           totalPages: Math.ceil(products.count / parsedLimit),
         },
+        statusCounts,
       },
     });
   } catch (error) {
@@ -1227,13 +1261,14 @@ const approveProductReview = async (req, res) => {
 const requestProductRevision = async (req, res) => {
   const transaction = await sequelize.transaction();
   let transactionFinished = false;
+  const uploadedFiles = getUploadedProductAssetFiles(req);
 
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       await transaction.rollback();
       transactionFinished = true;
-      await removeUploadedFile(req.file);
+      await removeUploadedFiles(uploadedFiles);
       return res.status(400).json({
         success: false,
         message: 'Validation errors',
@@ -1252,7 +1287,7 @@ const requestProductRevision = async (req, res) => {
     if (!product) {
       await transaction.rollback();
       transactionFinished = true;
-      await removeUploadedFile(req.file);
+      await removeUploadedFiles(uploadedFiles);
       return res.status(404).json({
         success: false,
         message: 'Product not found',
@@ -1272,18 +1307,19 @@ const requestProductRevision = async (req, res) => {
       transaction,
     });
 
-    let attachment = null;
-    if (req.file) {
-      const assetData = buildProductAssetData({
+    let attachments = [];
+    if (uploadedFiles.length > 0) {
+      const assetRows = uploadedFiles.map((file) => buildProductAssetData({
         productId: product.id,
         uploadedBy: req.user.id,
         assetType: PRODUCT_ASSET_TYPES.REVISION_ATTACHMENT,
-        file: req.file,
+        file,
         notes: plan.revisionRequestData.comment,
         revisionRequestId: revisionRequest.id,
-      });
-      attachment = await ProductAsset.create(assetData, { transaction });
+      }));
+      attachments = await ProductAsset.bulkCreate(assetRows, { transaction, returning: true });
     }
+    const attachmentAssetIds = attachments.map((attachment) => attachment.id);
 
     await ProductActionHistory.create(
       {
@@ -1291,7 +1327,8 @@ const requestProductRevision = async (req, res) => {
         metadata: {
           ...plan.historyEntry.metadata,
           revisionRequestId: revisionRequest.id,
-          attachmentAssetId: attachment?.id || null,
+          attachmentAssetId: attachmentAssetIds[0] || null,
+          attachmentAssetIds,
         },
       },
       { transaction }
@@ -1323,7 +1360,7 @@ const requestProductRevision = async (req, res) => {
       transactionFinished = true;
     }
 
-    await removeUploadedFile(req.file);
+    await removeUploadedFiles(uploadedFiles);
 
     if (/not permitted/i.test(error.message)) {
       return res.status(403).json({

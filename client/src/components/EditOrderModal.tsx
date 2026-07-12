@@ -256,6 +256,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
         deliveryLocation: deliveryLocation || undefined,
         notes: notes || undefined,
         items: activeItems.map(item => ({
+          id: item.id,
           productId: item.productId,
           productVariationId: item.productVariationId || undefined,
           quantity: item.quantity,

@@ -1,16 +1,17 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { CheckCircle2, FileUp, RefreshCw, RotateCcw } from 'lucide-react';
 import api from '../utils/api';
 import { toast } from '../context/ToastContext';
-import type { ProductWorkflowItem } from '../types';
+import type { ProductAsset, ProductRevisionRequest, ProductWorkflowItem } from '../types';
 import { Alert, Button, Input, Modal, Select } from './ui';
+import { ProductAssetsPanel } from './ProductAssetsPanel';
 import { ProductRevisionHistory } from './ProductRevisionHistory';
 import { ProductRevisionModal } from './ProductRevisionModal';
+import { RequirementsChecklist, type RequirementItem } from './RequirementsChecklist';
 
 type ProductReviewActionsProps = {
   product: ProductWorkflowItem;
   onChanged: () => void;
-  onOpenAssets: () => void;
 };
 
 function getErrorMessage(err: unknown, fallback: string) {
@@ -23,12 +24,13 @@ function getErrorMessage(err: unknown, fallback: string) {
 export const ProductReviewActions: React.FC<ProductReviewActionsProps> = ({
   product,
   onChanged,
-  onOpenAssets,
 }) => {
   const [submittingAction, setSubmittingAction] = useState('');
   const [error, setError] = useState('');
   const [revisionModalOpen, setRevisionModalOpen] = useState(false);
   const [revisionRefreshKey, setRevisionRefreshKey] = useState(0);
+  const [assetCount, setAssetCount] = useState(0);
+  const [revisionCount, setRevisionCount] = useState(0);
   const [kpiWeightMode, setKpiWeightMode] = useState('1');
   const [customKpiWeight, setCustomKpiWeight] = useState('');
 
@@ -36,8 +38,46 @@ export const ProductReviewActions: React.FC<ProductReviewActionsProps> = ({
   const canSubmitReview = allowedActions.includes('submit_review');
   const canReview = allowedActions.includes('approve') || allowedActions.includes('request_revision');
   const canResubmitRevision = allowedActions.includes('resubmit_revision');
+  const canEditMaterials = allowedActions.includes('manage_assets') && (canSubmitReview || canResubmitRevision);
   const kpiWeightValue = kpiWeightMode === 'custom' ? Number(customKpiWeight) : Number(kpiWeightMode);
   const kpiWeightValid = Number.isFinite(kpiWeightValue) && kpiWeightValue > 0 && kpiWeightValue <= 99.99;
+  const reviewRequirements: RequirementItem[] = [
+    {
+      label: 'Материалы карточки загружены',
+      met: assetCount > 0,
+      detail: assetCount > 0 ? `Файлов: ${assetCount}` : 'Нужно загрузить хотя бы один файл.',
+    },
+    {
+      label: 'Комментарии по доработке сохранены',
+      met: revisionCount > 0,
+      detail: revisionCount > 0 ? `Записей: ${revisionCount}` : 'Если доработок не было, этот пункт можно считать справочным.',
+    },
+    {
+      label: 'KPI-вес выбран корректно',
+      met: kpiWeightValid,
+    },
+  ];
+
+  const loadReviewRequirements = useCallback(async () => {
+    try {
+      const [assetsResponse, revisionsResponse] = await Promise.all([
+        api.get(`/products/${product.id}/assets`),
+        api.get(`/products/${product.id}/revisions`),
+      ]);
+      const assets: ProductAsset[] = assetsResponse.data.data.assets || [];
+      const revisions: ProductRevisionRequest[] =
+        revisionsResponse.data.data.revisionRequests || [];
+      setAssetCount(assets.length);
+      setRevisionCount(revisions.length);
+    } catch {
+      setAssetCount(0);
+      setRevisionCount(0);
+    }
+  }, [product.id]);
+
+  useEffect(() => {
+    loadReviewRequirements();
+  }, [loadReviewRequirements, revisionRefreshKey]);
 
   const runLifecycleAction = async ({
     action,
@@ -74,6 +114,28 @@ export const ProductReviewActions: React.FC<ProductReviewActionsProps> = ({
       </div>
 
       {error && <Alert variant="error">{error}</Alert>}
+
+      <section className="space-y-2">
+        <div>
+          <h4 className="text-body-medium text-brand-black">Материалы дизайнера</h4>
+          <p className="text-body text-text-muted">
+            Проверьте загруженные фото, слайды, исходники и комментарии перед решением.
+          </p>
+        </div>
+        <ProductAssetsPanel
+          productId={product.id}
+          productName={product.name}
+          canEdit={canEditMaterials}
+          canSubmitContent={false}
+          onContentSubmitted={() => undefined}
+          showProductHeader={false}
+          onAssetsChanged={(assets) => setAssetCount(assets.length)}
+        />
+      </section>
+
+      <ProductRevisionHistory productId={product.id} refreshKey={revisionRefreshKey} />
+
+      <RequirementsChecklist items={reviewRequirements} />
 
       <div className="rounded-xl border border-border-subtle bg-surface-muted p-3">
         {canSubmitReview && (
@@ -175,9 +237,6 @@ export const ProductReviewActions: React.FC<ProductReviewActionsProps> = ({
               </p>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
-              <Button type="button" variant="secondary" onClick={onOpenAssets}>
-                Материалы
-              </Button>
               <Button
                 type="button"
                 variant="primary"
@@ -205,8 +264,6 @@ export const ProductReviewActions: React.FC<ProductReviewActionsProps> = ({
         )}
       </div>
 
-      <ProductRevisionHistory productId={product.id} refreshKey={revisionRefreshKey} />
-
       <Modal
         isOpen={revisionModalOpen}
         onClose={() => setRevisionModalOpen(false)}
@@ -221,6 +278,7 @@ export const ProductReviewActions: React.FC<ProductReviewActionsProps> = ({
           onSubmitted={() => {
             setRevisionModalOpen(false);
             setRevisionRefreshKey((value) => value + 1);
+            loadReviewRequirements();
             onChanged();
           }}
         />

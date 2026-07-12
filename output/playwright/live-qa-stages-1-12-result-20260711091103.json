@@ -1,0 +1,96 @@
+{
+  "runId": "20260711091103",
+  "productId": 81,
+  "productName": "QA Full Lifecycle 20260711091103",
+  "productSku": "QA-FULL-KASPI-20260711091103",
+  "generatedAt": "2026-07-11T09:12:42.320Z",
+  "fatalError": "locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'В продаже', exact: true })\u001b[22m\n",
+  "steps": [
+    {
+      "name": "Admin prepares QA users, product draft, supplier link, and designer assignment",
+      "status": "passed",
+      "durationMs": 6009
+    },
+    {
+      "name": "Designer uploads content, marks content ready, and submits for review",
+      "status": "passed",
+      "durationMs": 10000
+    },
+    {
+      "name": "Admin requests revision with attachment, designer resubmits",
+      "status": "passed",
+      "durationMs": 12370
+    },
+    {
+      "name": "Admin approves with KPI weight and product moves to marketplace",
+      "status": "passed",
+      "durationMs": 6043
+    },
+    {
+      "name": "Permission probes reject forbidden lifecycle/card actions",
+      "status": "passed",
+      "durationMs": 15
+    },
+    {
+      "name": "Marketplace manager publishes Kaspi listing and sends product to purchase",
+      "status": "passed",
+      "durationMs": 6630
+    },
+    {
+      "name": "Purchase manager creates initial purchase and confirms partial arrival",
+      "status": "passed",
+      "durationMs": 10153
+    },
+    {
+      "name": "Warehouse operator completes warehouse passport",
+      "status": "passed",
+      "durationMs": 5597
+    },
+    {
+      "name": "Marketplace manager completes sale launch and edits completed sale flags",
+      "status": "passed",
+      "durationMs": 9496
+    },
+    {
+      "name": "Admin visually verifies history timeline and KPI report",
+      "status": "failed",
+      "durationMs": 32272,
+      "error": "locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'В продаже', exact: true })\u001b[22m\n"
+    }
+  ],
+  "findings": [],
+  "screenshots": [
+    "output/playwright/stages-1-12-20260711091103/01-login-admin.png",
+    "output/playwright/stages-1-12-20260711091103/02-draft-filled.png",
+    "output/playwright/stages-1-12-20260711091103/03-login-designer.png",
+    "output/playwright/stages-1-12-20260711091103/04-designer-assigned.png",
+    "output/playwright/stages-1-12-20260711091103/05-designer-content-created.png",
+    "output/playwright/stages-1-12-20260711091103/06-login-admin-revision.png",
+    "output/playwright/stages-1-12-20260711091103/07-admin-review-before-revision.png",
+    "output/playwright/stages-1-12-20260711091103/08-revision-request-filled.png",
+    "output/playwright/stages-1-12-20260711091103/09-login-designer-revision.png",
+    "output/playwright/stages-1-12-20260711091103/10-designer-revision-task.png",
+    "output/playwright/stages-1-12-20260711091103/11-revision-resubmit-panel.png",
+    "output/playwright/stages-1-12-20260711091103/12-login-admin-approve-kpi.png",
+    "output/playwright/stages-1-12-20260711091103/13-admin-review-after-revision.png",
+    "output/playwright/stages-1-12-20260711091103/14-approve-with-kpi-weight.png",
+    "output/playwright/stages-1-12-20260711091103/15-login-marketplace-kaspi.png",
+    "output/playwright/stages-1-12-20260711091103/16-marketplace-queue.png",
+    "output/playwright/stages-1-12-20260711091103/17-kaspi-panel-empty.png",
+    "output/playwright/stages-1-12-20260711091103/18-kaspi-panel-filled.png",
+    "output/playwright/stages-1-12-20260711091103/19-login-purchase-order.png",
+    "output/playwright/stages-1-12-20260711091103/20-purchase-queue-before-order.png",
+    "output/playwright/stages-1-12-20260711091103/21-purchase-panel-filled.png",
+    "output/playwright/stages-1-12-20260711091103/22-purchase-queue-after-order.png",
+    "output/playwright/stages-1-12-20260711091103/23-arrival-panel-filled.png",
+    "output/playwright/stages-1-12-20260711091103/24-login-warehouse.png",
+    "output/playwright/stages-1-12-20260711091103/25-warehouse-queue.png",
+    "output/playwright/stages-1-12-20260711091103/26-warehouse-panel-filled.png",
+    "output/playwright/stages-1-12-20260711091103/27-login-marketplace-sale-launch.png",
+    "output/playwright/stages-1-12-20260711091103/28-sale-launch-task-queue.png",
+    "output/playwright/stages-1-12-20260711091103/29-sale-launch-panel-filled.png",
+    "output/playwright/stages-1-12-20260711091103/30-completed-product-sales-view.png",
+    "output/playwright/stages-1-12-20260711091103/31-completed-sale-panel-updated.png",
+    "output/playwright/stages-1-12-20260711091103/32-login-admin-history-kpi.png"
+  ]
+}

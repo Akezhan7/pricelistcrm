@@ -5,6 +5,7 @@ import productsApi, { ProductLifecycleOperations } from '../services/productsApi
 import type { Product, ProductWorkflowItem } from '../types';
 import { formatPriceKZT } from '../utils/format';
 import { Alert, Badge, Button, Input, Select, Spinner, Textarea } from './ui';
+import { RequirementsChecklist, type RequirementItem } from './RequirementsChecklist';
 
 type ProductPurchaseActionsProps = {
   product: ProductWorkflowItem;
@@ -124,6 +125,27 @@ export const ProductPurchaseActions: React.FC<ProductPurchaseActionsProps> = ({
     supplierId && Number(quantity) > 0 && Number(purchasePrice) >= 0
   );
   const arrivalReady = Number(receivedQuantity) > 0;
+  const purchaseRequirements: RequirementItem[] = purchase
+    ? [
+        {
+          label: 'Фактическое количество поступления указано',
+          met: Number(receivedQuantity) > 0,
+        },
+      ]
+    : [
+        {
+          label: 'Поставщик выбран',
+          met: Boolean(supplierId),
+        },
+        {
+          label: 'Количество больше 0',
+          met: Number(quantity) > 0,
+        },
+        {
+          label: 'Закупочная цена указана',
+          met: Number(purchasePrice) >= 0 && purchasePrice.trim().length > 0,
+        },
+      ];
 
   return (
     <div className="space-y-4">
@@ -192,6 +214,7 @@ export const ProductPurchaseActions: React.FC<ProductPurchaseActionsProps> = ({
               className="resize-none"
             />
           </div>
+          <RequirementsChecklist items={purchaseRequirements} />
           {canEdit && (
             <div className="flex justify-end">
               <Button
@@ -234,6 +257,7 @@ export const ProductPurchaseActions: React.FC<ProductPurchaseActionsProps> = ({
             />
           </div>
           <Alert variant="info">После подтверждения остаток увеличится, а товар перейдет в очередь склада.</Alert>
+          <RequirementsChecklist items={purchaseRequirements} />
           {canEdit && (
             <div className="flex justify-end">
               <Button

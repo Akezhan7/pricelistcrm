@@ -39,6 +39,7 @@ import { ProductHistoryModal } from './ProductHistoryModal';
 
 import api from '../utils/api';
 import { PRODUCT_LIFECYCLE_FILTERS } from '../constants/productLifecycle';
+import { cn } from '../utils/cn';
 
 type ProductListProps = {
   products: Product[];
@@ -51,6 +52,7 @@ type ProductListProps = {
   canAssignDesigner?: boolean;
   lifecycleStatusFilter?: ProductLifecycleStatus | '';
   onLifecycleStatusFilterChange?: (status: ProductLifecycleStatus | '') => void;
+  compact?: boolean;
 };
 
 export const ProductList: React.FC<ProductListProps> = ({
@@ -64,6 +66,7 @@ export const ProductList: React.FC<ProductListProps> = ({
   canAssignDesigner = false,
   lifecycleStatusFilter = '',
   onLifecycleStatusFilterChange,
+  compact = false,
 }) => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isCreateDraftModalOpen, setIsCreateDraftModalOpen] = useState(false);
@@ -170,9 +173,6 @@ export const ProductList: React.FC<ProductListProps> = ({
   };
 
   const handleDraftCreated = () => {
-    if (onLifecycleStatusFilterChange) {
-      onLifecycleStatusFilterChange('new');
-    }
     onRefresh();
   };
 
@@ -210,7 +210,13 @@ export const ProductList: React.FC<ProductListProps> = ({
 
   return (
     <div className="flex flex-col flex-1" style={{ minHeight: 0 }}>
-      <div className="px-4 py-3 border-b border-border-subtle flex flex-col sm:flex-row sm:items-center gap-3 bg-surface-page/95 backdrop-blur-sm sticky top-0 z-10 shrink-0">
+      <div
+        className={cn(
+          'px-4 py-3 border-b border-border-subtle grid grid-cols-1 gap-3 bg-surface-page/95 backdrop-blur-sm sticky top-0 z-10 shrink-0',
+          !compact &&
+            'md:grid-cols-[repeat(2,minmax(0,1fr))] xl:grid-cols-[auto_auto_minmax(12rem,14rem)_minmax(18rem,1fr)] xl:items-center'
+        )}
+      >
         {canEdit && (
           <Button
             type="button"
@@ -218,7 +224,7 @@ export const ProductList: React.FC<ProductListProps> = ({
             leftIcon={Plus}
             onClick={() => setIsCreateModalOpen(true)}
             fullWidth
-            className="sm:w-auto sm:shrink-0"
+            className={cn(compact ? 'w-full' : 'md:w-auto md:shrink-0')}
           >
             Добавить товар
           </Button>
@@ -230,7 +236,7 @@ export const ProductList: React.FC<ProductListProps> = ({
             leftIcon={Plus}
             onClick={() => setIsCreateDraftModalOpen(true)}
             fullWidth
-            className="sm:w-auto sm:shrink-0"
+            className={cn(compact ? 'w-full' : 'md:w-auto md:shrink-0')}
           >
             Быстрый черновик
           </Button>
@@ -241,7 +247,7 @@ export const ProductList: React.FC<ProductListProps> = ({
             onChange={(e) =>
               onLifecycleStatusFilterChange(e.target.value as ProductLifecycleStatus | '')
             }
-            className="sm:max-w-48"
+            className="min-w-0 xl:w-56"
             aria-label="Фильтр по этапу товара"
           >
             {PRODUCT_LIFECYCLE_FILTERS.map((option) => (
@@ -251,17 +257,14 @@ export const ProductList: React.FC<ProductListProps> = ({
             ))}
           </Select>
         )}
-        <div className="relative flex-1 min-w-0 w-full">
-          <Search
-            className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted pointer-events-none z-10"
-            aria-hidden
-          />
+        <div className={cn('relative min-w-0 w-full', !compact && 'md:col-span-2 xl:col-span-1')}>
           <Input
+            leftIcon={Search}
             type="text"
             placeholder="Поиск по названию или артикулу..."
             value={localSearchQuery}
             onChange={(e) => setLocalSearchQuery(e.target.value)}
-            className="pl-10 pr-10 bg-brand-white border-border-subtle shadow-sm focus:border-brand-yellow focus:ring-2 focus:ring-brand-yellow/20"
+            className="pr-10 bg-brand-white border-border-subtle shadow-sm focus:border-brand-yellow focus:ring-2 focus:ring-brand-yellow/20"
           />
           {localSearchQuery && (
             <div className="absolute right-1 top-1/2 -translate-y-1/2">

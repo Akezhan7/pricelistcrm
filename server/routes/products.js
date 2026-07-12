@@ -206,7 +206,10 @@ router.post('/:id/lifecycle/approve',
 router.post('/:id/lifecycle/request-revision',
   auth,
   requireRole('admin'),
-  uploadProductAsset.single('attachment'),
+  uploadProductAsset.fields([
+    { name: 'attachments', maxCount: 20 },
+    { name: 'attachment', maxCount: 1 },
+  ]),
   [
     body('comment')
       .trim()

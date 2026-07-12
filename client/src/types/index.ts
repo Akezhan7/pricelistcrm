@@ -568,6 +568,7 @@ export interface UpdateOrderDto {
   deliveryLocation?: string;
   notes?: string;
   items?: Array<{
+    id?: number;
     productId: number;
     productVariationId?: number;
     quantity: number;

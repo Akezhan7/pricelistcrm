@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Download, FileText, Image as ImageIcon, Send, Trash2 } from 'lucide-react';
 import api from '../utils/api';
 import getImageUrl from '../utils/image';
@@ -22,6 +22,8 @@ type ProductAssetsPanelProps = {
   canEdit: boolean;
   canSubmitContent: boolean;
   onContentSubmitted: () => void;
+  showProductHeader?: boolean;
+  onAssetsChanged?: (assets: ProductAsset[]) => void;
 };
 
 const assetTypeOptions: Array<{
@@ -81,15 +83,22 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
   canEdit,
   canSubmitContent,
   onContentSubmitted,
+  showProductHeader = true,
+  onAssetsChanged,
 }) => {
   const [assets, setAssets] = useState<ProductAsset[]>([]);
   const [assetType, setAssetType] = useState<ProductAssetType>('product_photo');
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [submittingContent, setSubmittingContent] = useState(false);
   const [error, setError] = useState('');
+  const onAssetsChangedRef = useRef(onAssetsChanged);
+
+  useEffect(() => {
+    onAssetsChangedRef.current = onAssetsChanged;
+  }, [onAssetsChanged]);
 
   const selectedAssetType = useMemo(
     () => assetTypeOptions.find((option) => option.value === assetType) || assetTypeOptions[0],
@@ -110,7 +119,9 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
     setLoading(true);
     try {
       const response = await api.get(`/products/${productId}/assets`);
-      setAssets(response.data.data.assets || []);
+      const loadedAssets = response.data.data.assets || [];
+      setAssets(loadedAssets);
+      onAssetsChangedRef.current?.(loadedAssets);
       setError('');
     } catch {
       setError('Не удалось загрузить материалы товара');
@@ -126,25 +137,41 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
   const handleUpload = async () => {
     setError('');
 
-    if (!file) {
+    if (files.length === 0) {
       setError('Выберите файл');
       return;
     }
 
     setUploading(true);
     try {
-      const data = new FormData();
-      data.append('assetType', assetType);
-      data.append('asset', file);
-      if (notes.trim()) data.append('notes', notes.trim());
+      const results = await Promise.allSettled(
+        files.map((selectedFile) => {
+          const data = new FormData();
+          data.append('assetType', assetType);
+          data.append('asset', selectedFile);
+          if (notes.trim()) data.append('notes', notes.trim());
 
-      await api.post(`/products/${productId}/assets`, data, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+          return api.post(`/products/${productId}/assets`, data, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
+        })
+      );
 
-      toast.success('Материал загружен');
-      setFile(null);
-      setNotes('');
+      const failedFiles = files.filter((_, index) => results[index].status === 'rejected');
+      const successCount = files.length - failedFiles.length;
+
+      if (successCount > 0) {
+        toast.success(
+          successCount === 1 ? 'Материал загружен' : `Загружено файлов: ${successCount}`
+        );
+      }
+
+      setFiles(failedFiles);
+      if (failedFiles.length === 0) {
+        setNotes('');
+      } else {
+        setError(`РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ С„Р°Р№Р»РѕРІ: ${failedFiles.length}`);
+      }
       await loadAssets();
     } catch (err: unknown) {
       const message =
@@ -189,10 +216,12 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
 
   return (
     <div className="space-y-4">
-      <div>
-        <p className="text-caption text-text-muted">Товар</p>
-        <h3 className="text-section-title text-brand-black">{productName}</h3>
-      </div>
+      {showProductHeader && (
+        <div>
+          <p className="text-caption text-text-muted">Товар</p>
+          <h3 className="text-section-title text-brand-black">{productName}</h3>
+        </div>
+      )}
 
       {error && <Alert variant="error">{error}</Alert>}
 
@@ -204,7 +233,7 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
               value={assetType}
               onChange={(event) => {
                 setAssetType(event.target.value as ProductAssetType);
-                setFile(null);
+                setFiles([]);
               }}
             >
               {assetTypeOptions.map((option) => (
@@ -225,8 +254,9 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
 
           <FormField label="Файл">
             <FileUploadZone
-              selectedFile={file}
-              onFileChange={setFile}
+              selectedFiles={files}
+              onFilesChange={setFiles}
+              multiple
               accept={selectedAssetType.accept}
               label="Выбрать файл"
               hint={selectedAssetType.hint}
@@ -238,7 +268,7 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
               type="button"
               variant="primary"
               loading={uploading}
-              disabled={uploading || !file}
+              disabled={uploading || files.length === 0}
               onClick={handleUpload}
             >
               Загрузить

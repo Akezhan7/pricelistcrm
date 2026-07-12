@@ -405,6 +405,7 @@ export const Dashboard: React.FC = () => {
                   onSelectProduct={handleSelectProduct}
                   onRefresh={refreshData}
                   canEdit={canEdit}
+                  compact
                 />
               </div>
             </div>

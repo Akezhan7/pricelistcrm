@@ -17,7 +17,7 @@ export const ProductRevisionModal: React.FC<ProductRevisionModalProps> = ({
   onSubmitted,
 }) => {
   const [comment, setComment] = useState('');
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -34,7 +34,7 @@ export const ProductRevisionModal: React.FC<ProductRevisionModalProps> = ({
     try {
       const data = new FormData();
       data.append('comment', normalizedComment);
-      if (file) data.append('attachment', file);
+      files.forEach((file) => data.append('attachments', file));
 
       await api.post(`/products/${productId}/lifecycle/request-revision`, data, {
         headers: { 'Content-Type': 'multipart/form-data' },
@@ -72,8 +72,9 @@ export const ProductRevisionModal: React.FC<ProductRevisionModalProps> = ({
 
       <FormField label="Файл к доработке">
         <FileUploadZone
-          selectedFile={file}
-          onFileChange={setFile}
+          selectedFiles={files}
+          onFilesChange={setFiles}
+          multiple
           accept="image/*,application/pdf,.psd"
           label="Прикрепить файл"
           hint="Изображение, PDF или PSD до 50MB"

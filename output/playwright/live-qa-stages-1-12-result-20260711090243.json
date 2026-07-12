@@ -1,0 +1,18 @@
+{
+  "runId": "20260711090243",
+  "productId": null,
+  "productName": "QA Full Lifecycle 20260711090243",
+  "productSku": "QA-FULL-KASPI-20260711090243",
+  "generatedAt": "2026-07-11T09:03:18.784Z",
+  "fatalError": "locator.fill: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByLabel('Email Р°РґСЂРµСЃ')\u001b[22m\n",
+  "steps": [
+    {
+      "name": "Admin prepares QA users, product draft, supplier link, and designer assignment",
+      "status": "failed",
+      "durationMs": 33641,
+      "error": "locator.fill: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByLabel('Email Р°РґСЂРµСЃ')\u001b[22m\n"
+    }
+  ],
+  "findings": [],
+  "screenshots": []
+}

@@ -1,10 +1,12 @@
 import React from 'react';
+import type { LucideIcon } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
   error?: string;
   helperText?: string;
+  leftIcon?: LucideIcon;
 }
 
 const fieldBaseClasses =
@@ -17,7 +19,7 @@ const fieldBaseClasses =
 const labelClasses = 'block text-caption font-medium text-brand-black mb-1.5';
 
 export const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, helperText, className, id, ...props }, ref) => {
+  ({ label, error, helperText, className, id, leftIcon: LeftIcon, ...props }, ref) => {
     const inputId = id ?? (label ? `input-${label.replace(/\s+/g, '-').toLowerCase()}` : undefined);
 
     return (
@@ -27,20 +29,29 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
             {label}
           </label>
         )}
-        <input
-          ref={ref}
-          id={inputId}
-          className={cn(
-            fieldBaseClasses,
-            error && 'border-danger focus:ring-danger/20 focus:border-danger',
-            className
+        <div className="relative">
+          {LeftIcon && (
+            <LeftIcon
+              className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-text-muted"
+              aria-hidden
+            />
           )}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={
-            error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined
-          }
-          {...props}
-        />
+          <input
+            ref={ref}
+            id={inputId}
+            className={cn(
+              fieldBaseClasses,
+              LeftIcon && 'pl-10',
+              error && 'border-danger focus:ring-danger/20 focus:border-danger',
+              className
+            )}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={
+              error ? `${inputId}-error` : helperText ? `${inputId}-helper` : undefined
+            }
+            {...props}
+          />
+        </div>
         {error && (
           <p id={`${inputId}-error`} className="mt-1.5 text-caption text-danger" role="alert">
             {error}

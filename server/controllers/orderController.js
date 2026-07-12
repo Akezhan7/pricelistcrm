@@ -1,10 +1,11 @@
 const { Op } = require('sequelize');
 const sequelize = require('../config/database');
-const { Order, OrderItem, OrderStatusHistory, Product, Supplier, User, Payment, ProductVariation, OrderConfirmation, CollectorTask } = require('../models');
+const { Order, OrderItem, OrderStatusHistory, Product, Supplier, User, Payment, ProductVariation, OrderConfirmation, CollectorTask, ProductLifecyclePurchase } = require('../models');
 const { recalculateSupplierDebt } = require('./paymentController');
 const { createPriceHistoryRecord } = require('./priceHistoryController');
 const { formatOrderMessage, generateWhatsAppLink } = require('../utils/whatsappFormatter');
 const { generateOrderNumber } = require('../services/orderNumberService');
+const { buildOrderItemSyncPlan } = require('../services/orderItemSyncService');
 
 /**
  * Автоматический расчет статуса оплаты на основе сумм
@@ -452,14 +453,7 @@ exports.updateOrder = async (req, res) => {
 
     // Обновление товаров если они переданы
     if (items && items.length > 0) {
-      // Удалить старые товары
-      await OrderItem.destroy({
-        where: { orderId: order.id },
-        transaction
-      });
-
       // Проверка существования товаров и вариаций, расчет новой суммы
-      let totalAmount = 0;
       for (const item of items) {
         const product = await Product.findByPk(item.productId);
         if (!product) {
@@ -489,24 +483,53 @@ exports.updateOrder = async (req, res) => {
           }
         }
 
-        totalAmount += parseFloat(item.priceAtPurchase) * parseInt(item.quantity);
       }
 
-      // Создать новые товары
-      const orderItemsData = items.map(item => ({
+      const [existingItems, lifecyclePurchases] = await Promise.all([
+        OrderItem.findAll({
+          where: { orderId: order.id },
+          transaction,
+          lock: true,
+        }),
+        ProductLifecyclePurchase.findAll({
+          where: { orderId: order.id },
+          transaction,
+          lock: true,
+        }),
+      ]);
+
+      const syncPlan = buildOrderItemSyncPlan({
         orderId: order.id,
-        productId: item.productId,
-        productVariationId: item.productVariationId || null,
-        quantity: item.quantity,
-        priceAtPurchase: item.priceAtPurchase,
-        totalPrice: (parseFloat(item.priceAtPurchase) * parseInt(item.quantity)).toFixed(2),
-        notes: item.notes || null
-      }));
+        existingItems,
+        lifecyclePurchases,
+        incomingItems: items,
+      });
 
-      await OrderItem.bulkCreate(orderItemsData, { transaction });
+      const existingItemsById = new Map(existingItems.map((item) => [Number(item.id), item]));
+      for (const update of syncPlan.updates) {
+        const orderItem = existingItemsById.get(Number(update.id));
+        await orderItem.update(update.data, { transaction });
+      }
 
-      // Обновить общую сумму заявки
-      order.totalAmount = totalAmount.toFixed(2);
+      if (syncPlan.deleteIds.length > 0) {
+        await OrderItem.destroy({
+          where: { id: { [Op.in]: syncPlan.deleteIds }, orderId: order.id },
+          transaction,
+        });
+      }
+
+      if (syncPlan.creates.length > 0) {
+        await OrderItem.bulkCreate(syncPlan.creates, { transaction });
+      }
+
+      for (const update of syncPlan.lifecyclePurchaseUpdates) {
+        await ProductLifecyclePurchase.update(update.data, {
+          where: { id: update.id, orderId: order.id },
+          transaction,
+        });
+      }
+
+      order.totalAmount = syncPlan.totalAmount;
     }
 
     await order.save({ transaction });
@@ -550,6 +573,12 @@ exports.updateOrder = async (req, res) => {
 
   } catch (error) {
     await transaction.rollback();
+    if (/Cannot delete lifecycle-linked order item|Cannot change product for lifecycle-linked order item/i.test(error.message)) {
+      return res.status(409).json({
+        success: false,
+        message: 'Нельзя удалить или заменить строку, связанную с lifecycle-закупом. Можно изменить количество, цену и заметки, а остальные товары добавлять или удалять отдельно.',
+      });
+    }
     console.error('Ошибка обновления заявки:', error);
     res.status(500).json({
       success: false,

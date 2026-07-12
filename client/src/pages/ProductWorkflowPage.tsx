@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight,
   BriefcaseBusiness,
@@ -21,6 +21,7 @@ import {
   Input,
   Modal,
   PageHeader,
+  Pagination,
   Select,
   Spinner,
 } from '../components/ui';
@@ -56,7 +57,14 @@ type WorkflowUser = {
   role: string;
 };
 
-const API_LIST_LIMIT = 100;
+const WORKFLOW_PAGE_LIMIT = 50;
+
+type WorkflowPagination = {
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+};
 
 const roleQueueLabels: Record<string, string> = {
   admin: 'Общая очередь',
@@ -79,6 +87,7 @@ function formatUserLabel(user?: { name?: string; email?: string } | null) {
 export const ProductWorkflowPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [products, setProducts] = useState<ProductWorkflowItem[]>([]);
   const [workflow, setWorkflow] = useState<WorkflowMeta>({
     scope: user?.role || 'empty',
@@ -87,11 +96,14 @@ export const ProductWorkflowPage: React.FC = () => {
   const [users, setUsers] = useState<WorkflowUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingUsers, setLoadingUsers] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<ProductLifecycleStatus | ''>('');
-  const [designerFilter, setDesignerFilter] = useState('');
-  const [assignedFilter, setAssignedFilter] = useState('');
   const [totalProducts, setTotalProducts] = useState(0);
+  const [pagination, setPagination] = useState<WorkflowPagination>({
+    total: 0,
+    page: 1,
+    limit: WORKFLOW_PAGE_LIMIT,
+    totalPages: 1,
+  });
+  const [statusCounts, setStatusCounts] = useState<Partial<Record<ProductLifecycleStatus, number>>>({});
   const [assetProduct, setAssetProduct] = useState<ProductWorkflowItem | null>(null);
   const [reviewProduct, setReviewProduct] = useState<ProductWorkflowItem | null>(null);
   const [marketplaceProduct, setMarketplaceProduct] = useState<ProductWorkflowItem | null>(null);
@@ -99,14 +111,40 @@ export const ProductWorkflowPage: React.FC = () => {
   const [warehouseProduct, setWarehouseProduct] = useState<ProductWorkflowItem | null>(null);
   const [saleProduct, setSaleProduct] = useState<ProductWorkflowItem | null>(null);
   const [historyProduct, setHistoryProduct] = useState<ProductWorkflowItem | null>(null);
-  const [queueView, setQueueView] = useState<'tasks' | 'sales'>('tasks');
 
-  const canUseExtendedFilters = workflow.canUseExtendedFilters;
+  const canUseExtendedFilters = user?.role === 'admin' || workflow.canUseExtendedFilters;
+  const searchQuery = searchParams.get('search') || '';
+  const statusFilter = (searchParams.get('status') || '') as ProductLifecycleStatus | '';
+  const designerFilter = searchParams.get('designerId') || '';
+  const assignedFilter = searchParams.get('assignedToUserId') || '';
+  const queueView = searchParams.get('view') === 'sales' ? 'sales' : 'tasks';
+  const currentPage = Math.max(Number(searchParams.get('page')) || 1, 1);
+
+  const updateQuery = useCallback(
+    (updates: Record<string, string>, { resetPage = true }: { resetPage?: boolean } = {}) => {
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        Object.entries(updates).forEach(([key, value]) => {
+          if (value) {
+            next.set(key, value);
+          } else {
+            next.delete(key);
+          }
+        });
+        if (resetPage) next.delete('page');
+        return next;
+      });
+    },
+    [setSearchParams]
+  );
 
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
-      const params = new URLSearchParams({ limit: String(API_LIST_LIMIT) });
+      const params = new URLSearchParams({
+        page: String(currentPage),
+        limit: String(WORKFLOW_PAGE_LIMIT),
+      });
       if (searchQuery.trim()) params.set('search', searchQuery.trim());
       if (canUseExtendedFilters && statusFilter) params.set('lifecycleStatus', statusFilter);
       if (canUseExtendedFilters && designerFilter) params.set('designerId', designerFilter);
@@ -119,15 +157,39 @@ export const ProductWorkflowPage: React.FC = () => {
         scope: user?.role || 'empty',
         canUseExtendedFilters: false,
       });
-      setTotalProducts(response.data.data.pagination?.total || 0);
+      const nextPagination = response.data.data.pagination || {
+        total: 0,
+        page: currentPage,
+        limit: WORKFLOW_PAGE_LIMIT,
+        totalPages: 1,
+      };
+      setPagination(nextPagination);
+      setTotalProducts(nextPagination.total || 0);
+      setStatusCounts(response.data.data.statusCounts || {});
     } catch (error) {
       console.error('Ошибка загрузки очереди товаров:', error);
       setProducts([]);
       setTotalProducts(0);
+      setPagination({
+        total: 0,
+        page: 1,
+        limit: WORKFLOW_PAGE_LIMIT,
+        totalPages: 1,
+      });
+      setStatusCounts({});
     } finally {
       setLoading(false);
     }
-  }, [assignedFilter, canUseExtendedFilters, designerFilter, queueView, searchQuery, statusFilter, user?.role]);
+  }, [
+    assignedFilter,
+    canUseExtendedFilters,
+    currentPage,
+    designerFilter,
+    queueView,
+    searchQuery,
+    statusFilter,
+    user?.role,
+  ]);
 
   const fetchUsers = useCallback(async () => {
     if (user?.role !== 'admin') return;
@@ -161,13 +223,9 @@ export const ProductWorkflowPage: React.FC = () => {
   );
 
   const queueStats = useMemo(() => {
-    const counts = new Map<ProductLifecycleStatus, number>();
-    products.forEach((product) => {
-      if (!product.lifecycleStatus) return;
-      counts.set(product.lifecycleStatus, (counts.get(product.lifecycleStatus) || 0) + 1);
-    });
-    return Array.from(counts.entries());
-  }, [products]);
+    return Object.entries(statusCounts)
+      .filter((entry): entry is [ProductLifecycleStatus, number] => Number(entry[1]) > 0);
+  }, [statusCounts]);
 
   const countLabel =
     totalProducts === 1 ? 'задача' : totalProducts > 1 && totalProducts < 5 ? 'задачи' : 'задач';
@@ -215,28 +273,24 @@ export const ProductWorkflowPage: React.FC = () => {
 
         {(user?.role === 'marketplace_manager' || workflow.canUseSalesView) && (
           <div className="flex flex-wrap gap-2">
-            <FilterChip active={queueView === 'tasks'} onClick={() => setQueueView('tasks')}>
+            <FilterChip active={queueView === 'tasks'} onClick={() => updateQuery({ view: 'tasks' })}>
               Требуют действия
             </FilterChip>
-            <FilterChip active={queueView === 'sales'} onClick={() => setQueueView('sales')}>
+            <FilterChip active={queueView === 'sales'} onClick={() => updateQuery({ view: 'sales' })}>
               В продаже
             </FilterChip>
           </div>
         )}
 
         <div className="rounded-xl border border-border-subtle bg-brand-white shadow-sm overflow-hidden flex flex-col min-h-0 flex-1">
-          <div className="border-b border-border-subtle bg-surface-muted px-4 py-3 flex flex-col gap-3 lg:flex-row lg:items-end">
-            <div className="relative flex-1 min-w-0">
-              <Search
-                className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted"
-                aria-hidden
-              />
+          <div className="border-b border-border-subtle bg-surface-muted px-4 py-3 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(18rem,1fr)_minmax(12rem,14rem)_minmax(12rem,14rem)_minmax(12rem,14rem)] lg:items-end">
+            <div className="min-w-0">
               <Input
+                leftIcon={Search}
                 label="Поиск"
                 value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
+                onChange={(event) => updateQuery({ search: event.target.value })}
                 placeholder="Название, артикул, Kaspi SKU"
-                className="pl-10"
               />
             </div>
 
@@ -246,7 +300,7 @@ export const ProductWorkflowPage: React.FC = () => {
                   label="Этап"
                   value={statusFilter}
                   onChange={(event) =>
-                    setStatusFilter(event.target.value as ProductLifecycleStatus | '')
+                    updateQuery({ status: event.target.value })
                   }
                   className="lg:w-56"
                 >
@@ -260,7 +314,7 @@ export const ProductWorkflowPage: React.FC = () => {
                 <Select
                   label="Дизайнер"
                   value={designerFilter}
-                  onChange={(event) => setDesignerFilter(event.target.value)}
+                  onChange={(event) => updateQuery({ designerId: event.target.value })}
                   disabled={loadingUsers}
                   className="lg:w-56"
                 >
@@ -275,7 +329,7 @@ export const ProductWorkflowPage: React.FC = () => {
                 <Select
                   label="Ответственный"
                   value={assignedFilter}
-                  onChange={(event) => setAssignedFilter(event.target.value)}
+                  onChange={(event) => updateQuery({ assignedToUserId: event.target.value })}
                   disabled={loadingUsers}
                   className="lg:w-56"
                 >
@@ -454,6 +508,13 @@ export const ProductWorkflowPage: React.FC = () => {
               </div>
             )}
           </div>
+          <Pagination
+            currentPage={pagination.page}
+            totalPages={pagination.totalPages}
+            totalItems={pagination.total}
+            itemsPerPage={pagination.limit}
+            onPageChange={(page) => updateQuery({ page: String(page) }, { resetPage: false })}
+          />
         </div>
 
         <Modal
@@ -490,10 +551,6 @@ export const ProductWorkflowPage: React.FC = () => {
             <ProductReviewActions
               product={reviewProduct}
               onChanged={handleWorkflowChanged}
-              onOpenAssets={() => {
-                setAssetProduct(reviewProduct);
-                setReviewProduct(null);
-              }}
             />
           )}
         </Modal>

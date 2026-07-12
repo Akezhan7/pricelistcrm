@@ -8,6 +8,7 @@ import type {
   ProductWorkflowItem,
 } from '../types';
 import { Alert, Badge, Button, Input, Select, Spinner, Textarea } from './ui';
+import { RequirementsChecklist, type RequirementItem } from './RequirementsChecklist';
 
 type ProductMarketplacePanelProps = {
   product: ProductWorkflowItem;
@@ -90,6 +91,31 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
       priceNumber > 0,
     [form.marketplaceName, form.sku, form.status, priceNumber]
   );
+  const persistedForm = useMemo(() => buildFormState(listing), [listing]);
+  const hasUnsavedChanges = JSON.stringify(form) !== JSON.stringify(persistedForm);
+  const marketplaceRequirements: RequirementItem[] = [
+    {
+      label: 'Статус карточки: Опубликовано',
+      met: form.status === 'published',
+    },
+    {
+      label: 'SKU Kaspi заполнен',
+      met: form.sku.trim().length > 0,
+    },
+    {
+      label: 'Название на Kaspi заполнено',
+      met: form.marketplaceName.trim().length > 0,
+    },
+    {
+      label: 'Цена продажи больше 0',
+      met: Number.isFinite(priceNumber) && priceNumber > 0,
+    },
+    {
+      label: 'Ссылка на карточку добавлена',
+      met: form.url.trim().length > 0,
+      detail: 'Можно передать в закуп без ссылки, но для проверки карточки ее лучше сохранить.',
+    },
+  ];
 
   const loadListings = useCallback(async () => {
     setLoading(true);
@@ -116,6 +142,29 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
     value: MarketplaceFormState[K]
   ) => {
     setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const buildPayload = () => ({
+    marketplace: 'kaspi',
+    status: form.status,
+    sku: form.sku.trim() || null,
+    marketplaceArticle: form.marketplaceArticle.trim() || null,
+    marketplaceName: form.marketplaceName.trim() || null,
+    price: form.price.trim() ? Number(form.price) : null,
+    url: form.url.trim() || null,
+    description: form.description.trim() || null,
+  });
+
+  const saveListing = async ({ showToast = true }: { showToast?: boolean } = {}) => {
+    const response = listing
+      ? await api.put(`/products/${product.id}/marketplaces/${listing.id}`, buildPayload())
+      : await api.post(`/products/${product.id}/marketplaces`, buildPayload());
+
+    const savedListing = response.data.data.listing as ProductMarketplaceListing;
+    setListing(savedListing);
+    setForm(buildFormState(savedListing));
+    if (showToast) toast.success('Kaspi данные сохранены');
+    return savedListing;
   };
 
   const handleSave = async () => {
@@ -153,6 +202,7 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
     setMarkingReady(true);
 
     try {
+      await saveListing({ showToast: false });
       await api.post(`/products/${product.id}/lifecycle/mark-placement-ready`);
       toast.success('Товар передан в закуп');
       onChanged();
@@ -279,6 +329,16 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
         <Alert variant={isPlacementReady ? 'success' : 'info'}>
           Для передачи в закуп нужны статус "Опубликовано", SKU, название и цена больше 0.
         </Alert>
+      )}
+
+      {canMarkPlacementReady && hasUnsavedChanges && (
+        <Alert variant="info">
+          При передаче в закуп CRM сначала сохранит текущие Kaspi-данные, затем переведет этап.
+        </Alert>
+      )}
+
+      {canMarkPlacementReady && (
+        <RequirementsChecklist items={marketplaceRequirements} />
       )}
 
       {canEdit && (

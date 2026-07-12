@@ -1,0 +1,20 @@
+{
+  "runId": "20260711090537",
+  "productId": null,
+  "productName": "QA Full Lifecycle 20260711090537",
+  "productSku": "QA-FULL-KASPI-20260711090537",
+  "generatedAt": "2026-07-11T09:06:12.052Z",
+  "fatalError": "locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Р вЂРЎвЂ№РЎРѓРЎвЂљРЎР‚РЎвЂ№Р в„– РЎвЂЎР ВµРЎР‚Р Р…Р С•Р Р†Р С‘Р С”' })\u001b[22m\n",
+  "steps": [
+    {
+      "name": "Admin prepares QA users, product draft, supplier link, and designer assignment",
+      "status": "failed",
+      "durationMs": 33977,
+      "error": "locator.click: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: 'Р вЂРЎвЂ№РЎРѓРЎвЂљРЎР‚РЎвЂ№Р в„– РЎвЂЎР ВµРЎР‚Р Р…Р С•Р Р†Р С‘Р С”' })\u001b[22m\n"
+    }
+  ],
+  "findings": [],
+  "screenshots": [
+    "output/playwright/stages-1-12-20260711090537/01-login-admin.png"
+  ]
+}

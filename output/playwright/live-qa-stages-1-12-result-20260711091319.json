@@ -1,0 +1,167 @@
+{
+  "runId": "20260711091319",
+  "productId": 82,
+  "productName": "QA Full Lifecycle 20260711091319",
+  "productSku": "QA-FULL-KASPI-20260711091319",
+  "generatedAt": "2026-07-11T09:14:33.535Z",
+  "steps": [
+    {
+      "name": "Admin prepares QA users, product draft, supplier link, and designer assignment",
+      "status": "passed",
+      "durationMs": 5955
+    },
+    {
+      "name": "Designer uploads content, marks content ready, and submits for review",
+      "status": "passed",
+      "durationMs": 10098
+    },
+    {
+      "name": "Admin requests revision with attachment, designer resubmits",
+      "status": "passed",
+      "durationMs": 12812
+    },
+    {
+      "name": "Admin approves with KPI weight and product moves to marketplace",
+      "status": "passed",
+      "durationMs": 6015
+    },
+    {
+      "name": "Permission probes reject forbidden lifecycle/card actions",
+      "status": "passed",
+      "durationMs": 15
+    },
+    {
+      "name": "Marketplace manager publishes Kaspi listing and sends product to purchase",
+      "status": "passed",
+      "durationMs": 6557
+    },
+    {
+      "name": "Purchase manager creates initial purchase and confirms partial arrival",
+      "status": "passed",
+      "durationMs": 9778
+    },
+    {
+      "name": "Warehouse operator completes warehouse passport",
+      "status": "passed",
+      "durationMs": 5586
+    },
+    {
+      "name": "Marketplace manager completes sale launch and edits completed sale flags",
+      "status": "passed",
+      "durationMs": 9498
+    },
+    {
+      "name": "Admin visually verifies history timeline and KPI report",
+      "status": "passed",
+      "durationMs": 7141
+    },
+    {
+      "name": "Database state matches full stages 1-12 workflow",
+      "status": "passed",
+      "durationMs": 625
+    }
+  ],
+  "findings": [],
+  "screenshots": [
+    "output/playwright/stages-1-12-20260711091319/01-login-admin.png",
+    "output/playwright/stages-1-12-20260711091319/02-draft-filled.png",
+    "output/playwright/stages-1-12-20260711091319/03-login-designer.png",
+    "output/playwright/stages-1-12-20260711091319/04-designer-assigned.png",
+    "output/playwright/stages-1-12-20260711091319/05-designer-content-created.png",
+    "output/playwright/stages-1-12-20260711091319/06-login-admin-revision.png",
+    "output/playwright/stages-1-12-20260711091319/07-admin-review-before-revision.png",
+    "output/playwright/stages-1-12-20260711091319/08-revision-request-filled.png",
+    "output/playwright/stages-1-12-20260711091319/09-login-designer-revision.png",
+    "output/playwright/stages-1-12-20260711091319/10-designer-revision-task.png",
+    "output/playwright/stages-1-12-20260711091319/11-revision-resubmit-panel.png",
+    "output/playwright/stages-1-12-20260711091319/12-login-admin-approve-kpi.png",
+    "output/playwright/stages-1-12-20260711091319/13-admin-review-after-revision.png",
+    "output/playwright/stages-1-12-20260711091319/14-approve-with-kpi-weight.png",
+    "output/playwright/stages-1-12-20260711091319/15-login-marketplace-kaspi.png",
+    "output/playwright/stages-1-12-20260711091319/16-marketplace-queue.png",
+    "output/playwright/stages-1-12-20260711091319/17-kaspi-panel-empty.png",
+    "output/playwright/stages-1-12-20260711091319/18-kaspi-panel-filled.png",
+    "output/playwright/stages-1-12-20260711091319/19-login-purchase-order.png",
+    "output/playwright/stages-1-12-20260711091319/20-purchase-queue-before-order.png",
+    "output/playwright/stages-1-12-20260711091319/21-purchase-panel-filled.png",
+    "output/playwright/stages-1-12-20260711091319/22-purchase-queue-after-order.png",
+    "output/playwright/stages-1-12-20260711091319/23-arrival-panel-filled.png",
+    "output/playwright/stages-1-12-20260711091319/24-login-warehouse.png",
+    "output/playwright/stages-1-12-20260711091319/25-warehouse-queue.png",
+    "output/playwright/stages-1-12-20260711091319/26-warehouse-panel-filled.png",
+    "output/playwright/stages-1-12-20260711091319/27-login-marketplace-sale-launch.png",
+    "output/playwright/stages-1-12-20260711091319/28-sale-launch-task-queue.png",
+    "output/playwright/stages-1-12-20260711091319/29-sale-launch-panel-filled.png",
+    "output/playwright/stages-1-12-20260711091319/30-completed-product-sales-view.png",
+    "output/playwright/stages-1-12-20260711091319/31-completed-sale-panel-updated.png",
+    "output/playwright/stages-1-12-20260711091319/32-login-admin-history-kpi.png",
+    "output/playwright/stages-1-12-20260711091319/33-history-timeline-modal.png",
+    "output/playwright/stages-1-12-20260711091319/34-designer-kpi-report.png"
+  ],
+  "apiVerification": {
+    "forbiddenDesignerApprove": 403,
+    "forbiddenMarketplaceCardEdit": 403,
+    "forbiddenHistoryMutation": 404,
+    "historyEvents": 19,
+    "kpiTotalWeightForDesigner": 6
+  },
+  "databaseVerification": {
+    "productId": 82,
+    "lifecycleStatus": "in_sale",
+    "lifecycleCompletedAt": "2026-07-11T09:14:20.314Z",
+    "designerId": 5,
+    "kpiWeight": 2,
+    "currentStock": 4,
+    "costPrice": 1300,
+    "purchase": {
+      "orderId": 39,
+      "quantity": 5,
+      "receivedQuantity": 4
+    },
+    "receiptType": "partial",
+    "warehouseLocation": "QA-A/03/12",
+    "launchFlags": {
+      "advertisingStarted": true,
+      "promotionStarted": true,
+      "reviewBonusEnabled": true,
+      "completedAt": "2026-07-11T09:14:20.314Z"
+    },
+    "kaspiStatus": "in_sale",
+    "stockHistoryRecorded": true,
+    "priceHistoryRecorded": true,
+    "revisionCount": 1,
+    "resolvedRevisionCount": 1,
+    "assetTypes": [
+      "product_photo",
+      "revision_attachment"
+    ],
+    "kpiEntry": {
+      "designerId": 5,
+      "weight": 2,
+      "reviewedByUserId": 1
+    },
+    "approvedMetadata": {
+      "kpiWeight": 2,
+      "designerId": 5
+    },
+    "actions": [
+      "product_created",
+      "supplier_linked",
+      "designer_assigned",
+      "content_uploaded",
+      "content_created",
+      "submitted_for_review",
+      "revision_requested",
+      "revision_resubmitted",
+      "approved",
+      "marketplace_updated",
+      "marketplace_placement_ready",
+      "purchase_marked",
+      "warehouse_arrival_marked",
+      "warehouse_completed",
+      "sale_launch_completed",
+      "sale_flags_updated"
+    ],
+    "missingActions": []
+  }
+}

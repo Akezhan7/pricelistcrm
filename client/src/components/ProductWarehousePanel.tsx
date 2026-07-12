@@ -4,6 +4,7 @@ import { toast } from '../context/ToastContext';
 import productsApi from '../services/productsApi';
 import type { ProductWorkflowItem } from '../types';
 import { Alert, Badge, Button, Input, Textarea } from './ui';
+import { RequirementsChecklist, type RequirementItem } from './RequirementsChecklist';
 
 type ProductWarehousePanelProps = {
   product: ProductWorkflowItem;
@@ -60,6 +61,32 @@ export const ProductWarehousePanel: React.FC<ProductWarehousePanelProps> = ({
     && Number(form.height) > 0
     && Number(form.costPrice) >= 0
   );
+  const warehouseRequirements: RequirementItem[] = [
+    {
+      label: 'Сектор указан',
+      met: form.sector.trim().length > 0,
+    },
+    {
+      label: 'Полка указана',
+      met: form.shelf.trim().length > 0,
+    },
+    {
+      label: 'Ячейка указана',
+      met: form.cell.trim().length > 0,
+    },
+    {
+      label: 'Вес больше 0',
+      met: Number(form.weight) > 0,
+    },
+    {
+      label: 'Габариты заполнены',
+      met: Number(form.length) > 0 && Number(form.width) > 0 && Number(form.height) > 0,
+    },
+    {
+      label: 'Себестоимость указана',
+      met: Number(form.costPrice) >= 0 && form.costPrice.trim().length > 0,
+    },
+  ];
 
   const handleComplete = async () => {
     setSaving(true);
@@ -122,6 +149,7 @@ export const ProductWarehousePanel: React.FC<ProductWarehousePanelProps> = ({
         <Textarea label="Примечание" rows={3} value={form.notes} onChange={(event) => updateField('notes', event.target.value)} disabled={!canEdit} className="resize-none" />
       </div>
       <Alert variant="info">После сохранения товар перейдет в статус «В продаже».</Alert>
+      <RequirementsChecklist items={warehouseRequirements} />
       {canEdit && (
         <div className="flex justify-end">
           <Button type="button" leftIcon={Warehouse} loading={saving} disabled={saving || !isComplete} onClick={handleComplete}>

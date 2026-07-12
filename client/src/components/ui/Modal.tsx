@@ -64,12 +64,17 @@ export const Modal: React.FC<ModalProps> = ({
   const titleId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.stopPropagation();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -98,7 +103,7 @@ export const Modal: React.FC<ModalProps> = ({
         first.focus();
       }
     },
-    [onClose]
+    []
   );
 
   useEffect(() => {
