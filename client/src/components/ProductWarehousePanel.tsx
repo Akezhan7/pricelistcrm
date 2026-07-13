@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Warehouse } from 'lucide-react';
 import { toast } from '../context/ToastContext';
 import productsApi from '../services/productsApi';
-import type { ProductWorkflowItem } from '../types';
+import type { Product } from '../types';
 import { Alert, Badge, Button, Input, Textarea } from './ui';
 import { RequirementsChecklist, type RequirementItem } from './RequirementsChecklist';
 
 type ProductWarehousePanelProps = {
-  product: ProductWorkflowItem;
+  product: Product;
   onChanged: () => void;
 };
 
@@ -29,11 +29,8 @@ function getErrorMessage(error: unknown, fallback: string) {
     || fallback;
 }
 
-export const ProductWarehousePanel: React.FC<ProductWarehousePanelProps> = ({
-  product,
-  onChanged,
-}) => {
-  const [form, setForm] = useState<FormState>({
+function getInitialForm(product: Product): FormState {
+  return {
     sector: product.warehouseDetails?.sector || '',
     shelf: product.warehouseDetails?.shelf || '',
     cell: product.warehouseDetails?.cell || '',
@@ -43,9 +40,21 @@ export const ProductWarehousePanel: React.FC<ProductWarehousePanelProps> = ({
     height: product.warehouseDetails ? String(product.warehouseDetails.height) : '',
     costPrice: String(product.costPrice ?? ''),
     notes: product.warehouseDetails?.notes || '',
-  });
+  };
+}
+
+export const ProductWarehousePanel: React.FC<ProductWarehousePanelProps> = ({
+  product,
+  onChanged,
+}) => {
+  const [form, setForm] = useState<FormState>(() => getInitialForm(product));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    setForm(getInitialForm(product));
+    setError('');
+  }, [product]);
 
   const canEdit = Boolean(product.permissions?.allowedActions.includes('manage_warehouse'));
   const updateField = (field: keyof FormState, value: string) => {

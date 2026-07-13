@@ -4,15 +4,16 @@ import api from '../utils/api';
 import { toast } from '../context/ToastContext';
 import type {
   MarketplaceListingStatus,
+  Product,
   ProductMarketplaceListing,
-  ProductWorkflowItem,
 } from '../types';
 import { Alert, Badge, Button, Input, Select, Spinner, Textarea } from './ui';
 import { RequirementsChecklist, type RequirementItem } from './RequirementsChecklist';
 
 type ProductMarketplacePanelProps = {
-  product: ProductWorkflowItem;
+  product: Product;
   onChanged: () => void;
+  onSaved?: () => void;
 };
 
 type MarketplaceFormState = {
@@ -52,8 +53,28 @@ function getErrorMessage(err: unknown, fallback: string) {
   );
 }
 
-function buildFormState(listing?: ProductMarketplaceListing | null): MarketplaceFormState {
-  if (!listing) return initialFormState;
+function buildFormState(
+  listing?: ProductMarketplaceListing | null,
+  product?: Product
+): MarketplaceFormState {
+  if (!listing) {
+    if (!product) return initialFormState;
+
+    return {
+      ...initialFormState,
+      status:
+        product.lifecycleStatus === 'in_sale' && !product.lifecycleStartedAt
+          ? 'in_sale'
+          : initialFormState.status,
+      sku: product.kaspiArticle || '',
+      marketplaceName: product.kaspiName || '',
+      price:
+        product.sellingPrice === null || product.sellingPrice === undefined
+          ? ''
+          : String(product.sellingPrice),
+      description: product.description || '',
+    };
+  }
 
   return {
     status: listing.status || 'placing',
@@ -69,6 +90,7 @@ function buildFormState(listing?: ProductMarketplaceListing | null): Marketplace
 export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = ({
   product,
   onChanged,
+  onSaved,
 }) => {
   const [listing, setListing] = useState<ProductMarketplaceListing | null>(null);
   const [form, setForm] = useState<MarketplaceFormState>(initialFormState);
@@ -98,7 +120,7 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
   );
   const canSendToPurchase = hasRequiredKaspiData;
   const shouldAutoPublishBeforePurchase = canSendToPurchase && form.status !== 'published';
-  const persistedForm = useMemo(() => buildFormState(listing), [listing]);
+  const persistedForm = useMemo(() => buildFormState(listing, product), [listing, product]);
   const hasUnsavedChanges = JSON.stringify(form) !== JSON.stringify(persistedForm);
   const marketplaceRequirements: RequirementItem[] = [
     {
@@ -131,14 +153,14 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
       const listings: ProductMarketplaceListing[] = response.data.data.listings || [];
       const kaspiListing = listings.find((item) => item.marketplace === 'kaspi') || null;
       setListing(kaspiListing);
-      setForm(buildFormState(kaspiListing));
+      setForm(buildFormState(kaspiListing, product));
       setError('');
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Не удалось загрузить данные Kaspi'));
     } finally {
       setLoading(false);
     }
-  }, [product.id]);
+  }, [product]);
 
   useEffect(() => {
     loadListings();
@@ -179,7 +201,7 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
 
     const savedListing = response.data.data.listing as ProductMarketplaceListing;
     setListing(savedListing);
-    setForm(buildFormState(savedListing));
+    setForm(buildFormState(savedListing, product));
     if (showToast) toast.success('Kaspi данные сохранены');
     return savedListing;
   };
@@ -189,24 +211,8 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
     setSaving(true);
 
     try {
-      const payload = {
-        marketplace: 'kaspi',
-        status: form.status,
-        sku: form.sku.trim() || null,
-        marketplaceArticle: form.marketplaceArticle.trim() || null,
-        marketplaceName: form.marketplaceName.trim() || null,
-        price: form.price.trim() ? Number(form.price) : null,
-        url: form.url.trim() || null,
-        description: form.description.trim() || null,
-      };
-
-      const response = listing
-        ? await api.put(`/products/${product.id}/marketplaces/${listing.id}`, payload)
-        : await api.post(`/products/${product.id}/marketplaces`, payload);
-
-      setListing(response.data.data.listing);
-      setForm(buildFormState(response.data.data.listing));
-      toast.success('Kaspi данные сохранены');
+      await saveListing();
+      onSaved?.();
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Не удалось сохранить Kaspi данные'));
     } finally {

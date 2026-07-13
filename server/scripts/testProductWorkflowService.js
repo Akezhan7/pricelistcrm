@@ -60,6 +60,7 @@ function testRoleWorkflowQueries() {
     { lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE },
     {
       lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
+      lifecycleStartedAt: { [Op.ne]: null },
       lifecycleCompletedAt: null,
     },
   ]);
@@ -70,6 +71,7 @@ function testRoleWorkflowQueries() {
   });
   assert.strictEqual(marketplaceSales.workflowView, 'sales');
   assert.strictEqual(marketplaceSales.where.lifecycleStatus, PRODUCT_LIFECYCLE_STATUSES.IN_SALE);
+  assert.deepStrictEqual(marketplaceSales.where.lifecycleStartedAt, { [Op.ne]: null });
   assert.deepStrictEqual(marketplaceSales.where.lifecycleCompletedAt, { [Op.ne]: null });
 
   const purchaseItem = resolveProductWorkflowItem({
@@ -113,6 +115,7 @@ function testRoleWorkflowQueries() {
     product: {
       id: 106,
       lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
+      lifecycleStartedAt: '2026-07-10T08:00:00Z',
       lifecycleCompletedAt: null,
       launchFlags: { completedAt: null },
     },
@@ -122,10 +125,24 @@ function testRoleWorkflowQueries() {
   assert.strictEqual(pendingSaleItem.workflow.nextActionLabel, 'Настроить продажи');
   assert.strictEqual(pendingSaleItem.workflow.nextActionEnabled, true);
 
+  const legacyCatalogItem = resolveProductWorkflowItem({
+    product: {
+      id: 108,
+      lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
+      lifecycleStartedAt: null,
+      lifecycleCompletedAt: null,
+      launchFlags: null,
+    },
+    user: { id: 3, role: 'marketplace_manager' },
+  });
+  assert.strictEqual(legacyCatalogItem.workflow.nextActionKey, 'catalog_item');
+  assert.strictEqual(legacyCatalogItem.workflow.nextActionEnabled, false);
+
   const completedSaleItem = resolveProductWorkflowItem({
     product: {
       id: 107,
       lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
+      lifecycleStartedAt: '2026-07-10T08:00:00Z',
       lifecycleCompletedAt: '2026-07-10T14:00:00Z',
       launchFlags: { completedAt: '2026-07-10T14:00:00Z' },
     },

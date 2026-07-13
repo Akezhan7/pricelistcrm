@@ -96,6 +96,26 @@ const WORKFLOW_PERMISSION_ACTIONS = Object.freeze({
   manage_sale_launch: Object.freeze(['manage_sale_launch']),
 });
 
+const ACTIVE_LIFECYCLE_CATALOG_FILTER = Object.freeze({
+  [Op.or]: [
+    { lifecycleStatus: { [Op.ne]: PRODUCT_LIFECYCLE_STATUSES.IN_SALE } },
+    { lifecycleStartedAt: { [Op.ne]: null } },
+  ],
+});
+
+function applyActiveLifecycleCatalogFilter(where) {
+  if (where.lifecycleStatus === PRODUCT_LIFECYCLE_STATUSES.IN_SALE) {
+    where.lifecycleStartedAt = { [Op.ne]: null };
+    return where;
+  }
+
+  if (!where.lifecycleStatus) {
+    Object.assign(where, ACTIVE_LIFECYCLE_CATALOG_FILTER);
+  }
+
+  return where;
+}
+
 function toPositiveIntegerOrNull(value) {
   if (value === undefined || value === null || value === '') return null;
 
@@ -131,6 +151,7 @@ function buildProductWorkflowQuery({ user, filters = {} }) {
     if (designerId) where.designerId = designerId;
     if (assignedToUserId) where.assignedToUserId = assignedToUserId;
     if (marketplaceManagerId) where.marketplaceManagerId = marketplaceManagerId;
+    applyActiveLifecycleCatalogFilter(where);
 
     return {
       where,
@@ -163,6 +184,7 @@ function buildProductWorkflowQuery({ user, filters = {} }) {
         ? {
             ...baseWhere,
             lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
+            lifecycleStartedAt: { [Op.ne]: null },
             lifecycleCompletedAt: { [Op.ne]: null },
           }
         : {
@@ -171,6 +193,7 @@ function buildProductWorkflowQuery({ user, filters = {} }) {
               { lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE },
               {
                 lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
+                lifecycleStartedAt: { [Op.ne]: null },
                 lifecycleCompletedAt: null,
               },
             ],
@@ -228,7 +251,14 @@ function resolveProductWorkflowItem({ product, user }) {
     : resolveWorkflowAction(plainProduct.lifecycleStatus);
 
   if (plainProduct.lifecycleStatus === PRODUCT_LIFECYCLE_STATUSES.IN_SALE) {
-    workflow = plainProduct.lifecycleCompletedAt || plainProduct.launchFlags?.completedAt
+    workflow = !plainProduct.lifecycleStartedAt
+      ? {
+          nextActionKey: 'catalog_item',
+          nextActionLabel: 'Старый каталог',
+          nextActionEnabled: false,
+          ownerLabel: 'Каталог',
+        }
+      : plainProduct.lifecycleCompletedAt || plainProduct.launchFlags?.completedAt
       ? {
           nextActionKey: 'manage_sale_launch',
           nextActionLabel: 'Параметры продаж',

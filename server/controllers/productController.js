@@ -23,6 +23,7 @@ const path = require('path');
 const fs = require('fs').promises;
 const {
   PRODUCT_LIFECYCLE_ACTIONS,
+  PRODUCT_LIFECYCLE_STATUSES,
   PRODUCT_LIFECYCLE_STATUS_VALUES,
 } = require('../constants/productLifecycle');
 const {
@@ -41,6 +42,9 @@ const {
 const {
   buildProductDraftData,
 } = require('../services/productDraftService');
+const {
+  buildStartLifecyclePlan,
+} = require('../services/productLifecycleStartService');
 const {
   PRODUCT_ASSET_TYPES,
   buildProductAssetData,
@@ -972,6 +976,112 @@ const bulkAssignDesignerToProducts = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Server error while assigning designer in bulk',
+    });
+  }
+};
+
+const startProductLifecycle = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
+  try {
+    const { id } = req.params;
+    const product = await Product.findOne({
+      where: { id, isActive: true },
+      transaction,
+      lock: true,
+    });
+
+    if (!product) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(404).json({
+        success: false,
+        message: 'Product not found',
+      });
+    }
+
+    if (req.body.targetStatus === PRODUCT_LIFECYCLE_ACTIONS.ASSIGN_DESIGNER) {
+      return res.status(400).json({
+        success: false,
+        message: 'Use lifecycle status key, not action key',
+      });
+    }
+
+    if (
+      req.body.targetStatus === PRODUCT_LIFECYCLE_STATUSES.ASSIGNED_TO_DESIGNER
+      && req.body.designerId
+    ) {
+      const designer = await User.findOne({
+        where: { id: req.body.designerId, role: 'designer', isActive: true },
+        transaction,
+      });
+
+      if (!designer) {
+        await transaction.rollback();
+        transactionFinished = true;
+        return res.status(400).json({
+          success: false,
+          message: 'Designer not found',
+        });
+      }
+    }
+
+    const now = new Date();
+    const plan = buildStartLifecyclePlan({
+      actor: req.user,
+      product,
+      payload: req.body,
+      now,
+    });
+
+    await product.update(plan.productUpdate, { transaction });
+    await ProductActionHistory.create(plan.historyEntry, { transaction });
+
+    await transaction.commit();
+    transactionFinished = true;
+
+    const updatedProduct = await Product.findOne({
+      where: { id: product.id },
+      include: [
+        {
+          model: Supplier,
+          as: 'suppliers',
+          through: {
+            model: ProductSupplier,
+            attributes: ['supplierPrice', 'quantity', 'isAvailable', 'notes'],
+          },
+          where: { isActive: true },
+          required: false,
+        },
+        ...productUserInclude,
+      ],
+    });
+
+    return res.json({
+      success: true,
+      message: 'Product lifecycle started',
+      data: {
+        product: serializeProductForUser(updatedProduct, req.user),
+      },
+    });
+  } catch (error) {
+    if (!transactionFinished) {
+      await transaction.rollback();
+      transactionFinished = true;
+    }
+
+    if (/Only admin|Only legacy|Unsupported|designerId/i.test(error.message)) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    console.error('Error starting product lifecycle:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while starting product lifecycle',
     });
   }
 };
@@ -3430,6 +3540,7 @@ module.exports = {
   createProduct,
   assignDesignerToProduct,
   bulkAssignDesignerToProducts,
+  startProductLifecycle,
   submitProductContent,
   submitProductReview,
   approveProductReview,

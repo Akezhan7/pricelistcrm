@@ -16,9 +16,11 @@ import {
   UserPlus,
   CheckSquare,
   Square,
+  Store,
+  Rocket,
 } from 'lucide-react';
 
-import { Button, EmptyState, IconButton, Input, Pagination, Select } from './ui';
+import { Button, EmptyState, IconButton, Input, Modal, Pagination, Select } from './ui';
 
 import { ProductListItem } from './ProductListItem';
 
@@ -36,6 +38,9 @@ import { ProductVariationsModal } from './ProductVariationsModal';
 
 import { PriceHistoryModal } from './PriceHistoryModal';
 import { ProductHistoryModal } from './ProductHistoryModal';
+import { ProductMarketplacePanel } from './ProductMarketplacePanel';
+import { StartProductLifecycleModal } from './StartProductLifecycleModal';
+import { ProductCardModal } from './ProductCardModal';
 
 import api from '../utils/api';
 import { PRODUCT_LIFECYCLE_FILTERS } from '../constants/productLifecycle';
@@ -54,6 +59,10 @@ type ProductListProps = {
   onLifecycleStatusFilterChange?: (status: ProductLifecycleStatus | '') => void;
   compact?: boolean;
 };
+
+function isLegacyCatalogProduct(product: Product) {
+  return product.lifecycleStatus === 'in_sale' && !product.lifecycleStartedAt;
+}
 
 export const ProductList: React.FC<ProductListProps> = ({
   products,
@@ -75,8 +84,11 @@ export const ProductList: React.FC<ProductListProps> = ({
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [productForVariations, setProductForVariations] = useState<Product | null>(null);
+  const [productForMarketplace, setProductForMarketplace] = useState<Product | null>(null);
+  const [productForLifecycleStart, setProductForLifecycleStart] = useState<Product | null>(null);
+  const [productForCard, setProductForCard] = useState<Product | null>(null);
 
-  const { openEdit, openSuppliers, editorModals } = useProductEditor({
+  const { openSuppliers, editorModals } = useProductEditor({
     onUpdated: onRefresh,
   });
   const [productForPriceHistory, setProductForPriceHistory] = useState<Product | null>(null);
@@ -436,6 +448,32 @@ export const ProductList: React.FC<ProductListProps> = ({
                             }}
                           />
                         )}
+                        {product.permissions?.allowedActions.includes('manage_marketplace') && (
+                          <IconButton
+                            icon={Store}
+                            title="Маркетплейсы товара"
+                            size="md"
+                            variant="ghost"
+                            className="h-8 w-8 min-h-8 min-w-8"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setProductForMarketplace(product);
+                            }}
+                          />
+                        )}
+                        {canAssignDesigner && isLegacyCatalogProduct(product) && (
+                          <IconButton
+                            icon={Rocket}
+                            title="Запустить lifecycle"
+                            size="md"
+                            variant="ghost"
+                            className="h-8 w-8 min-h-8 min-w-8"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setProductForLifecycleStart(product);
+                            }}
+                          />
+                        )}
                         {product.permissions?.allowedActions.includes('edit_product_card') && (
                           <IconButton
                             icon={Edit}
@@ -445,7 +483,7 @@ export const ProductList: React.FC<ProductListProps> = ({
                             className="h-8 w-8 min-h-8 min-w-8"
                             onClick={(e) => {
                               e.stopPropagation();
-                              openEdit(product);
+                              setProductForCard(product);
                             }}
                           />
                         )}
@@ -501,6 +539,13 @@ export const ProductList: React.FC<ProductListProps> = ({
         onSuccess={handleDesignerAssigned}
       />
 
+      <ProductCardModal
+        isOpen={!!productForCard}
+        product={productForCard}
+        onClose={() => setProductForCard(null)}
+        onChanged={onRefresh}
+      />
+
       {editorModals}
 
       <DeleteConfirmModal
@@ -535,6 +580,31 @@ export const ProductList: React.FC<ProductListProps> = ({
       <ProductHistoryModal
         product={productForHistory}
         onClose={() => setProductForHistory(null)}
+      />
+
+      <Modal
+        isOpen={!!productForMarketplace}
+        onClose={() => setProductForMarketplace(null)}
+        title="Маркетплейсы товара"
+        size="xl"
+      >
+        {productForMarketplace && (
+          <ProductMarketplacePanel
+            product={productForMarketplace}
+            onChanged={() => {
+              setProductForMarketplace(null);
+              onRefresh();
+            }}
+            onSaved={onRefresh}
+          />
+        )}
+      </Modal>
+
+      <StartProductLifecycleModal
+        isOpen={!!productForLifecycleStart}
+        product={productForLifecycleStart}
+        onClose={() => setProductForLifecycleStart(null)}
+        onSuccess={onRefresh}
       />
     </div>
   );

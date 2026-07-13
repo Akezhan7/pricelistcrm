@@ -13,6 +13,7 @@ const {
   createProduct,
   assignDesignerToProduct,
   bulkAssignDesignerToProducts,
+  startProductLifecycle,
   submitProductContent,
   submitProductReview,
   approveProductReview,
@@ -326,6 +327,16 @@ router.post('/bulk/assign-designer',
     body('designerId').isInt({ min: 1 }).withMessage('designerId must be a positive integer'),
   ],
   bulkAssignDesignerToProducts
+);
+
+router.post('/:id/lifecycle/start',
+  auth,
+  requireRole('admin'),
+  [
+    body('targetStatus').isString().isLength({ min: 1, max: 40 }),
+    body('designerId').optional({ values: 'falsy' }).isInt({ min: 1 }),
+  ],
+  startProductLifecycle
 );
 
 router.post('/:id/assets',

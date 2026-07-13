@@ -18,7 +18,7 @@ import { getProductLifecycleLabel } from '../constants/productLifecycle';
 
 export interface ProductListItemProps {
 
-  product: Pick<Product, 'id' | 'name' | 'article' | 'image' | 'costPrice' | 'sellingPrice' | 'lifecycleStatus'> & {
+  product: Pick<Product, 'id' | 'name' | 'article' | 'image' | 'costPrice' | 'sellingPrice' | 'lifecycleStatus' | 'lifecycleStartedAt'> & {
 
     suppliers?: Product['suppliers'];
 
@@ -100,7 +100,11 @@ export const ProductListItem: React.FC<ProductListItemProps> = ({
 
   const imgClass = imageSizeClasses[imageSize];
 
-  const lifecycleLabel = getProductLifecycleLabel(product.lifecycleStatus);
+  const isLegacyCatalogProduct =
+    product.lifecycleStatus === 'in_sale' && !product.lifecycleStartedAt;
+  const lifecycleLabel = isLegacyCatalogProduct
+    ? 'Старый каталог'
+    : getProductLifecycleLabel(product.lifecycleStatus);
 
 
 
