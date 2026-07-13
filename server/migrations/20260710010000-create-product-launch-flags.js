@@ -36,9 +36,10 @@ module.exports = {
           onUpdate: 'CASCADE',
           onDelete: 'CASCADE',
         },
-        advertising_started: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
-        promotion_started: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+        internal_advertising_started: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+        external_advertising_started: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
         review_bonus_enabled: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+        seller_bonus_enabled: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
         notes: { type: DataTypes.TEXT, allowNull: true },
         updated_by: {
           type: DataTypes.INTEGER,
@@ -101,15 +102,17 @@ module.exports = {
       await queryInterface.sequelize.query(`
         INSERT INTO product_launch_flags (
           product_id,
-          advertising_started,
-          promotion_started,
+          internal_advertising_started,
+          external_advertising_started,
           review_bonus_enabled,
+          seller_bonus_enabled,
           completed_at,
           created_at,
           updated_at
         )
         SELECT
           p.id,
+          FALSE,
           FALSE,
           FALSE,
           FALSE,

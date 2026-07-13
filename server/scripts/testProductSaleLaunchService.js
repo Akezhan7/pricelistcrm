@@ -23,9 +23,10 @@ function testCompletesSaleLaunchWithOptionalFlagsDisabled() {
     },
     actor: { id: 7, role: 'marketplace_manager' },
     payload: {
-      advertisingStarted: true,
-      promotionStarted: false,
+      internalAdvertisingStarted: true,
+      externalAdvertisingStarted: false,
       reviewBonusEnabled: false,
+      sellerBonusEnabled: true,
       notes: ' Реклама нужна, остальное позже ',
     },
     now,
@@ -33,9 +34,10 @@ function testCompletesSaleLaunchWithOptionalFlagsDisabled() {
 
   assert.deepStrictEqual(plan.launchFlags, {
     productId: 15,
-    advertisingStarted: true,
-    promotionStarted: false,
+    internalAdvertisingStarted: true,
+    externalAdvertisingStarted: false,
     reviewBonusEnabled: false,
+    sellerBonusEnabled: true,
     notes: 'Реклама нужна, остальное позже',
     updatedBy: 7,
     completedBy: 7,
@@ -65,9 +67,10 @@ function testRejectsRepeatedSaleLaunchCompletion() {
       kaspiListing: { id: 31, marketplace: 'kaspi', status: 'in_sale' },
       actor: { id: 7, role: 'marketplace_manager' },
       payload: {
-        advertisingStarted: false,
-        promotionStarted: false,
+        internalAdvertisingStarted: false,
+        externalAdvertisingStarted: false,
         reviewBonusEnabled: false,
+        sellerBonusEnabled: false,
       },
     }),
     /already completed/i
@@ -84,27 +87,30 @@ function testBuildsPostCompletionFlagUpdate() {
       lifecycleCompletedAt: completedAt,
     },
     launchFlags: {
-      advertisingStarted: true,
-      promotionStarted: false,
+      internalAdvertisingStarted: true,
+      externalAdvertisingStarted: false,
       reviewBonusEnabled: false,
+      sellerBonusEnabled: true,
       notes: 'Реклама нужна, остальное позже',
       completedAt,
       completedBy: 7,
     },
     actor: { id: 8, role: 'admin' },
     payload: {
-      advertisingStarted: true,
-      promotionStarted: true,
+      internalAdvertisingStarted: true,
+      externalAdvertisingStarted: true,
       reviewBonusEnabled: false,
+      sellerBonusEnabled: false,
       notes: 'Акция подключена',
     },
     now,
   });
 
   assert.deepStrictEqual(plan.launchFlagsUpdate, {
-    advertisingStarted: true,
-    promotionStarted: true,
+    internalAdvertisingStarted: true,
+    externalAdvertisingStarted: true,
     reviewBonusEnabled: false,
+    sellerBonusEnabled: false,
     notes: 'Акция подключена',
     updatedBy: 8,
   });
@@ -112,7 +118,7 @@ function testBuildsPostCompletionFlagUpdate() {
     marketplaceManagerId: 8,
     assignedToUserId: 8,
   });
-  assert.deepStrictEqual(plan.changedFields, ['promotionStarted', 'notes']);
+  assert.deepStrictEqual(plan.changedFields, ['externalAdvertisingStarted', 'sellerBonusEnabled', 'notes']);
   assert.strictEqual(plan.history.actionType, 'sale_flags_updated');
   assert.strictEqual(plan.history.fromStatus, PRODUCT_LIFECYCLE_STATUSES.IN_SALE);
   assert.strictEqual(plan.history.toStatus, PRODUCT_LIFECYCLE_STATUSES.IN_SALE);

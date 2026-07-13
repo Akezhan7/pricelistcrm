@@ -37,7 +37,7 @@ const initialFormState: MarketplaceFormState = {
 
 const statusOptions: Array<{ value: MarketplaceListingStatus; label: string }> = [
   { value: 'not_started', label: 'Не начато' },
-  { value: 'placing', label: 'Размещение' },
+  { value: 'placing', label: 'В процессе размещения' },
   { value: 'moderation', label: 'Модерация' },
   { value: 'published', label: 'Опубликовано' },
   { value: 'in_sale', label: 'В продаже' },
@@ -82,15 +82,22 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
     product.permissions?.allowedActions.includes('mark_placement_ready')
   );
   const priceNumber = Number(form.price);
-  const isPlacementReady = useMemo(
+  const hasRequiredKaspiData = useMemo(
     () =>
-      form.status === 'published' &&
       form.sku.trim().length > 0 &&
       form.marketplaceName.trim().length > 0 &&
       Number.isFinite(priceNumber) &&
       priceNumber > 0,
-    [form.marketplaceName, form.sku, form.status, priceNumber]
+    [form.marketplaceName, form.sku, priceNumber]
   );
+  const isPlacementReady = useMemo(
+    () =>
+      form.status === 'published' &&
+      hasRequiredKaspiData,
+    [form.status, hasRequiredKaspiData]
+  );
+  const canSendToPurchase = hasRequiredKaspiData;
+  const shouldAutoPublishBeforePurchase = canSendToPurchase && form.status !== 'published';
   const persistedForm = useMemo(() => buildFormState(listing), [listing]);
   const hasUnsavedChanges = JSON.stringify(form) !== JSON.stringify(persistedForm);
   const marketplaceRequirements: RequirementItem[] = [
@@ -144,21 +151,31 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
     setForm((current) => ({ ...current, [field]: value }));
   };
 
-  const buildPayload = () => ({
-    marketplace: 'kaspi',
-    status: form.status,
-    sku: form.sku.trim() || null,
-    marketplaceArticle: form.marketplaceArticle.trim() || null,
-    marketplaceName: form.marketplaceName.trim() || null,
-    price: form.price.trim() ? Number(form.price) : null,
-    url: form.url.trim() || null,
-    description: form.description.trim() || null,
-  });
+  const buildPayload = (overrides: Partial<MarketplaceFormState> = {}) => {
+    const source = { ...form, ...overrides };
 
-  const saveListing = async ({ showToast = true }: { showToast?: boolean } = {}) => {
+    return {
+      marketplace: 'kaspi',
+      status: source.status,
+      sku: source.sku.trim() || null,
+      marketplaceArticle: source.marketplaceArticle.trim() || null,
+      marketplaceName: source.marketplaceName.trim() || null,
+      price: source.price.trim() ? Number(source.price) : null,
+      url: source.url.trim() || null,
+      description: source.description.trim() || null,
+    };
+  };
+
+  const saveListing = async ({
+    showToast = true,
+    overrides = {},
+  }: {
+    showToast?: boolean;
+    overrides?: Partial<MarketplaceFormState>;
+  } = {}) => {
     const response = listing
-      ? await api.put(`/products/${product.id}/marketplaces/${listing.id}`, buildPayload())
-      : await api.post(`/products/${product.id}/marketplaces`, buildPayload());
+      ? await api.put(`/products/${product.id}/marketplaces/${listing.id}`, buildPayload(overrides))
+      : await api.post(`/products/${product.id}/marketplaces`, buildPayload(overrides));
 
     const savedListing = response.data.data.listing as ProductMarketplaceListing;
     setListing(savedListing);
@@ -202,9 +219,16 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
     setMarkingReady(true);
 
     try {
-      await saveListing({ showToast: false });
+      await saveListing({
+        showToast: false,
+        overrides: shouldAutoPublishBeforePurchase ? { status: 'published' } : {},
+      });
       await api.post(`/products/${product.id}/lifecycle/mark-placement-ready`);
-      toast.success('Товар передан в закуп');
+      toast.success(
+        shouldAutoPublishBeforePurchase
+          ? 'Карточка отмечена опубликованной, товар передан в закуп'
+          : 'Товар передан в закуп'
+      );
       onChanged();
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Не удалось передать товар в закуп'));
@@ -244,7 +268,7 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
       <div className="rounded-xl border border-border-subtle bg-surface-muted p-3 space-y-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Select
-            label="Статус"
+            label="Статус карточки Kaspi"
             value={form.status}
             onChange={(event) =>
               updateField('status', event.target.value as MarketplaceListingStatus)
@@ -327,7 +351,11 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
 
       {canMarkPlacementReady && (
         <Alert variant={isPlacementReady ? 'success' : 'info'}>
-          Для передачи в закуп нужны статус "Опубликовано", SKU, название и цена больше 0.
+          {isPlacementReady
+            ? 'Карточка Kaspi готова: можно передавать товар в закуп.'
+            : hasRequiredKaspiData
+              ? 'Если карточка уже опубликована на Kaspi, можно сразу отметить это и передать товар в закуп.'
+              : 'Для передачи в закуп заполните SKU, название на Kaspi и цену больше 0.'}
         </Alert>
       )}
 
@@ -359,10 +387,12 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
               variant="primary"
               leftIcon={Send}
               loading={markingReady}
-              disabled={saving || markingReady || !isPlacementReady}
+              disabled={saving || markingReady || !canSendToPurchase}
               onClick={handleMarkReady}
             >
-              Передать в закуп
+              {shouldAutoPublishBeforePurchase
+                ? 'Отметить опубликовано и передать в закуп'
+                : 'Передать в закуп'}
             </Button>
           )}
         </div>

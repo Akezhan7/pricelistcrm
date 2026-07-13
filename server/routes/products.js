@@ -44,6 +44,7 @@ const {
   getLifecycleOperations,
   markProductArrived,
   markProductPurchased,
+  markProductsPurchasedBulk,
 } = require('../controllers/productLifecyclePurchaseController');
 const {
   completeProductSaleLaunch,
@@ -232,6 +233,23 @@ router.post('/:id/lifecycle/mark-placement-ready',
   markProductPlacementReady
 );
 
+router.post('/lifecycle/bulk-mark-purchased',
+  auth,
+  requireRole('admin', 'purchase_manager'),
+  [
+    body('supplierId').isInt({ min: 1 }),
+    body('items').isArray({ min: 1 }),
+    body('items.*.productId').isInt({ min: 1 }),
+    body('items.*.quantity').isInt({ min: 1 }),
+    body('items.*.purchasePrice').optional({ values: 'falsy' }).isFloat({ min: 0 }),
+    body('items.*.notes').optional({ values: 'falsy' }).isLength({ max: 2000 }),
+    body('expectedDeliveryDate').optional({ values: 'falsy' }).isISO8601(),
+    body('deliveryLocation').optional({ values: 'falsy' }).isLength({ max: 200 }),
+    body('notes').optional({ values: 'falsy' }).isLength({ max: 2000 }),
+  ],
+  markProductsPurchasedBulk
+);
+
 router.post('/:id/lifecycle/mark-purchased',
   auth,
   requireRole('admin', 'purchase_manager'),
@@ -274,9 +292,10 @@ router.post('/:id/lifecycle/complete-warehouse',
 );
 
 const saleLaunchValidation = [
-  body('advertisingStarted').isBoolean(),
-  body('promotionStarted').isBoolean(),
+  body('internalAdvertisingStarted').isBoolean(),
+  body('externalAdvertisingStarted').isBoolean(),
   body('reviewBonusEnabled').isBoolean(),
+  body('sellerBonusEnabled').isBoolean(),
   body('notes').optional({ nullable: true }).isLength({ max: 2000 }),
 ];
 

@@ -23,6 +23,19 @@ export interface MarkProductPurchasedDto {
   notes?: string;
 }
 
+export interface MarkProductsPurchasedBulkDto {
+  supplierId: number;
+  expectedDeliveryDate?: string;
+  deliveryLocation?: string;
+  notes?: string;
+  items: Array<{
+    productId: number;
+    quantity: number;
+    purchasePrice?: number;
+    notes?: string;
+  }>;
+}
+
 export interface CompleteProductWarehouseDto {
   sector: string;
   shelf: string;
@@ -36,9 +49,10 @@ export interface CompleteProductWarehouseDto {
 }
 
 export interface ProductSaleLaunchDto {
-  advertisingStarted: boolean;
-  promotionStarted: boolean;
+  internalAdvertisingStarted: boolean;
+  externalAdvertisingStarted: boolean;
   reviewBonusEnabled: boolean;
+  sellerBonusEnabled: boolean;
   notes?: string;
 }
 
@@ -136,6 +150,22 @@ class ProductsApi {
       throw new Error(response.data.message || 'Ошибка оформления закупа');
     }
     return response.data.data.purchase;
+  }
+
+  async markProductsPurchasedBulk(
+    data: MarkProductsPurchasedBulkDto
+  ): Promise<{ purchases: ProductLifecyclePurchase[]; order: { id: number; orderNumber: string } }> {
+    const response = await api.post<ApiResponse<{
+      purchases: ProductLifecyclePurchase[];
+      order: { id: number; orderNumber: string };
+    }>>(
+      `${this.baseUrl}/lifecycle/bulk-mark-purchased`,
+      data
+    );
+    if (!response.data.success || !response.data.data?.order) {
+      throw new Error(response.data.message || 'Ошибка оформления пакетного закупа');
+    }
+    return response.data.data;
   }
 
   async markProductArrived(

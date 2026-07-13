@@ -10,12 +10,17 @@ type ProductSaleLaunchPanelProps = {
   onChanged: () => void;
 };
 
-type FlagField = 'advertisingStarted' | 'promotionStarted' | 'reviewBonusEnabled';
+type FlagField =
+  | 'internalAdvertisingStarted'
+  | 'externalAdvertisingStarted'
+  | 'reviewBonusEnabled'
+  | 'sellerBonusEnabled';
 
 const flagOptions: Array<{ field: FlagField; label: string; description: string }> = [
-  { field: 'advertisingStarted', label: 'Реклама запущена', description: 'Рекламное продвижение товара активно' },
-  { field: 'promotionStarted', label: 'Акция запущена', description: 'Для товара действует акция' },
-  { field: 'reviewBonusEnabled', label: 'Бонус за отзывы', description: 'Подключено вознаграждение за отзывы' },
+  { field: 'internalAdvertisingStarted', label: 'Внутренняя реклама', description: 'Продвижение внутри маркетплейса подключено' },
+  { field: 'externalAdvertisingStarted', label: 'Внешняя реклама', description: 'Внешние рекламные каналы запущены' },
+  { field: 'reviewBonusEnabled', label: 'Бонус за отзыв', description: 'Подключено вознаграждение за отзывы покупателей' },
+  { field: 'sellerBonusEnabled', label: 'Бонус от продавца', description: 'Подключен бонус или стимулирование от продавца' },
 ];
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -62,9 +67,10 @@ export const ProductSaleLaunchPanel: React.FC<ProductSaleLaunchPanelProps> = ({
     setSaving(true);
     setError('');
     const payload = {
-      advertisingStarted: flags.advertisingStarted,
-      promotionStarted: flags.promotionStarted,
+      internalAdvertisingStarted: flags.internalAdvertisingStarted,
+      externalAdvertisingStarted: flags.externalAdvertisingStarted,
       reviewBonusEnabled: flags.reviewBonusEnabled,
+      sellerBonusEnabled: flags.sellerBonusEnabled,
       notes: notes.trim() || undefined,
     };
 

@@ -280,9 +280,10 @@ export interface ProductWarehouseDetails {
 export interface ProductLaunchFlags {
   id?: number;
   productId: number;
-  advertisingStarted: boolean;
-  promotionStarted: boolean;
+  internalAdvertisingStarted: boolean;
+  externalAdvertisingStarted: boolean;
   reviewBonusEnabled: boolean;
+  sellerBonusEnabled: boolean;
   notes?: string | null;
   updatedBy?: number | null;
   completedBy?: number | null;

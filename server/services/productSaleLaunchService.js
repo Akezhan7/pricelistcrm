@@ -13,9 +13,10 @@ const {
 } = require('./productMarketplaceService');
 
 const SALE_FLAG_FIELDS = Object.freeze([
-  'advertisingStarted',
-  'promotionStarted',
+  'internalAdvertisingStarted',
+  'externalAdvertisingStarted',
   'reviewBonusEnabled',
+  'sellerBonusEnabled',
 ]);
 
 function normalizeNotes(value) {
@@ -64,9 +65,10 @@ function buildSaleLaunchCompletionPlan({
 
   const launchFlags = {
     productId: product.id,
-    advertisingStarted: requireBoolean(payload.advertisingStarted, 'advertisingStarted'),
-    promotionStarted: requireBoolean(payload.promotionStarted, 'promotionStarted'),
+    internalAdvertisingStarted: requireBoolean(payload.internalAdvertisingStarted, 'internalAdvertisingStarted'),
+    externalAdvertisingStarted: requireBoolean(payload.externalAdvertisingStarted, 'externalAdvertisingStarted'),
     reviewBonusEnabled: requireBoolean(payload.reviewBonusEnabled, 'reviewBonusEnabled'),
+    sellerBonusEnabled: requireBoolean(payload.sellerBonusEnabled, 'sellerBonusEnabled'),
     notes: normalizeNotes(payload.notes),
     updatedBy: actor.id,
     completedBy: actor.id,
@@ -94,9 +96,10 @@ function buildSaleLaunchCompletionPlan({
       message: 'Sale launch completed',
       metadata: {
         marketplaceListingId: kaspiListing.id,
-        advertisingStarted: launchFlags.advertisingStarted,
-        promotionStarted: launchFlags.promotionStarted,
+        internalAdvertisingStarted: launchFlags.internalAdvertisingStarted,
+        externalAdvertisingStarted: launchFlags.externalAdvertisingStarted,
         reviewBonusEnabled: launchFlags.reviewBonusEnabled,
+        sellerBonusEnabled: launchFlags.sellerBonusEnabled,
       },
       createdAt: now,
     },
@@ -123,9 +126,10 @@ function buildSaleLaunchUpdatePlan({
   }
 
   const launchFlagsUpdate = {
-    advertisingStarted: requireBoolean(payload.advertisingStarted, 'advertisingStarted'),
-    promotionStarted: requireBoolean(payload.promotionStarted, 'promotionStarted'),
+    internalAdvertisingStarted: requireBoolean(payload.internalAdvertisingStarted, 'internalAdvertisingStarted'),
+    externalAdvertisingStarted: requireBoolean(payload.externalAdvertisingStarted, 'externalAdvertisingStarted'),
     reviewBonusEnabled: requireBoolean(payload.reviewBonusEnabled, 'reviewBonusEnabled'),
+    sellerBonusEnabled: requireBoolean(payload.sellerBonusEnabled, 'sellerBonusEnabled'),
     notes: normalizeNotes(payload.notes),
     updatedBy: actor.id,
   };
@@ -152,9 +156,10 @@ function buildSaleLaunchUpdatePlan({
       message: 'Sale launch settings updated',
       metadata: {
         changedFields,
-        advertisingStarted: launchFlagsUpdate.advertisingStarted,
-        promotionStarted: launchFlagsUpdate.promotionStarted,
+        internalAdvertisingStarted: launchFlagsUpdate.internalAdvertisingStarted,
+        externalAdvertisingStarted: launchFlagsUpdate.externalAdvertisingStarted,
         reviewBonusEnabled: launchFlagsUpdate.reviewBonusEnabled,
+        sellerBonusEnabled: launchFlagsUpdate.sellerBonusEnabled,
       },
       createdAt: now,
     } : null,

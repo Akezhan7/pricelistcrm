@@ -644,6 +644,11 @@ Product.hasOne(ProductLifecyclePurchase, {
 ProductLifecyclePurchase.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
 ProductLifecyclePurchase.belongsTo(Supplier, { foreignKey: 'supplierId', as: 'supplier' });
 ProductLifecyclePurchase.belongsTo(Order, { foreignKey: 'orderId', as: 'order' });
+Order.hasMany(ProductLifecyclePurchase, {
+  foreignKey: 'orderId',
+  as: 'lifecyclePurchases',
+  onDelete: 'RESTRICT',
+});
 ProductLifecyclePurchase.belongsTo(OrderItem, { foreignKey: 'orderItemId', as: 'orderItem' });
 ProductLifecyclePurchase.belongsTo(WarehouseReceipt, {
   foreignKey: 'warehouseReceiptId',

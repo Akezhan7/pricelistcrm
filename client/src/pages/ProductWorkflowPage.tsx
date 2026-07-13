@@ -9,6 +9,7 @@ import {
   Pencil,
   RefreshCw,
   Search,
+  ShoppingCart,
   UserRound,
 } from 'lucide-react';
 import { Layout } from '../components/Layout';
@@ -29,6 +30,7 @@ import { ProductAssetsPanel } from '../components/ProductAssetsPanel';
 import { ProductMarketplacePanel } from '../components/ProductMarketplacePanel';
 import { ProductReviewActions } from '../components/ProductReviewActions';
 import { ProductPurchaseActions } from '../components/ProductPurchaseActions';
+import { ProductBulkPurchaseActions } from '../components/ProductBulkPurchaseActions';
 import { ProductWarehousePanel } from '../components/ProductWarehousePanel';
 import { ProductSaleLaunchPanel } from '../components/ProductSaleLaunchPanel';
 import { ProductHistoryModal } from '../components/ProductHistoryModal';
@@ -36,7 +38,7 @@ import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import getImageUrl from '../utils/image';
 import { formatPriceKZT } from '../utils/format';
-import type { ProductLifecycleStatus, ProductWorkflowItem } from '../types';
+import type { ProductLifecycleStatus, ProductWorkflowItem, SupplierWithPrice } from '../types';
 import {
   PRODUCT_LIFECYCLE_ALL_FILTERS,
   getProductLifecycleLabel,
@@ -84,6 +86,27 @@ function formatUserLabel(user?: { name?: string; email?: string } | null) {
   return user.email ? `${user.name} · ${user.email}` : user.name;
 }
 
+function canSelectForBulkPurchase(product: ProductWorkflowItem) {
+  return (
+    product.workflow.nextActionKey === 'purchase_product' &&
+    Boolean(product.permissions?.allowedActions.includes('manage_purchase')) &&
+    !product.lifecyclePurchase
+  );
+}
+
+function getCommonSuppliers(products: ProductWorkflowItem[]): SupplierWithPrice[] {
+  if (products.length === 0) return [];
+
+  const supplierLists = products.map((product) =>
+    (product.suppliers || []).filter((supplier) => supplier.ProductSupplier?.isAvailable !== false)
+  );
+  const [firstList, ...restLists] = supplierLists;
+
+  return firstList.filter((supplier) =>
+    restLists.every((list) => list.some((item) => Number(item.id) === Number(supplier.id)))
+  );
+}
+
 export const ProductWorkflowPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -111,6 +134,9 @@ export const ProductWorkflowPage: React.FC = () => {
   const [warehouseProduct, setWarehouseProduct] = useState<ProductWorkflowItem | null>(null);
   const [saleProduct, setSaleProduct] = useState<ProductWorkflowItem | null>(null);
   const [historyProduct, setHistoryProduct] = useState<ProductWorkflowItem | null>(null);
+  const [selectedPurchaseIds, setSelectedPurchaseIds] = useState<number[]>([]);
+  const [bulkSupplierId, setBulkSupplierId] = useState('');
+  const [bulkPurchaseOpen, setBulkPurchaseOpen] = useState(false);
 
   const canUseExtendedFilters = user?.role === 'admin' || workflow.canUseExtendedFilters;
   const searchQuery = searchParams.get('search') || '';
@@ -227,6 +253,26 @@ export const ProductWorkflowPage: React.FC = () => {
       .filter((entry): entry is [ProductLifecycleStatus, number] => Number(entry[1]) > 0);
   }, [statusCounts]);
 
+  const purchaseSelectableProducts = useMemo(
+    () => products.filter(canSelectForBulkPurchase),
+    [products]
+  );
+
+  const selectedPurchaseProducts = useMemo(
+    () => products.filter((product) => selectedPurchaseIds.includes(product.id) && canSelectForBulkPurchase(product)),
+    [products, selectedPurchaseIds]
+  );
+
+  const commonSuppliers = useMemo(
+    () => getCommonSuppliers(selectedPurchaseProducts),
+    [selectedPurchaseProducts]
+  );
+
+  const canUseBulkPurchase = Boolean(
+    (user?.role === 'admin' || user?.role === 'purchase_manager') &&
+    purchaseSelectableProducts.length > 0
+  );
+
   const countLabel =
     totalProducts === 1 ? 'задача' : totalProducts > 1 && totalProducts < 5 ? 'задачи' : 'задач';
 
@@ -247,9 +293,37 @@ export const ProductWorkflowPage: React.FC = () => {
     setReviewProduct(null);
     setMarketplaceProduct(null);
     setPurchaseProduct(null);
+    setBulkPurchaseOpen(false);
+    setSelectedPurchaseIds([]);
+    setBulkSupplierId('');
     setWarehouseProduct(null);
     setSaleProduct(null);
     await fetchProducts();
+  };
+
+  useEffect(() => {
+    setSelectedPurchaseIds((current) =>
+      current.filter((id) => purchaseSelectableProducts.some((product) => product.id === id))
+    );
+  }, [purchaseSelectableProducts]);
+
+  useEffect(() => {
+    if (selectedPurchaseProducts.length === 0) {
+      if (bulkSupplierId) setBulkSupplierId('');
+      return;
+    }
+
+    if (!commonSuppliers.some((supplier) => String(supplier.id) === bulkSupplierId)) {
+      setBulkSupplierId(commonSuppliers[0] ? String(commonSuppliers[0].id) : '');
+    }
+  }, [bulkSupplierId, commonSuppliers, selectedPurchaseProducts.length]);
+
+  const togglePurchaseSelection = (productId: number) => {
+    setSelectedPurchaseIds((current) =>
+      current.includes(productId)
+        ? current.filter((id) => id !== productId)
+        : [...current, productId]
+    );
   };
 
   return (
@@ -354,6 +428,48 @@ export const ProductWorkflowPage: React.FC = () => {
             </div>
           )}
 
+          {canUseBulkPurchase && (
+            <div className="border-b border-border-subtle bg-brand-white px-4 py-3">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                <div className="min-w-0">
+                  <p className="text-card-title text-brand-black">Пакетный закуп</p>
+                  <p className="text-body text-text-muted">
+                    Выберите несколько товаров одного поставщика и создайте одну заявку.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+                  <Select
+                    label="Поставщик"
+                    value={bulkSupplierId}
+                    onChange={(event) => setBulkSupplierId(event.target.value)}
+                    disabled={selectedPurchaseProducts.length === 0 || commonSuppliers.length === 0}
+                    className="sm:w-72"
+                  >
+                    {selectedPurchaseProducts.length === 0 ? (
+                      <option value="">Выберите товары</option>
+                    ) : commonSuppliers.length === 0 ? (
+                      <option value="">Нет общего поставщика</option>
+                    ) : (
+                      commonSuppliers.map((supplier) => (
+                        <option key={supplier.id} value={supplier.id}>
+                          {supplier.name}
+                        </option>
+                      ))
+                    )}
+                  </Select>
+                  <Button
+                    type="button"
+                    leftIcon={ShoppingCart}
+                    disabled={selectedPurchaseProducts.length === 0 || !bulkSupplierId || commonSuppliers.length === 0}
+                    onClick={() => setBulkPurchaseOpen(true)}
+                  >
+                    Создать заявку ({selectedPurchaseProducts.length})
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="flex-1 min-h-0 overflow-y-auto p-3 lg:p-4">
             {loading ? (
               <div className="flex h-64 flex-col items-center justify-center gap-3">
@@ -372,25 +488,40 @@ export const ProductWorkflowPage: React.FC = () => {
               />
             ) : (
               <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-                {products.map((product) => (
-                  <article
-                    key={product.id}
-                    className="rounded-xl border border-border-subtle bg-brand-white p-3 shadow-sm transition-shadow hover:shadow-card-hover"
-                  >
-                    <div className="flex gap-3">
-                      <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-border-subtle bg-surface-inset">
-                        {product.image ? (
-                          <img
-                            src={getImageUrl(product.image) || undefined}
-                            alt={product.name}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center">
-                            <ImageIcon className="h-5 w-5 text-text-muted" aria-hidden />
-                          </div>
+                {products.map((product) => {
+                  const selectableForBulk = canSelectForBulkPurchase(product);
+                  const selectedForBulk = selectedPurchaseIds.includes(product.id);
+
+                  return (
+                    <article
+                      key={product.id}
+                      className="rounded-xl border border-border-subtle bg-brand-white p-3 shadow-sm transition-shadow hover:shadow-card-hover"
+                    >
+                      <div className="flex gap-3">
+                        {canUseBulkPurchase && selectableForBulk && (
+                          <label className="mt-5 flex h-6 w-6 shrink-0 items-center justify-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedForBulk}
+                              onChange={() => togglePurchaseSelection(product.id)}
+                              className="h-4 w-4 rounded border-border-strong text-brand-yellow focus:ring-brand-yellow"
+                              aria-label={`Выбрать ${product.name} для пакетного закупа`}
+                            />
+                          </label>
                         )}
-                      </div>
+                        <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-border-subtle bg-surface-inset">
+                          {product.image ? (
+                            <img
+                              src={getImageUrl(product.image) || undefined}
+                              alt={product.name}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center">
+                              <ImageIcon className="h-5 w-5 text-text-muted" aria-hidden />
+                            </div>
+                          )}
+                        </div>
 
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-start justify-between gap-2">
@@ -503,8 +634,9 @@ export const ProductWorkflowPage: React.FC = () => {
                         </div>
                       </div>
                     </div>
-                  </article>
-                ))}
+                    </article>
+                  );
+                })}
               </div>
             )}
           </div>
@@ -578,6 +710,21 @@ export const ProductWorkflowPage: React.FC = () => {
           {purchaseProduct && (
             <ProductPurchaseActions
               product={purchaseProduct}
+              onChanged={handleWorkflowChanged}
+            />
+          )}
+        </Modal>
+
+        <Modal
+          isOpen={bulkPurchaseOpen}
+          onClose={() => setBulkPurchaseOpen(false)}
+          title="Пакетный закуп"
+          size="xl"
+        >
+          {bulkPurchaseOpen && bulkSupplierId && (
+            <ProductBulkPurchaseActions
+              products={selectedPurchaseProducts}
+              supplierId={Number(bulkSupplierId)}
               onChanged={handleWorkflowChanged}
             />
           )}

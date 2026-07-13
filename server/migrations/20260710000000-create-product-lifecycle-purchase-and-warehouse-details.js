@@ -46,7 +46,6 @@ module.exports = {
         order_id: {
           type: DataTypes.INTEGER,
           allowNull: false,
-          unique: true,
           references: { model: 'orders', key: 'id' },
           onUpdate: 'CASCADE',
           onDelete: 'RESTRICT',

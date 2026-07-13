@@ -47,9 +47,10 @@ async function getProductLaunchFlags(req, res) {
       data: {
         launchFlags: launchFlags || {
           productId: product.id,
-          advertisingStarted: false,
-          promotionStarted: false,
+          internalAdvertisingStarted: false,
+          externalAdvertisingStarted: false,
           reviewBonusEnabled: false,
+          sellerBonusEnabled: false,
           notes: null,
           completedAt: product.lifecycleCompletedAt,
         },
