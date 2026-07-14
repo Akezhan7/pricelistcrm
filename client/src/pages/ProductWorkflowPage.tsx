@@ -34,6 +34,7 @@ import { ProductBulkPurchaseActions } from '../components/ProductBulkPurchaseAct
 import { ProductWarehousePanel } from '../components/ProductWarehousePanel';
 import { ProductSaleLaunchPanel } from '../components/ProductSaleLaunchPanel';
 import { ProductHistoryModal } from '../components/ProductHistoryModal';
+import { AssignDesignerModal } from '../components/AssignDesignerModal';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import getImageUrl from '../utils/image';
@@ -134,6 +135,7 @@ export const ProductWorkflowPage: React.FC = () => {
   const [warehouseProduct, setWarehouseProduct] = useState<ProductWorkflowItem | null>(null);
   const [saleProduct, setSaleProduct] = useState<ProductWorkflowItem | null>(null);
   const [historyProduct, setHistoryProduct] = useState<ProductWorkflowItem | null>(null);
+  const [assignDesignerProduct, setAssignDesignerProduct] = useState<ProductWorkflowItem | null>(null);
   const [selectedPurchaseIds, setSelectedPurchaseIds] = useState<number[]>([]);
   const [bulkSupplierId, setBulkSupplierId] = useState('');
   const [bulkPurchaseOpen, setBulkPurchaseOpen] = useState(false);
@@ -290,6 +292,7 @@ export const ProductWorkflowPage: React.FC = () => {
   };
 
   const handleWorkflowChanged = async () => {
+    setAssignDesignerProduct(null);
     setReviewProduct(null);
     setMarketplaceProduct(null);
     setPurchaseProduct(null);
@@ -601,7 +604,9 @@ export const ProductWorkflowPage: React.FC = () => {
                               rightIcon={ArrowRight}
                               disabled={!product.workflow.nextActionEnabled}
                               onClick={() => {
-                              if (product.workflow.nextActionKey === 'upload_content_assets') {
+                              if (product.workflow.nextActionKey === 'assign_designer') {
+                                setAssignDesignerProduct(product);
+                              } else if (product.workflow.nextActionKey === 'upload_content_assets') {
                                 setAssetProduct(product);
                               } else if (
                                 product.workflow.nextActionKey === 'submit_review' ||
@@ -667,6 +672,14 @@ export const ProductWorkflowPage: React.FC = () => {
         </Modal>
 
         {editorModals}
+
+        <AssignDesignerModal
+          isOpen={!!assignDesignerProduct}
+          onClose={() => setAssignDesignerProduct(null)}
+          productIds={assignDesignerProduct ? [assignDesignerProduct.id] : []}
+          selectedCount={assignDesignerProduct ? 1 : 0}
+          onSuccess={handleWorkflowChanged}
+        />
 
         <ProductHistoryModal
           product={historyProduct}
