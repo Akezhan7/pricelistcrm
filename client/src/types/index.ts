@@ -163,6 +163,115 @@ export interface DesignerKpiReport {
   designers: DesignerKpiRow[];
 }
 
+export type EmployeeTaskStatus =
+  | 'new'
+  | 'in_progress'
+  | 'review'
+  | 'returned'
+  | 'done'
+  | 'cancelled';
+
+export type EmployeeTaskPriority = 'low' | 'normal' | 'high' | 'urgent';
+
+export type EmployeeTaskAction =
+  | 'start'
+  | 'submit_review'
+  | 'approve'
+  | 'return'
+  | 'cancel';
+
+export interface EmployeeTaskUser {
+  id: number;
+  name: string;
+  email?: string;
+  role: string;
+  isActive?: boolean;
+}
+
+export interface EmployeeTaskHistoryEntry {
+  id: number;
+  taskId: number;
+  actorId?: number | null;
+  actor?: EmployeeTaskUser | null;
+  action: string;
+  fromStatus?: EmployeeTaskStatus | null;
+  toStatus?: EmployeeTaskStatus | null;
+  comment?: string | null;
+  createdAt: string;
+}
+
+export interface EmployeeTaskComment {
+  id: number;
+  taskId: number;
+  authorId: number;
+  author?: EmployeeTaskUser;
+  comment: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EmployeeTask {
+  id: number;
+  title: string;
+  description?: string | null;
+  status: EmployeeTaskStatus;
+  priority: EmployeeTaskPriority;
+  createdByUserId: number;
+  assignedToUserId: number;
+  creator?: EmployeeTaskUser;
+  assignee?: EmployeeTaskUser;
+  dueDate?: string | null;
+  submittedAt?: string | null;
+  completedAt?: string | null;
+  cancelledAt?: string | null;
+  allowedActions: EmployeeTaskAction[];
+  history?: EmployeeTaskHistoryEntry[];
+  comments?: EmployeeTaskComment[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EmployeeTasksResponse {
+  tasks: EmployeeTask[];
+  stats: Partial<Record<EmployeeTaskStatus, number>>;
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
+}
+
+export interface CreateEmployeeTaskDto {
+  title: string;
+  description?: string;
+  assignedToUserId: number;
+  priority?: EmployeeTaskPriority;
+  dueDate?: string;
+  comment?: string;
+}
+
+export interface UpdateEmployeeTaskDto {
+  title?: string;
+  description?: string | null;
+  assignedToUserId?: number;
+  priority?: EmployeeTaskPriority;
+  dueDate?: string | null;
+  comment?: string;
+}
+
+export interface EmployeeTaskFilters {
+  scope?: 'all' | 'assigned' | 'created';
+  search?: string;
+  status?: EmployeeTaskStatus | '';
+  priority?: EmployeeTaskPriority | '';
+  assignedToUserId?: number | '';
+  createdByUserId?: number | '';
+  overdue?: boolean;
+  page?: number;
+  limit?: number;
+}
+
 export type ProductAssetType =
   | 'product_photo'
   | 'slide_jpg'

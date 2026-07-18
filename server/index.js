@@ -2,11 +2,11 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
-const rateLimit = require('express-rate-limit');
 const compression = require('compression');
 const path = require('path');
 const { sequelize } = require('./models');
 const { runMigrations } = require('./scripts/runMigrations');
+const { createApiLimiter, createAuthLimiter } = require('./middleware/rateLimit');
 
 // Импорт маршрутов
 const authRoutes = require('./routes/auth');
@@ -23,11 +23,16 @@ const collectorRoutes = require('./routes/collector');
 const warehouseRoutes = require('./routes/warehouse');
 const exportRoutes = require('./routes/export');
 const analyticsRoutes = require('./routes/analytics');
+const taskRoutes = require('./routes/tasks');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 const NODE_ENV = process.env.NODE_ENV || 'development';
 const isProduction = NODE_ENV === 'production';
+
+if (isProduction) {
+  app.set('trust proxy', 1);
+}
 
 // Настройка CORS origins
 const allowedOrigins = [process.env.CLIENT_URL];
@@ -72,42 +77,18 @@ app.use(helmet({
   contentSecurityPolicy: isProduction ? undefined : false // CSP только для production
 }));
 
-// Rate limiting - строже для production
-const limiter = rateLimit({
-  windowMs: isProduction ? 15 * 60 * 1000 : 1 * 60 * 1000, // 15 мин в prod, 1 мин в dev
-  max: isProduction ? 100 : 1000, // 100 запросов в prod, 1000 в dev
-  message: {
-    success: false,
-    message: 'Слишком много запросов, попробуйте позже',
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: (req) => {
-    // Пропускаем preflight запросы и статические файлы
-    return req.method === 'OPTIONS' || req.url.startsWith('/uploads');
-  }
-});
+// Мягкий общий лимит для рабочей CRM и строгий лимит только для auth-сценариев.
+const apiLimiter = createApiLimiter(isProduction);
+const authLimiter = createAuthLimiter(isProduction);
 
-// Строгий rate limiter для аутентификации (защита от brute force)
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 минут
-  max: isProduction ? 5 : 50, // 5 попыток в prod, 50 в dev
-  message: {
-    success: false,
-    message: 'Слишком много попыток входа. Попробуйте через 15 минут',
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  skipSuccessfulRequests: true, // Не считаем успешные попытки
-});
-
-app.use('/api', limiter);
-app.use('/api/auth/login', authLimiter);
-app.use('/api/auth/register', authLimiter);
+app.use('/api', apiLimiter);
 
 // Парсинг JSON
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/register', authLimiter);
 
 // Дополнительная обработка preflight запросов
 app.options('*', (req, res) => {
@@ -168,6 +149,7 @@ app.use('/api/price-history', priceHistoryRoutes);
 app.use('/api/warehouse', warehouseRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/tasks', taskRoutes);
 
 // Базовый маршрут
 app.get('/api', (req, res) => {

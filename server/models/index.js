@@ -28,6 +28,9 @@ const ProductLifecyclePurchase = require('./ProductLifecyclePurchase');
 const ProductWarehouseDetails = require('./ProductWarehouseDetails');
 const ProductLaunchFlags = require('./ProductLaunchFlags');
 const ProductDesignerKpiEntry = require('./ProductDesignerKpiEntry');
+const EmployeeTask = require('./EmployeeTask');
+const EmployeeTaskHistory = require('./EmployeeTaskHistory');
+const EmployeeTaskComment = require('./EmployeeTaskComment');
 
 // Импортируем связи (все связи определены в associations.js)
 require('./associations');
@@ -62,4 +65,7 @@ module.exports = {
   ProductWarehouseDetails,
   ProductLaunchFlags,
   ProductDesignerKpiEntry,
+  EmployeeTask,
+  EmployeeTaskHistory,
+  EmployeeTaskComment,
 };

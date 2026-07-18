@@ -26,6 +26,9 @@ const ProductLifecyclePurchase = require('./ProductLifecyclePurchase');
 const ProductWarehouseDetails = require('./ProductWarehouseDetails');
 const ProductLaunchFlags = require('./ProductLaunchFlags');
 const ProductDesignerKpiEntry = require('./ProductDesignerKpiEntry');
+const EmployeeTask = require('./EmployeeTask');
+const EmployeeTaskHistory = require('./EmployeeTaskHistory');
+const EmployeeTaskComment = require('./EmployeeTaskComment');
 
 // Связи между рынками и секторами
 Market.hasMany(Sector, {
@@ -691,6 +694,78 @@ User.hasMany(ProductDesignerKpiEntry, {
   as: 'reviewedDesignerKpiEntries',
 });
 
+EmployeeTask.belongsTo(User, {
+  foreignKey: 'createdByUserId',
+  as: 'creator',
+  onDelete: 'RESTRICT',
+  onUpdate: 'CASCADE',
+});
+
+User.hasMany(EmployeeTask, {
+  foreignKey: 'createdByUserId',
+  as: 'createdEmployeeTasks',
+});
+
+EmployeeTask.belongsTo(User, {
+  foreignKey: 'assignedToUserId',
+  as: 'assignee',
+  onDelete: 'RESTRICT',
+  onUpdate: 'CASCADE',
+});
+
+User.hasMany(EmployeeTask, {
+  foreignKey: 'assignedToUserId',
+  as: 'assignedEmployeeTasks',
+});
+
+EmployeeTask.hasMany(EmployeeTaskHistory, {
+  foreignKey: 'taskId',
+  as: 'history',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE',
+});
+
+EmployeeTaskHistory.belongsTo(EmployeeTask, {
+  foreignKey: 'taskId',
+  as: 'task',
+});
+
+EmployeeTaskHistory.belongsTo(User, {
+  foreignKey: 'actorId',
+  as: 'actor',
+  onDelete: 'SET NULL',
+  onUpdate: 'CASCADE',
+});
+
+User.hasMany(EmployeeTaskHistory, {
+  foreignKey: 'actorId',
+  as: 'employeeTaskHistory',
+});
+
+EmployeeTask.hasMany(EmployeeTaskComment, {
+  foreignKey: 'taskId',
+  as: 'comments',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE',
+});
+
+EmployeeTaskComment.belongsTo(EmployeeTask, {
+  foreignKey: 'taskId',
+  as: 'task',
+});
+
+EmployeeTaskComment.belongsTo(User, {
+  foreignKey: 'authorId',
+  as: 'author',
+  onDelete: 'RESTRICT',
+  onUpdate: 'CASCADE',
+});
+
+User.hasMany(EmployeeTaskComment, {
+  foreignKey: 'authorId',
+  as: 'employeeTaskComments',
+});
+
 module.exports = {
   Market,
   Sector,
@@ -719,4 +794,7 @@ module.exports = {
   ProductWarehouseDetails,
   ProductLaunchFlags,
   ProductDesignerKpiEntry,
+  EmployeeTask,
+  EmployeeTaskHistory,
+  EmployeeTaskComment,
 };

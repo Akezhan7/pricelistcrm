@@ -20,6 +20,7 @@ import {
   FolderTree,
   Warehouse,
   ClipboardList,
+  ListTodo,
   ListChecks,
   PackageCheck,
   BarChart3,
@@ -100,6 +101,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
         'purchase_manager',
         'warehouse_operator',
       ],
+    },
+    {
+      id: 'tasks',
+      label: 'Задачи',
+      icon: <ListTodo className="w-5 h-5 flex-shrink-0" />,
+      path: '/tasks',
     },
     {
       id: 'suppliers',

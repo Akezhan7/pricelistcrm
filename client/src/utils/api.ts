@@ -1,4 +1,6 @@
 import axios, { AxiosInstance, AxiosResponse } from 'axios';
+import { toast } from '../context/ToastContext';
+import { buildRateLimitMessage } from './apiError';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
 
@@ -9,6 +11,8 @@ const api: AxiosInstance = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+let lastRateLimitToastAt = 0;
 
 api.interceptors.request.use(
   (config) => {
@@ -29,6 +33,24 @@ api.interceptors.response.use(
       localStorage.removeItem('user');
       window.location.href = '/login';
     }
+
+    if (error.response?.status === 429) {
+      const retryAfter = error.response.headers?.['retry-after'];
+      const backendMessage = error.response.data?.message;
+      const message = buildRateLimitMessage(retryAfter, backendMessage);
+
+      error.message = message;
+      if (error.response.data) {
+        error.response.data.message = message;
+      }
+
+      const now = Date.now();
+      if (now - lastRateLimitToastAt > 5000) {
+        toast.warning(message, 8000);
+        lastRateLimitToastAt = now;
+      }
+    }
+
     return Promise.reject(error);
   }
 );
