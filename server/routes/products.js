@@ -41,6 +41,9 @@ const {
 const { getProductPriceHistory } = require('../controllers/priceHistoryController');
 const { getProductHistory } = require('../controllers/productHistoryController');
 const {
+  updateProductWarehouseDetails,
+} = require('../controllers/productWarehouseDetailsController');
+const {
   completeProductWarehouse,
   getLifecycleOperations,
   markProductArrived,
@@ -282,14 +285,30 @@ router.post('/:id/lifecycle/complete-warehouse',
     body('sector').trim().isLength({ min: 1, max: 80 }),
     body('shelf').trim().isLength({ min: 1, max: 80 }),
     body('cell').trim().isLength({ min: 1, max: 80 }),
-    body('weight').isFloat({ gt: 0 }),
-    body('length').isFloat({ gt: 0 }),
-    body('width').isFloat({ gt: 0 }),
-    body('height').isFloat({ gt: 0 }),
+    body('weight').optional({ values: 'falsy' }).isFloat({ min: 0 }),
+    body('length').optional({ values: 'falsy' }).isFloat({ min: 0 }),
+    body('width').optional({ values: 'falsy' }).isFloat({ min: 0 }),
+    body('height').optional({ values: 'falsy' }).isFloat({ min: 0 }),
     body('costPrice').optional({ values: 'falsy' }).isFloat({ min: 0 }),
     body('notes').optional({ values: 'falsy' }).isLength({ max: 2000 }),
   ],
   completeProductWarehouse
+);
+
+router.put('/:id/warehouse-details',
+  auth,
+  requireRole('admin', 'warehouse_operator'),
+  [
+    body('sector').trim().isLength({ min: 1, max: 80 }),
+    body('shelf').trim().isLength({ min: 1, max: 80 }),
+    body('cell').trim().isLength({ min: 1, max: 80 }),
+    body('weight').optional({ values: 'falsy' }).isFloat({ min: 0 }),
+    body('length').optional({ values: 'falsy' }).isFloat({ min: 0 }),
+    body('width').optional({ values: 'falsy' }).isFloat({ min: 0 }),
+    body('height').optional({ values: 'falsy' }).isFloat({ min: 0 }),
+    body('notes').optional({ values: 'falsy' }).isLength({ max: 2000 }),
+  ],
+  updateProductWarehouseDetails
 );
 
 const saleLaunchValidation = [

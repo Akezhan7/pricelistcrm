@@ -2,6 +2,7 @@ const assert = require('assert');
 const {
   PRODUCT_ASSET_TYPES,
   buildProductAssetData,
+  normalizeUploadedFileOriginalName,
   validateProductAssetUpload,
 } = require('../services/productAssetService');
 
@@ -61,6 +62,17 @@ function testValidatesAllowedUploads() {
       },
     })
   );
+
+  assert.doesNotThrow(() =>
+    validateProductAssetUpload({
+      assetType: PRODUCT_ASSET_TYPES.PSD_SOURCE,
+      file: {
+        originalname: 'source.psd',
+        mimetype: '',
+        size: 10 * 1024 * 1024,
+      },
+    })
+  );
 }
 
 function testRejectsInvalidUploads() {
@@ -105,8 +117,21 @@ function testRejectsInvalidUploads() {
   );
 }
 
+function testNormalizesBrokenOriginalNames() {
+  assert.strictEqual(
+    normalizeUploadedFileOriginalName('\u0420\u040e\u0420\u00b5\u0421\u201a\u0420\u00b5\u0420\u0406\u0420\u0455\u0420\u2116 \u0421\u201e\u0420\u0451\u0420\u00bb\u0421\u040a\u0421\u201a\u0421\u0402 1-03.psd'),
+    '\u0421\u0435\u0442\u0435\u0432\u043e\u0439 \u0444\u0438\u043b\u044c\u0442\u0440 1-03.psd'
+  );
+
+  assert.strictEqual(
+    normalizeUploadedFileOriginalName('\u00d0\u00a1\u00d0\u00b5\u00d1\u0082\u00d0\u00b5\u00d0\u00b2\u00d0\u00be\u00d0\u00b9 \u00d1\u0084\u00d0\u00b8\u00d0\u00bb\u00d1\u008c\u00d1\u0082\u00d1\u0080 1-03.png'),
+    '\u0421\u0435\u0442\u0435\u0432\u043e\u0439 \u0444\u0438\u043b\u044c\u0442\u0440 1-03.png'
+  );
+}
+
 testBuildsProductAssetData();
 testValidatesAllowedUploads();
 testRejectsInvalidUploads();
+testNormalizesBrokenOriginalNames();
 
 console.log('Product asset service test passed');

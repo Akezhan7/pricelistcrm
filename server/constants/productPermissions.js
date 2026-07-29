@@ -10,6 +10,7 @@ const PRODUCT_PERMISSION_ACTIONS = Object.freeze({
   MANAGE_MARKETPLACE: 'manage_marketplace',
   MANAGE_PURCHASE: 'manage_purchase',
   MANAGE_WAREHOUSE: 'manage_warehouse',
+  EDIT_WAREHOUSE_LOCATION: 'edit_warehouse_location',
   MANAGE_SALE_LAUNCH: 'manage_sale_launch',
   MANAGE_SUPPLIERS: 'manage_product_suppliers',
   MANAGE_VARIATIONS: 'manage_product_variations',
@@ -102,6 +103,10 @@ function getSupportingActions({ user, product }) {
     && hasRole(user, 'admin', 'warehouse_operator')
   ) {
     actions.push(PRODUCT_PERMISSION_ACTIONS.MANAGE_WAREHOUSE);
+  }
+
+  if (hasRole(user, 'admin', 'warehouse_operator')) {
+    actions.push(PRODUCT_PERMISSION_ACTIONS.EDIT_WAREHOUSE_LOCATION);
   }
 
   if (

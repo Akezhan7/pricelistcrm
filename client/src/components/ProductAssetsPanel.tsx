@@ -1,7 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Download, FileText, Image as ImageIcon, Send, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Eye, FileText, Image as ImageIcon, Send, Trash2 } from 'lucide-react';
 import api from '../utils/api';
 import getImageUrl from '../utils/image';
+import {
+  getDisplayAssetName,
+  getGalleryImageAssets,
+  isPreviewableImageAsset,
+  recommendAssetTypeForFiles,
+} from '../utils/productAssets';
 import type { ProductAsset, ProductAssetType } from '../types';
 import {
   Alert,
@@ -10,6 +16,7 @@ import {
   FileUploadZone,
   FormField,
   IconButton,
+  Modal,
   Select,
   Spinner,
   Textarea,
@@ -73,10 +80,6 @@ function formatFileSize(size?: number | null) {
   return `${(size / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function isImageAsset(asset: ProductAsset) {
-  return Boolean(asset.mimeType?.startsWith('image/'));
-}
-
 export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
   productId,
   productName,
@@ -94,6 +97,7 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
   const [uploading, setUploading] = useState(false);
   const [submittingContent, setSubmittingContent] = useState(false);
   const [error, setError] = useState('');
+  const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
   const onAssetsChangedRef = useRef(onAssetsChanged);
 
   useEffect(() => {
@@ -114,6 +118,32 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
     });
     return Array.from(groups.entries());
   }, [assets]);
+
+  const galleryAssets = useMemo(() => getGalleryImageAssets(assets), [assets]);
+  const activeGalleryAsset = galleryIndex === null ? null : galleryAssets[galleryIndex] || null;
+
+  const closeGallery = () => setGalleryIndex(null);
+
+  const openGallery = (asset: ProductAsset) => {
+    const index = galleryAssets.findIndex((item) => item.id === asset.id);
+    if (index >= 0) setGalleryIndex(index);
+  };
+
+  const showPreviousGalleryAsset = () => {
+    if (galleryAssets.length === 0) return;
+    setGalleryIndex((current) => {
+      const index = current ?? 0;
+      return index === 0 ? galleryAssets.length - 1 : index - 1;
+    });
+  };
+
+  const showNextGalleryAsset = () => {
+    if (galleryAssets.length === 0) return;
+    setGalleryIndex((current) => {
+      const index = current ?? 0;
+      return index === galleryAssets.length - 1 ? 0 : index + 1;
+    });
+  };
 
   const loadAssets = useCallback(async () => {
     setLoading(true);
@@ -144,20 +174,29 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
 
     setUploading(true);
     try {
-      const results = await Promise.allSettled(
-        files.map((selectedFile) => {
-          const data = new FormData();
-          data.append('assetType', assetType);
-          data.append('asset', selectedFile);
-          if (notes.trim()) data.append('notes', notes.trim());
+      const failedFiles: File[] = [];
+      const failedMessages: string[] = [];
 
-          return api.post(`/products/${productId}/assets`, data, {
+      for (const selectedFile of files) {
+        const data = new FormData();
+        data.append('assetType', recommendAssetTypeForFiles([selectedFile], assetType));
+        data.append('asset', selectedFile);
+        if (notes.trim()) data.append('notes', notes.trim());
+
+        try {
+          await api.post(`/products/${productId}/assets`, data, {
             headers: { 'Content-Type': 'multipart/form-data' },
           });
-        })
-      );
+        } catch (err: unknown) {
+          failedFiles.push(selectedFile);
+          const message =
+            (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+            (err as Error)?.message ||
+            'ошибка загрузки';
+          failedMessages.push(`${selectedFile.name}: ${message}`);
+        }
+      }
 
-      const failedFiles = files.filter((_, index) => results[index].status === 'rejected');
       const successCount = files.length - failedFiles.length;
 
       if (successCount > 0) {
@@ -170,7 +209,7 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
       if (failedFiles.length === 0) {
         setNotes('');
       } else {
-        setError(`РќРµ СѓРґР°Р»РѕСЃСЊ Р·Р°РіСЂСѓР·РёС‚СЊ С„Р°Р№Р»РѕРІ: ${failedFiles.length}`);
+        setError(failedMessages.length > 0 ? failedMessages.join('\n') : `Не удалось загрузить файлов: ${failedFiles.length}`);
       }
       await loadAssets();
     } catch (err: unknown) {
@@ -255,7 +294,10 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
           <FormField label="Файл">
             <FileUploadZone
               selectedFiles={files}
-              onFilesChange={setFiles}
+              onFilesChange={(selectedFiles) => {
+                setFiles(selectedFiles);
+                setAssetType((currentType) => recommendAssetTypeForFiles(selectedFiles, currentType));
+              }}
               multiple
               accept={selectedAssetType.accept}
               label="Выбрать файл"
@@ -303,25 +345,34 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
                 <div className="space-y-2">
                   {items.map((asset) => {
                     const assetUrl = getImageUrl(asset.filePath) || asset.filePath;
+                    const assetName = getDisplayAssetName(asset);
+                    const canPreview = isPreviewableImageAsset(asset);
                     return (
                       <div
                         key={asset.id}
                         className="flex items-center gap-3 rounded-lg border border-border-subtle bg-surface-inset p-2"
                       >
                         <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-brand-white border border-border-subtle">
-                          {isImageAsset(asset) ? (
-                            <img
-                              src={assetUrl}
-                              alt={asset.originalName || 'Материал'}
-                              className="h-full w-full object-cover"
-                            />
+                          {canPreview ? (
+                            <button
+                              type="button"
+                              className="h-full w-full"
+                              onClick={() => openGallery(asset)}
+                              title="Открыть галерею"
+                            >
+                              <img
+                                src={assetUrl}
+                                alt={assetName || 'Материал'}
+                                className="h-full w-full object-cover"
+                              />
+                            </button>
                           ) : (
                             <FileText className="h-5 w-5 text-text-muted" aria-hidden />
                           )}
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-body-medium text-brand-black">
-                            {asset.originalName || asset.filePath}
+                            {assetName || asset.filePath}
                           </p>
                           <p className="text-caption text-text-muted">
                             {formatFileSize(asset.fileSize)}
@@ -340,12 +391,21 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
                           className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-text-muted hover:bg-brand-white hover:text-brand-black"
                           title="Открыть файл"
                         >
-                          {isImageAsset(asset) ? (
-                            <ImageIcon className="h-4 w-4" aria-hidden />
+                          {canPreview ? (
+                            <Eye className="h-4 w-4" aria-hidden />
                           ) : (
                             <Download className="h-4 w-4" aria-hidden />
                           )}
                         </a>
+                        {canPreview && (
+                          <IconButton
+                            icon={ImageIcon}
+                            title="Листать слайды"
+                            size="md"
+                            variant="ghost"
+                            onClick={() => openGallery(asset)}
+                          />
+                        )}
                         {canEdit && (
                           <IconButton
                             icon={Trash2}
@@ -379,6 +439,79 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
           </Button>
         </div>
       )}
+
+      <Modal
+        isOpen={Boolean(activeGalleryAsset)}
+        onClose={closeGallery}
+        title={activeGalleryAsset ? getDisplayAssetName(activeGalleryAsset) : 'Слайд'}
+        size="xl"
+        elevated
+      >
+        {activeGalleryAsset && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-3 text-caption text-text-muted">
+              <span>{(galleryIndex ?? 0) + 1} из {galleryAssets.length}</span>
+              <a
+                href={getImageUrl(activeGalleryAsset.filePath) || activeGalleryAsset.filePath}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-accent hover:text-accent-hover"
+              >
+                <Download className="h-4 w-4" aria-hidden />
+                Скачать оригинал
+              </a>
+            </div>
+
+            <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3">
+              <IconButton
+                icon={ChevronLeft}
+                title="Предыдущий слайд"
+                size="md"
+                variant="default"
+                onClick={showPreviousGalleryAsset}
+                disabled={galleryAssets.length <= 1}
+              />
+              <div className="flex min-h-[18rem] items-center justify-center rounded-lg bg-surface-inset p-2 sm:min-h-[28rem]">
+                <img
+                  src={getImageUrl(activeGalleryAsset.filePath) || activeGalleryAsset.filePath}
+                  alt={getDisplayAssetName(activeGalleryAsset)}
+                  className="max-h-[65vh] max-w-full object-contain"
+                />
+              </div>
+              <IconButton
+                icon={ChevronRight}
+                title="Следующий слайд"
+                size="md"
+                variant="default"
+                onClick={showNextGalleryAsset}
+                disabled={galleryAssets.length <= 1}
+              />
+            </div>
+
+            {galleryAssets.length > 1 && (
+              <div className="flex gap-2 overflow-x-auto pb-1">
+                {galleryAssets.map((asset, index) => (
+                  <button
+                    key={asset.id}
+                    type="button"
+                    className={`h-14 w-14 shrink-0 overflow-hidden rounded-lg border ${
+                      index === galleryIndex ? 'border-brand-yellow' : 'border-border-subtle'
+                    }`}
+                    onClick={() => setGalleryIndex(index)}
+                    title={getDisplayAssetName(asset)}
+                  >
+                    <img
+                      src={getImageUrl(asset.filePath) || asset.filePath}
+                      alt={getDisplayAssetName(asset)}
+                      className="h-full w-full object-cover"
+                    />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };

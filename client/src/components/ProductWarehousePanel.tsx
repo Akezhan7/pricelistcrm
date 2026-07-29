@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Warehouse } from 'lucide-react';
+import { Save, Warehouse } from 'lucide-react';
 import { toast } from '../context/ToastContext';
 import productsApi from '../services/productsApi';
 import type { Product } from '../types';
@@ -29,18 +29,35 @@ function getErrorMessage(error: unknown, fallback: string) {
     || fallback;
 }
 
+function formatOptionalValue(value: string | number | null | undefined) {
+  if (value === null || value === undefined) return '';
+  return String(value);
+}
+
 function getInitialForm(product: Product): FormState {
   return {
     sector: product.warehouseDetails?.sector || '',
     shelf: product.warehouseDetails?.shelf || '',
     cell: product.warehouseDetails?.cell || '',
-    weight: product.warehouseDetails ? String(product.warehouseDetails.weight) : '',
-    length: product.warehouseDetails ? String(product.warehouseDetails.length) : '',
-    width: product.warehouseDetails ? String(product.warehouseDetails.width) : '',
-    height: product.warehouseDetails ? String(product.warehouseDetails.height) : '',
+    weight: formatOptionalValue(product.warehouseDetails?.weight),
+    length: formatOptionalValue(product.warehouseDetails?.length),
+    width: formatOptionalValue(product.warehouseDetails?.width),
+    height: formatOptionalValue(product.warehouseDetails?.height),
     costPrice: String(product.costPrice ?? ''),
     notes: product.warehouseDetails?.notes || '',
   };
+}
+
+function optionalNumber(value: string) {
+  const normalized = value.trim();
+  return normalized === '' ? undefined : Number(normalized);
+}
+
+function isOptionalNonNegative(value: string) {
+  const normalized = value.trim();
+  if (normalized === '') return true;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) && parsed >= 0;
 }
 
 export const ProductWarehousePanel: React.FC<ProductWarehousePanelProps> = ({
@@ -48,7 +65,8 @@ export const ProductWarehousePanel: React.FC<ProductWarehousePanelProps> = ({
   onChanged,
 }) => {
   const [form, setForm] = useState<FormState>(() => getInitialForm(product));
-  const [saving, setSaving] = useState(false);
+  const [savingLocation, setSavingLocation] = useState(false);
+  const [completing, setCompleting] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -56,23 +74,38 @@ export const ProductWarehousePanel: React.FC<ProductWarehousePanelProps> = ({
     setError('');
   }, [product]);
 
-  const canEdit = Boolean(product.permissions?.allowedActions.includes('manage_warehouse'));
+  const canEditLocation = Boolean(
+    product.permissions?.allowedActions.includes('edit_warehouse_location')
+  );
+  const canCompleteWarehouse = Boolean(
+    product.permissions?.allowedActions.includes('manage_warehouse')
+  );
+
   const updateField = (field: keyof FormState, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
   };
-  const isComplete = Boolean(
+
+  const hasLocation = Boolean(
     form.sector.trim()
     && form.shelf.trim()
     && form.cell.trim()
-    && Number(form.weight) > 0
-    && Number(form.length) > 0
-    && Number(form.width) > 0
-    && Number(form.height) > 0
-    && Number(form.costPrice) >= 0
   );
+  const optionalNumbersAreValid = [
+    form.weight,
+    form.length,
+    form.width,
+    form.height,
+  ].every(isOptionalNonNegative);
+  const parsedCostPrice = Number(form.costPrice);
+  const hasCostPrice = form.costPrice.trim().length > 0
+    && Number.isFinite(parsedCostPrice)
+    && parsedCostPrice >= 0;
+  const canSaveLocation = canEditLocation && hasLocation && optionalNumbersAreValid;
+  const canFinishStage = canCompleteWarehouse && hasLocation && optionalNumbersAreValid && hasCostPrice;
+
   const warehouseRequirements: RequirementItem[] = [
     {
-      label: 'Сектор указан',
+      label: 'Склад / сектор указан',
       met: form.sector.trim().length > 0,
     },
     {
@@ -84,40 +117,50 @@ export const ProductWarehousePanel: React.FC<ProductWarehousePanelProps> = ({
       met: form.cell.trim().length > 0,
     },
     {
-      label: 'Вес больше 0',
-      met: Number(form.weight) > 0,
-    },
-    {
-      label: 'Габариты заполнены',
-      met: Number(form.length) > 0 && Number(form.width) > 0 && Number(form.height) > 0,
-    },
-    {
       label: 'Себестоимость указана',
-      met: Number(form.costPrice) >= 0 && form.costPrice.trim().length > 0,
+      met: hasCostPrice,
     },
   ];
 
+  const getWarehousePayload = () => ({
+    sector: form.sector.trim(),
+    shelf: form.shelf.trim(),
+    cell: form.cell.trim(),
+    weight: optionalNumber(form.weight),
+    length: optionalNumber(form.length),
+    width: optionalNumber(form.width),
+    height: optionalNumber(form.height),
+    notes: form.notes.trim() || undefined,
+  });
+
+  const handleSaveLocation = async () => {
+    setSavingLocation(true);
+    setError('');
+    try {
+      await productsApi.updateProductWarehouseDetails(product.id, getWarehousePayload());
+      toast.success('Место хранения сохранено');
+      onChanged();
+    } catch (saveError) {
+      setError(getErrorMessage(saveError, 'Не удалось сохранить место хранения'));
+    } finally {
+      setSavingLocation(false);
+    }
+  };
+
   const handleComplete = async () => {
-    setSaving(true);
+    setCompleting(true);
     setError('');
     try {
       await productsApi.completeProductWarehouse(product.id, {
-        sector: form.sector.trim(),
-        shelf: form.shelf.trim(),
-        cell: form.cell.trim(),
-        weight: Number(form.weight),
-        length: Number(form.length),
-        width: Number(form.width),
-        height: Number(form.height),
-        costPrice: Number(form.costPrice),
-        notes: form.notes.trim() || undefined,
+        ...getWarehousePayload(),
+        costPrice: optionalNumber(form.costPrice),
       });
-      toast.success('Складской паспорт сохранен');
+      toast.success('Складской этап завершен');
       onChanged();
     } catch (saveError) {
       setError(getErrorMessage(saveError, 'Не удалось завершить складской этап'));
     } finally {
-      setSaving(false);
+      setCompleting(false);
     }
   };
 
@@ -129,42 +172,143 @@ export const ProductWarehousePanel: React.FC<ProductWarehousePanelProps> = ({
           <h3 className="text-section-title text-brand-black">{product.name}</h3>
           <p className="mt-1 text-body text-text-muted">Остаток: {product.currentStock || 0} шт.</p>
         </div>
-        <Badge variant="outline">Складской паспорт</Badge>
+        <Badge variant="outline">Склад</Badge>
       </div>
 
       {error && <Alert variant="error">{error}</Alert>}
-      <div className="space-y-3 rounded-xl border border-border-subtle bg-surface-muted p-3">
+
+      <div className="space-y-3 rounded-lg border border-border-subtle bg-surface-muted p-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h4 className="text-body font-semibold text-brand-black">Место хранения</h4>
+            <p className="mt-1 text-caption text-text-muted">
+              Эти поля можно менять без перехода товара по этапам.
+            </p>
+          </div>
+        </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Input label="Сектор" value={form.sector} onChange={(event) => updateField('sector', event.target.value)} disabled={!canEdit} />
-          <Input label="Полка" value={form.shelf} onChange={(event) => updateField('shelf', event.target.value)} disabled={!canEdit} />
-          <Input label="Ячейка" value={form.cell} onChange={(event) => updateField('cell', event.target.value)} disabled={!canEdit} />
+          <Input
+            label="Склад / сектор"
+            value={form.sector}
+            onChange={(event) => updateField('sector', event.target.value)}
+            disabled={!canEditLocation}
+          />
+          <Input
+            label="Полка"
+            value={form.shelf}
+            onChange={(event) => updateField('shelf', event.target.value)}
+            disabled={!canEditLocation}
+          />
+          <Input
+            label="Ячейка"
+            value={form.cell}
+            onChange={(event) => updateField('cell', event.target.value)}
+            disabled={!canEditLocation}
+          />
+        </div>
+        {canEditLocation && (
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              variant="secondary"
+              leftIcon={Save}
+              loading={savingLocation}
+              disabled={savingLocation || !canSaveLocation}
+              onClick={handleSaveLocation}
+            >
+              Сохранить место
+            </Button>
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-3 rounded-lg border border-border-subtle bg-brand-white p-3">
+        <div>
+          <h4 className="text-body font-semibold text-brand-black">Габариты и вес</h4>
+          <p className="mt-1 text-caption text-text-muted">
+            Необязательные поля. Заполняйте, когда данные уже известны.
+          </p>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Input label="Вес, кг" type="number" min="0.001" step="0.001" value={form.weight} onChange={(event) => updateField('weight', event.target.value)} disabled={!canEdit} />
-          <Input label="Длина, см" type="number" min="0.01" step="0.01" value={form.length} onChange={(event) => updateField('length', event.target.value)} disabled={!canEdit} />
-          <Input label="Ширина, см" type="number" min="0.01" step="0.01" value={form.width} onChange={(event) => updateField('width', event.target.value)} disabled={!canEdit} />
-          <Input label="Высота, см" type="number" min="0.01" step="0.01" value={form.height} onChange={(event) => updateField('height', event.target.value)} disabled={!canEdit} />
+          <Input
+            label="Вес, кг"
+            type="number"
+            min="0"
+            step="0.001"
+            value={form.weight}
+            onChange={(event) => updateField('weight', event.target.value)}
+            disabled={!canEditLocation}
+          />
+          <Input
+            label="Длина, см"
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.length}
+            onChange={(event) => updateField('length', event.target.value)}
+            disabled={!canEditLocation}
+          />
+          <Input
+            label="Ширина, см"
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.width}
+            onChange={(event) => updateField('width', event.target.value)}
+            disabled={!canEditLocation}
+          />
+          <Input
+            label="Высота, см"
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.height}
+            onChange={(event) => updateField('height', event.target.value)}
+            disabled={!canEditLocation}
+          />
         </div>
-        <Input
-          label="Уточненная себестоимость"
-          type="number"
-          min="0"
-          step="0.01"
-          value={form.costPrice}
-          onChange={(event) => updateField('costPrice', event.target.value)}
-          disabled={!canEdit}
-          helperText="Изменение будет записано в историю цен"
+        <Textarea
+          label="Примечание"
+          rows={3}
+          value={form.notes}
+          onChange={(event) => updateField('notes', event.target.value)}
+          disabled={!canEditLocation}
+          className="resize-none"
         />
-        <Textarea label="Примечание" rows={3} value={form.notes} onChange={(event) => updateField('notes', event.target.value)} disabled={!canEdit} className="resize-none" />
       </div>
-      <Alert variant="info">После сохранения товар перейдет в статус «В продаже».</Alert>
-      <RequirementsChecklist items={warehouseRequirements} />
-      {canEdit && (
-        <div className="flex justify-end">
-          <Button type="button" leftIcon={Warehouse} loading={saving} disabled={saving || !isComplete} onClick={handleComplete}>
-            Завершить складской этап
-          </Button>
+
+      {canCompleteWarehouse && (
+        <div className="space-y-3 rounded-lg border border-border-subtle bg-surface-muted p-3">
+          <Input
+            label="Уточненная себестоимость"
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.costPrice}
+            onChange={(event) => updateField('costPrice', event.target.value)}
+            disabled={!canCompleteWarehouse}
+            helperText="Изменение будет записано в историю цен"
+          />
+          <Alert variant="info">
+            Эта кнопка завершает складской этап и переводит товар в продажу.
+          </Alert>
+          <RequirementsChecklist items={warehouseRequirements} />
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              leftIcon={Warehouse}
+              loading={completing}
+              disabled={completing || !canFinishStage}
+              onClick={handleComplete}
+            >
+              Завершить складской этап
+            </Button>
+          </div>
         </div>
+      )}
+
+      {!canEditLocation && !canCompleteWarehouse && (
+        <Alert variant="info">У вас нет прав на редактирование складских данных.</Alert>
       )}
     </div>
   );

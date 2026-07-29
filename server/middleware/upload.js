@@ -86,7 +86,9 @@ const productAssetFileFilter = (req, file, cb) => {
     'image/photoshop',
   ];
 
-  if (allowedMimeTypes.includes(file.mimetype)) {
+  const extension = path.extname(file.originalname || '').toLowerCase();
+
+  if (allowedMimeTypes.includes(file.mimetype) || extension === '.psd') {
     cb(null, true);
   } else {
     cb(new Error('Недопустимый тип файла для материалов товара'), false);

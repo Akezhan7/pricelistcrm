@@ -140,25 +140,24 @@ function testBuildsWarehouseCompletionPlan() {
 }
 
 function testWarehouseCompletionRequiresCompletePassport() {
-  assert.throws(
-    () => buildWarehouseCompletionPlan({
-      product: {
-        id: 15,
-        lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.WAREHOUSE,
-        costPrice: 2490,
-      },
-      actor: { id: 8, role: 'warehouse_operator' },
-      payload: {
-        sector: 'A',
-        shelf: '03',
-        cell: '12',
-        weight: 0.45,
-        length: 20,
-        width: 12.5,
-      },
-    }),
-    /height is required/i
-  );
+  const plan = buildWarehouseCompletionPlan({
+    product: {
+      id: 15,
+      lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.WAREHOUSE,
+      costPrice: 2490,
+    },
+    actor: { id: 8, role: 'warehouse_operator' },
+    payload: {
+      sector: 'A',
+      shelf: '03',
+      cell: '12',
+    },
+  });
+
+  assert.strictEqual(plan.warehouseDetails.weight, null);
+  assert.strictEqual(plan.warehouseDetails.length, null);
+  assert.strictEqual(plan.warehouseDetails.width, null);
+  assert.strictEqual(plan.warehouseDetails.height, null);
 }
 
 testBuildsLifecyclePurchasePlan();

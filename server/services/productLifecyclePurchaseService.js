@@ -20,10 +20,11 @@ function requiredNonNegativeNumber(value, fieldName) {
   return parsed;
 }
 
-function requiredPositiveNumber(value, fieldName) {
+function optionalNonNegativeNumber(value, fieldName) {
+  if (value === undefined || value === null || value === '') return null;
   const parsed = Number(value);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    throw new Error(`${fieldName} is required and must be a positive number`);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    throw new Error(`${fieldName} must be a non-negative number`);
   }
   return parsed;
 }
@@ -182,10 +183,10 @@ function buildWarehouseCompletionPlan({ product, actor, payload = {}, now = new 
     sector: requiredText(payload.sector, 'sector'),
     shelf: requiredText(payload.shelf, 'shelf'),
     cell: requiredText(payload.cell, 'cell'),
-    weight: requiredPositiveNumber(payload.weight, 'weight'),
-    length: requiredPositiveNumber(payload.length, 'length'),
-    width: requiredPositiveNumber(payload.width, 'width'),
-    height: requiredPositiveNumber(payload.height, 'height'),
+    weight: optionalNonNegativeNumber(payload.weight, 'weight'),
+    length: optionalNonNegativeNumber(payload.length, 'length'),
+    width: optionalNonNegativeNumber(payload.width, 'width'),
+    height: optionalNonNegativeNumber(payload.height, 'height'),
     notes: optionalText(payload.notes),
     updatedBy: actor.id,
   };

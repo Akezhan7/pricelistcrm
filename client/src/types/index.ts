@@ -376,10 +376,10 @@ export interface ProductWarehouseDetails {
   sector: string;
   shelf: string;
   cell: string;
-  weight: string | number;
-  length: string | number;
-  width: string | number;
-  height: string | number;
+  weight?: string | number | null;
+  length?: string | number | null;
+  width?: string | number | null;
+  height?: string | number | null;
   notes?: string | null;
   updatedBy?: number | null;
   createdAt: string;

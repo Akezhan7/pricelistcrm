@@ -40,11 +40,22 @@ export interface CompleteProductWarehouseDto {
   sector: string;
   shelf: string;
   cell: string;
-  weight: number;
-  length: number;
-  width: number;
-  height: number;
+  weight?: number;
+  length?: number;
+  width?: number;
+  height?: number;
   costPrice?: number;
+  notes?: string;
+}
+
+export interface UpdateProductWarehouseDetailsDto {
+  sector: string;
+  shelf: string;
+  cell: string;
+  weight?: number;
+  length?: number;
+  width?: number;
+  height?: number;
   notes?: string;
 }
 
@@ -192,6 +203,20 @@ class ProductsApi {
     );
     if (!response.data.success || !response.data.data?.warehouseDetails) {
       throw new Error(response.data.message || 'Ошибка сохранения складского паспорта');
+    }
+    return response.data.data.warehouseDetails;
+  }
+
+  async updateProductWarehouseDetails(
+    productId: number,
+    data: UpdateProductWarehouseDetailsDto
+  ): Promise<ProductWarehouseDetails> {
+    const response = await api.put<ApiResponse<{ warehouseDetails: ProductWarehouseDetails }>>(
+      `${this.baseUrl}/${productId}/warehouse-details`,
+      data
+    );
+    if (!response.data.success || !response.data.data?.warehouseDetails) {
+      throw new Error(response.data.message || 'Ошибка сохранения места хранения');
     }
     return response.data.data.warehouseDetails;
   }

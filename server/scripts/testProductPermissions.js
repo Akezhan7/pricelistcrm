@@ -68,6 +68,23 @@ function testOperationalRolesStayInTheirArea() {
   assert(!accountant.allowedActions.includes(PRODUCT_PERMISSION_ACTIONS.MANAGE_WAREHOUSE));
 }
 
+function testWarehouseLocationCanBeEditedOutsideWarehouseStage() {
+  const admin = permissionsFor('admin', {
+    lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE,
+  });
+  assert(admin.allowedActions.includes('edit_warehouse_location'));
+
+  const warehouse = permissionsFor('warehouse_operator', {
+    lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
+  });
+  assert(warehouse.allowedActions.includes('edit_warehouse_location'));
+
+  const marketplace = permissionsFor('marketplace_manager', {
+    lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
+  });
+  assert(!marketplace.allowedActions.includes('edit_warehouse_location'));
+}
+
 function testForbiddenProductFieldsAreRejected() {
   assert.doesNotThrow(() =>
     assertProductFieldsAllowed({
@@ -113,6 +130,7 @@ function run() {
   testAdminHasFullProductAccess();
   testDesignerMustBeAssigned();
   testOperationalRolesStayInTheirArea();
+  testWarehouseLocationCanBeEditedOutsideWarehouseStage();
   testForbiddenProductFieldsAreRejected();
   testForbiddenActionsExposeHttp403();
   testAuthenticatedUsersCanViewImmutableHistory();

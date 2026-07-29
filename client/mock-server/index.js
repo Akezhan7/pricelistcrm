@@ -69,6 +69,25 @@ function route(method, pathname, query, body, res) {
     }
     const product = products.find(p => p.id === numId);
     if (!product) { res.writeHead(404); return res.end(notFound()); }
+    if (action === 'warehouse-details' && method === 'PUT') {
+      product.warehouseDetails = {
+        id: product.warehouseDetails?.id || Date.now(),
+        productId: product.id,
+        sector: body.sector,
+        shelf: body.shelf,
+        cell: body.cell,
+        weight: body.weight ?? null,
+        length: body.length ?? null,
+        width: body.width ?? null,
+        height: body.height ?? null,
+        notes: body.notes || null,
+        updatedBy: MOCK_USER.id,
+        createdAt: product.warehouseDetails?.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      res.writeHead(200);
+      return res.end(ok({ warehouseDetails: product.warehouseDetails }));
+    }
     if (method === 'GET') { res.writeHead(200); return res.end(ok(product)); }
     if (method === 'PUT') {
       Object.assign(product, body);

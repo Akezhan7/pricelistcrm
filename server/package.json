@@ -22,6 +22,7 @@
     "test:product-review": "node scripts/testProductReviewService.js",
     "test:product-marketplace": "node scripts/testProductMarketplaceService.js",
     "test:product-lifecycle-purchase": "node scripts/testProductLifecyclePurchaseService.js",
+    "test:product-warehouse-details": "node scripts/testProductWarehouseDetailsService.js",
     "test:product-sale-launch": "node scripts/testProductSaleLaunchService.js",
     "test:bulk-assign-designer": "node scripts/testProductBulkAssignDesignerService.js",
     "test:workflow": "node scripts/testProductWorkflowService.js",

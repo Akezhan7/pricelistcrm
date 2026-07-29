@@ -18,6 +18,7 @@ const PRODUCT_ACTION_TYPES = Object.freeze({
   PURCHASE_MARKED: 'purchase_marked',
   WAREHOUSE_ARRIVAL_MARKED: 'warehouse_arrival_marked',
   WAREHOUSE_COMPLETED: 'warehouse_completed',
+  WAREHOUSE_LOCATION_UPDATED: 'warehouse_location_updated',
   STOCK_UPDATED: 'stock_updated',
   SALE_LAUNCH_COMPLETED: 'sale_launch_completed',
   SALE_FLAGS_UPDATED: 'sale_flags_updated',
@@ -32,6 +33,7 @@ const PRODUCT_ACTION_MESSAGES = Object.freeze({
   [PRODUCT_ACTION_TYPES.SUPPLIER_UPDATED]: 'Product supplier updated',
   [PRODUCT_ACTION_TYPES.SUPPLIER_UNLINKED]: 'Product supplier unlinked',
   [PRODUCT_ACTION_TYPES.STOCK_UPDATED]: 'Product stock settings updated',
+  [PRODUCT_ACTION_TYPES.WAREHOUSE_LOCATION_UPDATED]: 'Product warehouse location updated',
 });
 
 module.exports = {
