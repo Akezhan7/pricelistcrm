@@ -50,6 +50,9 @@ const {
   buildProductAssetData,
 } = require('../services/productAssetService');
 const {
+  buildProductCategoryFilter,
+} = require('../services/productListQueryService');
+const {
   buildProductWorkflowQuery,
   resolveProductWorkflowItem,
 } = require('../services/productWorkflowService');
@@ -248,11 +251,22 @@ function generateDraftDatePrefix(date) {
 
 const getAllProducts = async (req, res) => {
   try {
-    const { search, page = 1, limit = 50, excludeSupplierId, lifecycleStatus } = req.query;
+    const { search, page = 1, limit = 50, excludeSupplierId, lifecycleStatus, categoryId } = req.query;
     const offset = (page - 1) * limit;
+
+    let categoryFilter;
+    try {
+      categoryFilter = buildProductCategoryFilter(categoryId);
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid category id',
+      });
+    }
 
     const whereClause = {
       isActive: true,
+      ...categoryFilter,
     };
 
     if (lifecycleStatus) {

@@ -1,5 +1,7 @@
 import type { ProductAsset } from '../types';
 import {
+  buildProductAssetUploadConfig,
+  calculateProductAssetUploadProgress,
   getDisplayAssetName,
   getGalleryImageAssets,
   recommendAssetTypeForFiles,
@@ -43,5 +45,20 @@ describe('productAssets helpers', () => {
     ];
 
     expect(getGalleryImageAssets(assets).map((asset) => asset.id)).toEqual([2, 3]);
+  });
+
+  it('uses a dedicated long timeout for product asset uploads', () => {
+    const config = buildProductAssetUploadConfig();
+
+    expect(config.timeout).toBe(10 * 60 * 1000);
+  });
+
+  it('calculates upload progress from transferred and file bytes', () => {
+    expect(calculateProductAssetUploadProgress(55, undefined, 110)).toEqual({
+      loaded: 55,
+      total: 110,
+      percent: 50,
+    });
+    expect(calculateProductAssetUploadProgress(150, 100, 100).percent).toBe(100);
   });
 });

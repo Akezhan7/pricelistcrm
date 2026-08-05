@@ -57,6 +57,7 @@ type ProductListProps = {
   canAssignDesigner?: boolean;
   lifecycleStatusFilter?: ProductLifecycleStatus | '';
   onLifecycleStatusFilterChange?: (status: ProductLifecycleStatus | '') => void;
+  pageResetKey?: string | number;
   compact?: boolean;
 };
 
@@ -75,6 +76,7 @@ export const ProductList: React.FC<ProductListProps> = ({
   canAssignDesigner = false,
   lifecycleStatusFilter = '',
   onLifecycleStatusFilterChange,
+  pageResetKey,
   compact = false,
 }) => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -99,7 +101,7 @@ export const ProductList: React.FC<ProductListProps> = ({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, localSearchQuery]);
+  }, [searchQuery, localSearchQuery, pageResetKey]);
 
   const filteredProducts = useMemo(() => {
     let filtered = products;

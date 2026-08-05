@@ -1,45 +1,98 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { ProductList } from '../components/ProductList';
 import { useAuth } from '../context/AuthContext';
 import { useUI } from '../context/UIContext';
 import { Product, ProductLifecycleStatus } from '../types';
 import api from '../utils/api';
-import { Package, RefreshCw } from 'lucide-react';
-import { IconButton, Spinner } from '../components/ui';
+import { Package, RefreshCw, X } from 'lucide-react';
+import { Badge, IconButton, Spinner } from '../components/ui';
+import categoryApi from '../services/categoryApi';
+import {
+  buildProductsListSearchParams,
+  parseCategoryIdParam,
+} from '../utils/productFilters';
 
 const API_LIST_LIMIT = 1000;
 
 export const ProductsPage: React.FC = () => {
   const { user } = useAuth();
   const { searchQuery, setSearchQuery } = useUI();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const categoryId = parseCategoryIdParam(searchParams.get('categoryId'));
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [totalProducts, setTotalProducts] = useState(0);
   const [lifecycleStatusFilter, setLifecycleStatusFilter] = useState<ProductLifecycleStatus | ''>('');
+  const [categoryName, setCategoryName] = useState('');
+  const productsRequestRef = useRef<AbortController | null>(null);
 
   const fetchProducts = useCallback(async () => {
+    productsRequestRef.current?.abort();
+    const requestController = new AbortController();
+    productsRequestRef.current = requestController;
+
     try {
       setLoading(true);
-      const params = new URLSearchParams({ limit: String(API_LIST_LIMIT) });
-      if (lifecycleStatusFilter) {
-        params.set('lifecycleStatus', lifecycleStatusFilter);
-      }
+      const params = buildProductsListSearchParams({
+        limit: API_LIST_LIMIT,
+        categoryId,
+        lifecycleStatus: lifecycleStatusFilter,
+      });
 
-      const res = await api.get(`/products?${params.toString()}`);
+      const res = await api.get(`/products?${params.toString()}`, {
+        signal: requestController.signal,
+      });
       setProducts(res.data.data.products);
       setTotalProducts(res.data.data.pagination?.total || res.data.data.products.length);
     } catch (error) {
-      console.error('Ошибка загрузки товаров:', error);
+      if ((error as { code?: string })?.code !== 'ERR_CANCELED') {
+        console.error('Ошибка загрузки товаров:', error);
+        setProducts([]);
+        setTotalProducts(0);
+      }
     } finally {
-      setLoading(false);
+      if (productsRequestRef.current === requestController) {
+        productsRequestRef.current = null;
+        setLoading(false);
+      }
     }
-  }, [lifecycleStatusFilter]);
+  }, [categoryId, lifecycleStatusFilter]);
 
   useEffect(() => {
     fetchProducts();
+    return () => productsRequestRef.current?.abort();
   }, [fetchProducts]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!categoryId) {
+      setCategoryName('');
+      return undefined;
+    }
+
+    setCategoryName('');
+    categoryApi.getCategoryById(categoryId)
+      .then((category) => {
+        if (!cancelled) setCategoryName(category.name);
+      })
+      .catch(() => {
+        if (!cancelled) setCategoryName(`Категория #${categoryId}`);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [categoryId]);
+
+  const clearCategoryFilter = () => {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('categoryId');
+    setSearchParams(nextParams);
+  };
 
   const countLabel =
     totalProducts === 1 ? 'позиция' : totalProducts < 5 ? 'позиции' : 'позиций';
@@ -101,6 +154,23 @@ export const ProductsPage: React.FC = () => {
               onClick={fetchProducts}
             />
           </div>
+          {categoryId && (
+            <div className="flex items-center justify-between gap-3 border-b border-border-subtle bg-surface-inset px-4 py-2.5 shrink-0">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="text-caption text-text-muted">Категория</span>
+                <Badge variant="info" className="max-w-full truncate">
+                  {categoryName || `#${categoryId}`}
+                </Badge>
+              </div>
+              <IconButton
+                icon={X}
+                title="Сбросить фильтр категории"
+                size="sm"
+                variant="ghost"
+                onClick={clearCategoryFilter}
+              />
+            </div>
+          )}
           <ProductList
             products={products}
             searchQuery={searchQuery}
@@ -112,6 +182,7 @@ export const ProductsPage: React.FC = () => {
             canAssignDesigner={user?.role === 'admin'}
             lifecycleStatusFilter={lifecycleStatusFilter}
             onLifecycleStatusFilterChange={setLifecycleStatusFilter}
+            pageResetKey={categoryId || 'all-products'}
           />
         </div>
       </div>

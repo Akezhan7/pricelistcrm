@@ -19,6 +19,7 @@
     "test:product-draft": "node scripts/testProductDraftService.js",
     "test:product-lifecycle-start": "node scripts/testProductLifecycleStartService.js",
     "test:product-assets": "node scripts/testProductAssetService.js",
+    "test:product-list-query": "node scripts/testProductListQueryService.js",
     "test:product-review": "node scripts/testProductReviewService.js",
     "test:product-marketplace": "node scripts/testProductMarketplaceService.js",
     "test:product-lifecycle-purchase": "node scripts/testProductLifecyclePurchaseService.js",

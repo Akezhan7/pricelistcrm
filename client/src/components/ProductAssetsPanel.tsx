@@ -3,6 +3,8 @@ import { ChevronLeft, ChevronRight, Download, Eye, FileText, Image as ImageIcon,
 import api from '../utils/api';
 import getImageUrl from '../utils/image';
 import {
+  buildProductAssetUploadConfig,
+  calculateProductAssetUploadProgress,
   getDisplayAssetName,
   getGalleryImageAssets,
   isPreviewableImageAsset,
@@ -95,14 +97,25 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{
+    fileName: string;
+    loaded: number;
+    total: number;
+    percent: number;
+  } | null>(null);
   const [submittingContent, setSubmittingContent] = useState(false);
   const [error, setError] = useState('');
   const [galleryIndex, setGalleryIndex] = useState<number | null>(null);
   const onAssetsChangedRef = useRef(onAssetsChanged);
+  const uploadAbortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     onAssetsChangedRef.current = onAssetsChanged;
   }, [onAssetsChanged]);
+
+  useEffect(() => () => {
+    uploadAbortControllerRef.current?.abort();
+  }, []);
 
   const selectedAssetType = useMemo(
     () => assetTypeOptions.find((option) => option.value === assetType) || assetTypeOptions[0],
@@ -173,21 +186,50 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
     }
 
     setUploading(true);
+    const abortController = new AbortController();
+    uploadAbortControllerRef.current = abortController;
     try {
       const failedFiles: File[] = [];
       const failedMessages: string[] = [];
 
-      for (const selectedFile of files) {
+      for (let fileIndex = 0; fileIndex < files.length; fileIndex += 1) {
+        const selectedFile = files[fileIndex];
         const data = new FormData();
         data.append('assetType', recommendAssetTypeForFiles([selectedFile], assetType));
         data.append('asset', selectedFile);
         if (notes.trim()) data.append('notes', notes.trim());
 
         try {
+          setUploadProgress({
+            fileName: selectedFile.name,
+            loaded: 0,
+            total: selectedFile.size,
+            percent: 0,
+          });
           await api.post(`/products/${productId}/assets`, data, {
+            ...buildProductAssetUploadConfig(),
             headers: { 'Content-Type': 'multipart/form-data' },
+            signal: abortController.signal,
+            onUploadProgress: (event) => {
+              setUploadProgress({
+                fileName: selectedFile.name,
+                ...calculateProductAssetUploadProgress(
+                  event.loaded,
+                  event.total,
+                  selectedFile.size
+                ),
+              });
+            },
           });
         } catch (err: unknown) {
+          const isCancelled = (err as { code?: string })?.code === 'ERR_CANCELED';
+
+          if (isCancelled) {
+            failedFiles.push(...files.slice(fileIndex));
+            failedMessages.push('Загрузка отменена');
+            break;
+          }
+
           failedFiles.push(selectedFile);
           const message =
             (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
@@ -218,8 +260,14 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
         'Не удалось загрузить материал';
       setError(message);
     } finally {
+      uploadAbortControllerRef.current = null;
+      setUploadProgress(null);
       setUploading(false);
     }
+  };
+
+  const handleCancelUpload = () => {
+    uploadAbortControllerRef.current?.abort();
   };
 
   const handleDelete = async (assetId: number) => {
@@ -305,7 +353,33 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
             />
           </FormField>
 
-          <div className="flex justify-end">
+          {uploadProgress && (
+            <div className="space-y-1.5" aria-live="polite">
+              <div className="flex items-center justify-between gap-3 text-caption text-text-muted">
+                <span className="min-w-0 truncate">{uploadProgress.fileName}</span>
+                <span className="shrink-0 tabular-nums">
+                  {formatFileSize(uploadProgress.loaded) || '0 KB'} / {formatFileSize(uploadProgress.total)} · {uploadProgress.percent}%
+                </span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-border-subtle">
+                <div
+                  className="h-full bg-brand-yellow transition-[width] duration-200"
+                  style={{ width: `${uploadProgress.percent}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2">
+            {uploading && (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleCancelUpload}
+              >
+                Отменить
+              </Button>
+            )}
             <Button
               type="button"
               variant="primary"

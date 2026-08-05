@@ -7,6 +7,29 @@ const CP1251_HIGH_CHARS =
   '\u00b0\u00b1\u0406\u0456\u0491\u00b5\u00b6\u00b7\u0451\u2116\u0454\u00bb\u0458\u0405\u0455\u0457';
 
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
+const PRODUCT_ASSET_UPLOAD_TIMEOUT_MS = 10 * 60 * 1000;
+
+export type ProductAssetUploadProgress = {
+  loaded: number;
+  total: number;
+  percent: number;
+};
+
+export function buildProductAssetUploadConfig() {
+  return { timeout: PRODUCT_ASSET_UPLOAD_TIMEOUT_MS };
+}
+
+export function calculateProductAssetUploadProgress(
+  loaded: number,
+  reportedTotal: number | undefined,
+  fileSize: number
+): ProductAssetUploadProgress {
+  const total = reportedTotal && reportedTotal > 0 ? reportedTotal : fileSize;
+  const safeLoaded = Math.min(Math.max(loaded, 0), total);
+  const percent = total > 0 ? Math.round((safeLoaded / total) * 100) : 0;
+
+  return { loaded: safeLoaded, total, percent };
+}
 
 function getExtension(value?: string | null) {
   const source = value || '';

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { CategoryModal } from '../components/CategoryModal';
 import { DeleteConfirmModal } from '../components/DeleteConfirmModal';
@@ -12,8 +13,7 @@ import {
   FolderOpen,
   Folder,
   RefreshCw,
-  Eye,
-  EyeOff,
+  PackageSearch,
 } from 'lucide-react';
 import {
   Alert,
@@ -33,6 +33,7 @@ import { cn } from '../utils/cn';
 
 export const Categories: React.FC = () => {
   const toast = useToast();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<Category[]>([]);
   const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set());
@@ -94,19 +95,6 @@ export const Categories: React.FC = () => {
       toast.error('Не удалось удалить категорию');
     } finally {
       setIsDeleting(false);
-    }
-  };
-
-  const handleToggleActive = async (category: Category) => {
-    try {
-      await categoryApi.updateCategory(category.id, {
-        isActive: !category.isActive,
-      });
-      await loadCategories();
-      toast.success(category.isActive ? 'Категория деактивирована' : 'Категория активирована');
-    } catch (error) {
-      console.error('Ошибка изменения статуса категории:', error);
-      toast.error('Не удалось изменить статус категории');
     }
   };
 
@@ -187,9 +175,9 @@ export const Categories: React.FC = () => {
 
           <div className="flex shrink-0 items-center gap-0.5">
             <IconButton
-              icon={category.isActive ? Eye : EyeOff}
-              title={category.isActive ? 'Деактивировать' : 'Активировать'}
-              onClick={() => handleToggleActive(category)}
+              icon={PackageSearch}
+              title="Открыть товары категории"
+              onClick={() => navigate(`/products?categoryId=${category.id}`)}
             />
             <IconButton icon={Edit} title="Редактировать" onClick={() => handleEditCategory(category)} />
             <IconButton
