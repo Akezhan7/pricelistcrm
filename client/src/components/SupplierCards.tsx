@@ -38,6 +38,7 @@ type SupplierCardsProps = {
   canEdit: boolean;
   onSelectSupplier?: (supplier: Supplier) => void;
   selectedSupplierId?: number | null;
+  className?: string;
 };
 
 export const SupplierCards: React.FC<SupplierCardsProps> = ({
@@ -47,6 +48,7 @@ export const SupplierCards: React.FC<SupplierCardsProps> = ({
   canEdit,
   onSelectSupplier,
   selectedSupplierId,
+  className,
 }) => {
   const handleImgError = (e: React.SyntheticEvent<HTMLImageElement, Event>) => {
     const el = e.currentTarget;
@@ -124,8 +126,8 @@ export const SupplierCards: React.FC<SupplierCardsProps> = ({
       : 'Поставщики не добавлены';
 
   return (
-    <div className="flex flex-col flex-1" style={{ minHeight: 0 }}>
-      <div className="px-4 py-3 border-b border-border-subtle flex flex-col sm:flex-row sm:items-center gap-3 bg-surface-inset/50 sticky top-0 z-10 shrink-0">
+    <div className={cn('flex flex-col flex-1', className)} style={{ minHeight: 0 }}>
+      <div className="supplier-cards-toolbar px-4 py-3 border-b border-border-subtle flex flex-col sm:flex-row sm:items-center gap-3 bg-surface-inset/50 sticky top-0 z-10 shrink-0">
         {canEdit && (
           <Button
             type="button"
@@ -164,7 +166,7 @@ export const SupplierCards: React.FC<SupplierCardsProps> = ({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4" style={{ minHeight: 0 }}>
+      <div className="supplier-cards-scroll flex-1 overflow-y-auto p-4" style={{ minHeight: 0 }}>
         {filteredSuppliers.length === 0 ? (
           <EmptyState
             icon={Building2}
@@ -189,7 +191,7 @@ export const SupplierCards: React.FC<SupplierCardsProps> = ({
           />
         ) : (
           <div
-            className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-5"
+            className="supplier-cards-grid grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-5"
             style={{ maxWidth: '1800px', margin: '0 auto' }}
           >
             {paginatedSuppliers.map((supplier) => {
@@ -203,7 +205,7 @@ export const SupplierCards: React.FC<SupplierCardsProps> = ({
                 <div
                   key={supplier.id}
                   className={cn(
-                    'group flex flex-col rounded-xl border bg-brand-white overflow-hidden shadow-sm',
+                    'supplier-card group flex flex-col rounded-xl border bg-brand-white overflow-hidden shadow-sm',
                     'transition-[shadow,transform] duration-200 ease-product',
                     onSelectSupplier &&
                       'cursor-pointer hover:shadow-card-hover hover:-translate-y-px active:scale-[0.99]',
@@ -213,7 +215,7 @@ export const SupplierCards: React.FC<SupplierCardsProps> = ({
                   )}
                   onClick={() => onSelectSupplier?.(supplier)}
                 >
-                  <div className="relative">
+                  <div className="supplier-card-media relative">
                     {supplier.containerImage ? (
                       <img
                         src={getImageUrl(supplier.containerImage) || undefined}

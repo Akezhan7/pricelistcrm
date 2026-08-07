@@ -28,6 +28,8 @@ function testBuildsProductAssetData() {
     revisionRequestId: null,
     assetType: PRODUCT_ASSET_TYPES.PRODUCT_PHOTO,
     filePath: '/uploads/photo-1.jpg',
+    thumbnailPath: null,
+    previewPath: null,
     originalName: 'Photo 1.jpg',
     mimeType: 'image/jpeg',
     fileSize: 1024,
@@ -35,6 +37,27 @@ function testBuildsProductAssetData() {
     sortOrder: 3,
     isActive: true,
   });
+}
+
+function testBuildsProductAssetDataWithImageVariants() {
+  const asset = buildProductAssetData({
+    productId: 15,
+    uploadedBy: 7,
+    assetType: PRODUCT_ASSET_TYPES.SLIDE_JPG,
+    file: {
+      filename: 'slide-1.jpg',
+      originalname: 'Slide 1.jpg',
+      mimetype: 'image/jpeg',
+      size: 1024,
+    },
+    imageVariants: {
+      thumbnailPath: '/uploads/slide-1-thumbnail.webp',
+      previewPath: '/uploads/slide-1-preview.webp',
+    },
+  });
+
+  assert.strictEqual(asset.thumbnailPath, '/uploads/slide-1-thumbnail.webp');
+  assert.strictEqual(asset.previewPath, '/uploads/slide-1-preview.webp');
 }
 
 function testValidatesAllowedUploads() {
@@ -130,6 +153,7 @@ function testNormalizesBrokenOriginalNames() {
 }
 
 testBuildsProductAssetData();
+testBuildsProductAssetDataWithImageVariants();
 testValidatesAllowedUploads();
 testRejectsInvalidUploads();
 testNormalizesBrokenOriginalNames();

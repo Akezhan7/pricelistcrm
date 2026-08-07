@@ -16,6 +16,7 @@ import {
   Undo2,
   ChevronRight,
   SlidersHorizontal,
+  XCircle,
 } from 'lucide-react';
 import { Layout } from '../components/Layout';
 import { useAuth } from '../context/AuthContext';
@@ -102,6 +103,7 @@ const STATUS_STATS: { status: OrderStatus; label: string; key: keyof OrderStats 
   { status: 'Доставка', label: 'Доставка', key: 'delivery' },
   { status: 'Принята на складе', label: 'Приняты', key: 'received' },
   { status: 'Закрыта', label: 'Закрыты', key: 'closed' },
+  { status: 'Отменена', label: 'Отменены', key: 'cancelled' },
 ];
 
 const PAYMENT_FILTERS: { value?: PaymentStatus; label: string }[] = [
@@ -244,6 +246,7 @@ const Orders: React.FC = () => {
       'Забрана': <Truck className="h-3.5 w-3.5" />,
       'Принята на складе': <Warehouse className="h-3.5 w-3.5" />,
       'Закрыта': <Archive className="h-3.5 w-3.5" />,
+      'Отменена': <XCircle className="h-3.5 w-3.5" />,
     };
     return icons[status];
   };
@@ -607,7 +610,7 @@ const Orders: React.FC = () => {
                             )}
                           </div>
                           <p className="mt-1 truncate text-body-medium text-brand-black">
-                            {order.supplier?.name}
+                            {order.supplier?.name || 'Без поставщика'}
                           </p>
                         </div>
                         <div className="flex shrink-0 items-center gap-1 text-caption text-text-muted">
@@ -639,7 +642,7 @@ const Orders: React.FC = () => {
                         </Badge>
                       </div>
 
-                      {canManagePayments && order.paymentStatus !== 'Оплачено' && (
+                      {canManagePayments && order.supplierId && order.status !== 'Отменена' && order.paymentStatus !== 'Оплачено' && (
                         <Button
                           variant="secondary"
                           size="md"
@@ -693,7 +696,9 @@ const Orders: React.FC = () => {
                           </div>
                         </TableCell>
                         <TableCell className="whitespace-normal">
-                          <div className="text-body-medium text-brand-black">{order.supplier?.name}</div>
+                          <div className="text-body-medium text-brand-black">
+                            {order.supplier?.name || 'Без поставщика'}
+                          </div>
                           {order.supplier?.phone && (
                             <div className="text-caption text-text-muted">{order.supplier.phone}</div>
                           )}
@@ -727,7 +732,7 @@ const Orders: React.FC = () => {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
-                          {canManagePayments && order.paymentStatus !== 'Оплачено' && (
+                          {canManagePayments && order.supplierId && order.status !== 'Отменена' && order.paymentStatus !== 'Оплачено' && (
                             <Button
                               variant="secondary"
                               size="sm"

@@ -710,6 +710,7 @@ export const ProductWorkflowPage: React.FC = () => {
             <ProductMarketplacePanel
               product={marketplaceProduct}
               onChanged={handleWorkflowChanged}
+              showMaterials
             />
           )}
         </Modal>

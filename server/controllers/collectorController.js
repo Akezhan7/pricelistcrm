@@ -1,5 +1,7 @@
 const { CollectorTask, Order, OrderItem, Product, Supplier, User } = require('../models');
 const { Op } = require('sequelize');
+const { assertOrderHasSupplier } = require('../services/orderSupplierPolicyService');
+const { assertOrderWorkflowOpen } = require('../services/orderStatusPolicyService');
 
 /**
  * Получить список заданий для текущего сборщика
@@ -235,6 +237,19 @@ const completeTask = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Задание уже завершено',
+      });
+    }
+
+    try {
+      assertOrderHasSupplier(task.order);
+      assertOrderWorkflowOpen(task.order);
+    } catch (error) {
+      return res.status(error.statusCode || 409).json({
+        success: false,
+        message: error.code === 'ORDER_SUPPLIER_REQUIRED'
+          ? 'Сначала назначьте поставщика заявке'
+          : 'Закрытую или отменённую заявку нельзя завершить повторно',
+        code: error.code,
       });
     }
 

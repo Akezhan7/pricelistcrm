@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
-import { Package } from 'lucide-react';
 import ordersApi from '../services/ordersApi';
 import suppliersApi from '../services/suppliersApi';
+import productsApi from '../services/productsApi';
 import api from '../utils/api';
 import type { Supplier, CreateOrderDto, ProductVariation, ProductWithPrice } from '../types';
 import {
   type OrderLineForm,
   buildMainOrderLine,
   getSupplierListPrice,
+  getSupplierSuggestions,
 } from '../utils/orderItems';
-import { useSupplierProducts } from '../hooks/useSupplierProducts';
 import { SupplierProductCatalog } from './SupplierProductCatalog';
 import { draftLinesToForm, useOrderDraft } from '../context/OrderDraftContext';
 import { Modal } from './ui/Modal';
@@ -52,17 +52,14 @@ const CreateOrderModal: React.FC = () => {
   const [notes, setNotes] = useState(EMPTY_FORM.notes);
   const [items, setItems] = useState<OrderLineForm[]>(EMPTY_FORM.items);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [catalogProducts, setCatalogProducts] = useState<ProductWithPrice[]>([]);
   const [productSearch, setProductSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState(true);
 
-  const prevSupplierIdRef = useRef<number | null>(null);
   const isFormReadyRef = useRef(false);
   const hydrateSessionRef = useRef(false);
-
-  const { products: supplierProducts, loading: loadingSupplierProducts, error: supplierProductsError } =
-    useSupplierProducts(isModalOpen ? supplierId : null);
 
   const pickedProductIds = useMemo(
     () =>
@@ -72,15 +69,34 @@ const CreateOrderModal: React.FC = () => {
     [items]
   );
 
+  const supplierSuggestions = useMemo(
+    () => getSupplierSuggestions(items.map((item) => ({
+      ...item,
+      product: catalogProducts.find((product) => product.id === item.productId) || item.product,
+    }))),
+    [catalogProducts, items]
+  );
+
+  const visibleCatalogProducts = useMemo(
+    () => catalogProducts.map((product) => {
+      if (!supplierId) return product;
+      const supplier = product.suppliers?.find((item) => item.id === supplierId);
+      return supplier
+        ? ({ ...product, ProductSupplier: supplier.ProductSupplier } as ProductWithPrice)
+        : product;
+    }),
+    [catalogProducts, supplierId]
+  );
+
   const resetForm = () => {
     setSupplierId(EMPTY_FORM.supplierId);
     setExpectedDeliveryDate(EMPTY_FORM.expectedDeliveryDate);
     setDeliveryLocation(EMPTY_FORM.deliveryLocation);
     setNotes(EMPTY_FORM.notes);
     setItems(EMPTY_FORM.items);
+    setCatalogProducts([]);
     setProductSearch('');
     setError(null);
-    prevSupplierIdRef.current = null;
     isFormReadyRef.current = false;
     hydrateSessionRef.current = false;
   };
@@ -103,7 +119,6 @@ const CreateOrderModal: React.FC = () => {
 
     const sid = draft?.supplierId ? draft.supplierId : null;
     setSupplierId(sid);
-    prevSupplierIdRef.current = sid;
     setItems(draftLinesToForm(draft));
     setDeliveryLocation(draft?.deliveryLocation ?? EMPTY_FORM.deliveryLocation);
     setExpectedDeliveryDate(draft?.expectedDeliveryDate ?? EMPTY_FORM.expectedDeliveryDate);
@@ -112,12 +127,6 @@ const CreateOrderModal: React.FC = () => {
     setError(null);
     isFormReadyRef.current = true;
   }, [isModalOpen, draft]);
-
-  useEffect(() => {
-    if (supplierProductsError) {
-      setError(supplierProductsError);
-    }
-  }, [supplierProductsError]);
 
   useEffect(() => {
     if (!isModalOpen || !isFormReadyRef.current) return;
@@ -148,15 +157,20 @@ const CreateOrderModal: React.FC = () => {
     try {
       setLoadingData(true);
       setError(null);
-      const suppliersData = await suppliersApi.getSuppliers({
-        isActive: true,
-        limit: SUPPLIERS_LIST_LIMIT,
-      });
+      const [suppliersData, productsData] = await Promise.all([
+        suppliersApi.getSuppliers({
+          isActive: true,
+          limit: SUPPLIERS_LIST_LIMIT,
+        }),
+        productsApi.getProducts({ isActive: true, limit: 1000 }),
+      ]);
       setSuppliers(Array.isArray(suppliersData) ? suppliersData : []);
+      setCatalogProducts(Array.isArray(productsData) ? productsData as ProductWithPrice[] : []);
     } catch (err: unknown) {
       console.error('Ошибка загрузки данных:', err);
       setError(err instanceof Error ? err.message : 'Ошибка загрузки данных');
       setSuppliers([]);
+      setCatalogProducts([]);
     } finally {
       setLoadingData(false);
     }
@@ -165,18 +179,6 @@ const CreateOrderModal: React.FC = () => {
   const handleSupplierChange = (rawValue: string) => {
     const nextId = rawValue ? Number(rawValue) : null;
 
-    if (
-      prevSupplierIdRef.current !== null &&
-      nextId !== null &&
-      prevSupplierIdRef.current !== nextId
-    ) {
-      setItems([]);
-    }
-    if (!nextId) {
-      setItems([]);
-    }
-
-    prevSupplierIdRef.current = nextId;
     setSupplierId(nextId);
     setProductSearch('');
   };
@@ -254,7 +256,7 @@ const CreateOrderModal: React.FC = () => {
     items.reduce((sum, item) => sum + item.quantity * item.priceAtPurchase, 0);
 
   const validateForm = (): string | null => {
-    if (!supplierId) return 'Выберите поставщика';
+    if (isReturn && !supplierId) return 'Выберите поставщика для возврата';
     if (items.length === 0) return 'Добавьте хотя бы один товар';
 
     for (const item of items) {
@@ -279,7 +281,7 @@ const CreateOrderModal: React.FC = () => {
       setError(null);
 
       const orderData: CreateOrderDto = {
-        supplierId: supplierId!,
+        supplierId,
         type: orderType,
         expectedDeliveryDate: expectedDeliveryDate || undefined,
         deliveryLocation: deliveryLocation || undefined,
@@ -329,7 +331,9 @@ const CreateOrderModal: React.FC = () => {
                   : 'Создание...'
                 : isReturn
                   ? 'Оформить возврат'
-                  : 'Создать заявку'
+                  : supplierId
+                    ? 'Создать заявку'
+                    : 'Сохранить черновик'
             }
             submitLoading={loading}
             submitDisabled={loading || loadingData}
@@ -351,17 +355,49 @@ const CreateOrderModal: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Select
               label="Поставщик"
-              required
+              required={isReturn}
               value={supplierId || ''}
               onChange={(e) => handleSupplierChange(e.target.value)}
             >
-              <option value="">Выберите поставщика</option>
+              <option value="">
+                {isReturn ? 'Выберите поставщика' : 'Без поставщика — сохранить как черновик'}
+              </option>
               {suppliers.map((supplier) => (
                 <option key={supplier.id} value={supplier.id}>
                   {supplier.name} - {supplier.phone}
                 </option>
               ))}
             </Select>
+
+            {!isReturn && !supplierId && (
+              <div className="md:col-span-2">
+                <Alert variant="info">
+                  Поставщика можно назначить позже. До этого отправка, подтверждение и оплата
+                  заявки будут недоступны.
+                </Alert>
+              </div>
+            )}
+
+            {supplierSuggestions.length > 0 && (
+              <div className="md:col-span-2">
+                <p className="mb-2 text-caption text-text-muted">Поставщики выбранных товаров</p>
+                <div className="flex flex-wrap gap-2">
+                  {supplierSuggestions.map((suggestion) => (
+                    <button
+                      key={suggestion.supplierId}
+                      type="button"
+                      onClick={() => handleSupplierChange(String(suggestion.supplierId))}
+                      className="inline-flex items-center gap-2 rounded-lg border border-border-subtle bg-surface-inset px-3 py-2 text-caption text-brand-black hover:border-brand-yellow"
+                    >
+                      <span className="font-medium">{suggestion.supplier.name}</span>
+                      <span className="text-text-muted">
+                        {suggestion.matchedProductCount}/{suggestion.totalProductCount} товаров
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <Input
               label="Ожидаемая дата поставки"
@@ -383,27 +419,19 @@ const CreateOrderModal: React.FC = () => {
 
               <div>
                 <p className="text-overline text-text-muted tracking-wider mb-3">
-                  Товары поставщика <span className="text-danger">*</span>
+                  Товары <span className="text-danger">*</span>
                 </p>
 
-                {!supplierId ? (
-                  <div className="text-center py-8 text-text-muted border-2 border-dashed border-border-subtle rounded-xl bg-surface-inset">
-                    <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                    <p>Сначала выберите поставщика</p>
-                    <p className="text-sm mt-1">Здесь появятся его товары</p>
-                  </div>
-                ) : (
-                  <SupplierProductCatalog
-                    products={supplierProducts}
-                    loading={loadingSupplierProducts}
-                    search={productSearch}
-                    onSearchChange={setProductSearch}
-                    mode="pick"
-                    listMaxHeight="max-h-56"
-                    onPickProduct={handleAddProduct}
-                    pickedProductIds={pickedProductIds}
-                  />
-                )}
+                <SupplierProductCatalog
+                  products={visibleCatalogProducts}
+                  search={productSearch}
+                  onSearchChange={setProductSearch}
+                  mode="pick"
+                  listMaxHeight="max-h-[clamp(20rem,46vh,30rem)]"
+                  emptyTitle="Товары не найдены"
+                  onPickProduct={handleAddProduct}
+                  pickedProductIds={pickedProductIds}
+                />
 
                 <div className="mt-4">
                   <p className="text-overline text-text-muted tracking-wider mb-3">

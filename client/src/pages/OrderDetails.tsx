@@ -21,6 +21,7 @@ import {
   UserPlus,
   ClipboardCheck,
   MoreVertical,
+  XCircle,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Layout } from '../components/Layout';
@@ -58,7 +59,7 @@ import {
 } from '../theme/statusColors';
 import { formatPriceKZT } from '../utils/format';
 import { cn } from '../utils/cn';
-import type { Order, OrderStatus } from '../types';
+import type { Order, OrderStatus, OrderStatusOptions } from '../types';
 
 type HeaderAction = {
   key: string;
@@ -107,6 +108,7 @@ const OrderDetails: React.FC = () => {
   const canAssignCollector = user?.role === 'admin' || user?.role === 'purchase_manager' || user?.role === 'warehouse_operator';
 
   const [order, setOrder] = useState<Order | null>(null);
+  const [statusOptions, setStatusOptions] = useState<OrderStatusOptions | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showChangeStatusModal, setShowChangeStatusModal] = useState(false);
@@ -130,8 +132,12 @@ const OrderDetails: React.FC = () => {
     try {
       setLoading(true);
       setError(null);
-      const data = await ordersApi.getOrderById(Number(id));
+      const [data, options] = await Promise.all([
+        ordersApi.getOrderById(Number(id)),
+        ordersApi.getOrderStatusOptions(Number(id)),
+      ]);
       setOrder(data);
+      setStatusOptions(options);
 
       try {
         const paymentsData = await ordersApi.getOrderPayments(Number(id));
@@ -174,6 +180,7 @@ const OrderDetails: React.FC = () => {
       'Забрана': <Truck className="w-4 h-4" />,
       'Принята на складе': <Warehouse className="w-4 h-4" />,
       'Закрыта': <Package className="w-4 h-4" />,
+      'Отменена': <XCircle className="w-4 h-4" />,
       'В работе': <Package className="w-4 h-4" />,
       'На точке': <MapPin className="w-4 h-4" />,
       'В пути': <Truck className="w-4 h-4" />,
@@ -368,7 +375,12 @@ const OrderDetails: React.FC = () => {
       });
     }
 
-    if (canManagePayments && order.paymentStatus !== 'Оплачено') {
+    if (
+      canManagePayments &&
+      order.supplierId &&
+      order.status !== 'Отменена' &&
+      order.paymentStatus !== 'Оплачено'
+    ) {
       actions.push({
         key: 'payment',
         label: 'Зарегистрировать оплату',
@@ -399,7 +411,18 @@ const OrderDetails: React.FC = () => {
       });
     }
 
-    if (canEditOrders && !['Закрыта'].includes(order.status)) {
+    if (statusOptions?.canReceiveAtWarehouse) {
+      actions.push({
+        key: 'warehouse-receipt',
+        label: 'Принять на склад',
+        icon: Warehouse,
+        onClick: () => navigate(`/warehouse/receipt?orderId=${order.id}`),
+        variant: 'primary',
+        primary: true,
+      });
+    }
+
+    if (canEditOrders && order.supplierId && statusOptions?.availableStatuses.length) {
       actions.push({
         key: 'status',
         label: 'Изменить статус',
@@ -428,6 +451,8 @@ const OrderDetails: React.FC = () => {
     canAssignCollector,
     whatsappLoading,
     showConfirmationForm,
+    statusOptions,
+    navigate,
     showCollectorAssign,
   ]);
 
@@ -492,6 +517,7 @@ const OrderDetails: React.FC = () => {
           orderId={order.id}
           currentStatus={order.status}
           orderNumber={order.orderNumber}
+          remainingAmount={Math.max(0, Number(order.totalAmount) - Number(order.paidAmount))}
         />
       )}
 
@@ -520,6 +546,13 @@ const OrderDetails: React.FC = () => {
       )}
 
       <div className="pb-24 md:pb-0 space-y-5 lg:space-y-6">
+        {!order.supplierId && (
+          <Alert variant="info" title="Поставщик не назначен">
+            Это черновик закупки. Назначьте поставщика через редактирование заявки, чтобы
+            отправить её, изменить статус или зарегистрировать оплату.
+          </Alert>
+        )}
+
         {/* Sticky hero header — Orders V7 pattern */}
         <div className="sticky top-0 z-10 -mx-4 px-4 pt-1 pb-4 md:static md:mx-0 md:px-0 md:pt-0 md:pb-0 bg-surface-page/95 backdrop-blur-sm border-b border-border-subtle md:border-0 space-y-4">
           <Button
@@ -546,7 +579,7 @@ const OrderDetails: React.FC = () => {
                       )}
                     </div>
                     <p className="mt-1 truncate text-body-medium text-brand-black">
-                      {order.supplier?.name}
+                      {order.supplier?.name || 'Без поставщика'}
                     </p>
                     <div className="mt-2 flex flex-col gap-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4 text-caption text-text-muted">
                       <div className="flex items-center gap-1.5">
@@ -613,7 +646,9 @@ const OrderDetails: React.FC = () => {
             <CardBody className="space-y-4">
               <div>
                 <p className="text-caption text-text-muted">Название</p>
-                <p className="text-body-medium font-medium text-brand-black">{order.supplier?.name}</p>
+                <p className="text-body-medium font-medium text-brand-black">
+                  {order.supplier?.name || 'Без поставщика'}
+                </p>
               </div>
               {order.supplier?.address && (
                 <div>

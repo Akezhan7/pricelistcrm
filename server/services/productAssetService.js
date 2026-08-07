@@ -170,6 +170,7 @@ function buildProductAssetData({
   notes = null,
   sortOrder = 0,
   revisionRequestId = null,
+  imageVariants = {},
 }) {
   validateProductAssetUpload({ assetType, file });
 
@@ -179,6 +180,8 @@ function buildProductAssetData({
     revisionRequestId: revisionRequestId ? Number(revisionRequestId) : null,
     assetType,
     filePath: `/uploads/${file.filename}`,
+    thumbnailPath: imageVariants.thumbnailPath || null,
+    previewPath: imageVariants.previewPath || null,
     originalName: normalizeUploadedFileOriginalName(file.originalname),
     mimeType: file.mimetype || null,
     fileSize: Number(file.size) || null,

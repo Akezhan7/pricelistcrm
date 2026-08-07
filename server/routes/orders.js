@@ -4,6 +4,7 @@ const { body, param, query, validationResult } = require('express-validator');
 const { auth } = require('../middleware/auth');
 const checkRole = require('../middleware/checkRole');
 const orderController = require('../controllers/orderController');
+const { ORDER_STATUSES } = require('../services/orderStatusPolicyService');
 
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
@@ -25,7 +26,7 @@ router.get('/',
   auth,
   query('page').optional().isInt({ min: 1 }),
   query('limit').optional().isInt({ min: 1, max: 100 }),
-  query('status').optional().isIn(['Создана', 'Отправлена поставщику', 'Частично подтверждена', 'Подтверждена', 'Доставка', 'В сборе', 'Забрана', 'Принята на складе', 'Закрыта']),
+  query('status').optional().isIn(ORDER_STATUSES),
   query('paymentStatus').optional().isIn(['Не оплачено', 'Частично оплачено', 'Оплачено']),
   query('supplierId').optional().isInt(),
   query('type').optional().isIn(['purchase', 'return']),
@@ -38,7 +39,7 @@ router.get('/',
 router.post('/',
   auth,
   checkRole(['admin', 'purchase_manager']),
-  body('supplierId').notEmpty().isInt(),
+  body('supplierId').optional({ nullable: true }).isInt({ min: 1 }),
   body('type').optional().isIn(['purchase', 'return']),
   body('expectedDeliveryDate').optional({ nullable: true }).isISO8601(),
   body('deliveryLocation').optional().isString().trim().isLength({ max: 200 }),
@@ -55,10 +56,17 @@ router.post('/',
 router.patch('/:id/status',
   auth,
   param('id').isInt(),
-  body('status').notEmpty().isIn(['Создана', 'Отправлена поставщику', 'Частично подтверждена', 'Подтверждена', 'Доставка', 'В сборе', 'Забрана', 'Принята на складе', 'Закрыта']),
+  body('status').notEmpty().isIn(ORDER_STATUSES),
   body('comment').optional({ nullable: true }).isString().trim().isLength({ max: 500 }),
   handleValidationErrors,
   orderController.changeOrderStatus
+);
+
+router.get('/:id/status-options',
+  auth,
+  param('id').isInt(),
+  handleValidationErrors,
+  orderController.getOrderStatusOptions
 );
 
 router.patch('/:id/payment',
@@ -82,6 +90,7 @@ router.put('/:id',
   auth,
   checkRole(['admin', 'purchase_manager']),
   param('id').isInt(),
+  body('supplierId').optional({ nullable: true }).isInt({ min: 1 }),
   body('expectedDeliveryDate').optional({ nullable: true }).isISO8601(),
   body('deliveryLocation').optional().isString().trim().isLength({ max: 200 }),
   body('notes').optional({ nullable: true }).isString().trim(),

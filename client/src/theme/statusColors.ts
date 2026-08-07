@@ -21,6 +21,7 @@ export const orderStatusColors: Record<OrderStatus, StatusBadgeClasses> = {
   'Забрана': badge('bg-indigo-100', 'text-indigo-800', 'border border-indigo-200'),
   'Принята на складе': badge('bg-teal-100', 'text-teal-800', 'border border-teal-200'),
   'Закрыта': badge('bg-gray-200', 'text-gray-600', 'border border-gray-300'),
+  'Отменена': badge('bg-red-100', 'text-red-700', 'border border-red-200'),
 };
 
 /** Compact variant without borders (Orders list) */
@@ -34,6 +35,7 @@ export const orderStatusColorsCompact: Record<OrderStatus, StatusBadgeClasses> =
   'Забрана': badge('bg-indigo-100', 'text-indigo-800'),
   'Принята на складе': badge('bg-teal-100', 'text-teal-800'),
   'Закрыта': badge('bg-gray-200', 'text-gray-600'),
+  'Отменена': badge('bg-red-100', 'text-red-700'),
 };
 
 /** Legacy / delivery sub-statuses used in OrderDetails timeline */

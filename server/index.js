@@ -7,6 +7,7 @@ const path = require('path');
 const { sequelize } = require('./models');
 const { runMigrations } = require('./scripts/runMigrations');
 const { createApiLimiter, createAuthLimiter } = require('./middleware/rateLimit');
+const { uploadsDir } = require('./middleware/upload');
 
 // Импорт маршрутов
 const authRoutes = require('./routes/auth');
@@ -101,7 +102,12 @@ app.options('*', (req, res) => {
 });
 
 // Статические файлы — serve uploads from project root to match multer storage
-app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
+app.use('/uploads', express.static(uploadsDir, {
+  etag: true,
+  lastModified: true,
+  maxAge: isProduction ? '1y' : 0,
+  immutable: isProduction,
+}));
 
 // Serve статические файлы клиента в production
 if (isProduction) {

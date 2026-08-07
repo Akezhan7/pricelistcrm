@@ -1,6 +1,7 @@
 const { Op } = require('sequelize');
 const sequelize = require('../config/database');
 const { Payment, Order, Supplier, User } = require('../models');
+const { DEBT_STATUSES } = require('../services/orderStatusPolicyService');
 
 /**
  * Автоматический расчет статуса оплаты на основе сумм
@@ -25,13 +26,17 @@ const calculatePaymentStatus = (order) => {
  * @param {number} supplierId - ID поставщика
  * @returns {Promise<number>} - общая задолженность
  */
-const recalculateSupplierDebt = async (supplierId) => {
+const recalculateSupplierDebt = async (supplierId, options = {}) => {
+  if (!supplierId) return 0;
+
   const orders = await Order.findAll({
     where: {
       supplierId,
-      isActive: true
+      isActive: true,
+      status: { [Op.in]: DEBT_STATUSES },
     },
-    attributes: ['totalAmount', 'paidAmount']
+    attributes: ['totalAmount', 'paidAmount'],
+    transaction: options.transaction,
   });
 
   let totalDebt = 0;
@@ -45,7 +50,7 @@ const recalculateSupplierDebt = async (supplierId) => {
   // Обновляем поле debt в таблице поставщиков
   await Supplier.update(
     { debt: totalDebt.toFixed(2) },
-    { where: { id: supplierId } }
+    { where: { id: supplierId }, transaction: options.transaction }
   );
 
   return totalDebt;
@@ -171,7 +176,8 @@ const getPaymentsBySupplier = async (req, res) => {
         isActive: true,
         paymentStatus: {
           [Op.in]: ['Не оплачено', 'Частично оплачено']
-        }
+        },
+        status: { [Op.in]: DEBT_STATUSES },
       },
       attributes: ['id', 'orderNumber', 'totalAmount', 'paidAmount', 'paymentStatus', 'createdAt'],
       order: [['createdAt', 'DESC']]
@@ -329,7 +335,7 @@ const createPayment = async (req, res) => {
         where: {
           supplierId,
           isActive: true,
-          paymentStatus: { [Op.in]: ['Не оплачено', 'Частично оплачено'] }
+          paymentStatus: { [Op.in]: ['Не оплачено', 'Частично оплачено'] },
         },
         order: [['createdAt', 'ASC']], // Сначала старые заказы
         transaction
@@ -535,7 +541,7 @@ const updatePayment = async (req, res) => {
           where: {
             supplierId,
             isActive: true,
-            paymentStatus: { [Op.in]: ['Не оплачено', 'Частично оплачено'] }
+            paymentStatus: { [Op.in]: ['Не оплачено', 'Частично оплачено'] },
           },
           order: [['createdAt', 'ASC']],
           transaction
@@ -654,7 +660,7 @@ const deletePayment = async (req, res) => {
         where: {
           supplierId,
           isActive: true,
-          paymentStatus: { [Op.in]: ['Не оплачено', 'Частично оплачено'] }
+          paymentStatus: { [Op.in]: ['Не оплачено', 'Частично оплачено'] },
         },
         order: [['createdAt', 'ASC']],
         transaction

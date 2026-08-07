@@ -5,6 +5,7 @@ import type {
   CreateOrderDto,
   UpdateOrderDto,
   ChangeOrderStatusDto,
+  OrderStatusOptions,
   OrderFilters,
   ApiResponse
 } from '../types';
@@ -78,6 +79,18 @@ class OrdersApi {
 
     if (!response.data.success || !response.data.data) {
       throw new Error(response.data.message || 'Ошибка изменения статуса');
+    }
+
+    return response.data.data;
+  }
+
+  async getOrderStatusOptions(id: number): Promise<OrderStatusOptions> {
+    const response = await api.get<ApiResponse<OrderStatusOptions>>(
+      `${this.baseUrl}/${id}/status-options`
+    );
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.message || 'Ошибка получения доступных действий');
     }
 
     return response.data.data;

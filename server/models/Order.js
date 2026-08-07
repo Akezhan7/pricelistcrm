@@ -15,7 +15,7 @@ const Order = sequelize.define('Order', {
   },
   supplierId: {
     type: DataTypes.INTEGER,
-    allowNull: false,
+    allowNull: true,
     comment: 'ID поставщика',
   },
   expectedDeliveryDate: {
@@ -57,7 +57,8 @@ const Order = sequelize.define('Order', {
       'В сборе',
       'Забрана',
       'Принята на складе',
-      'Закрыта'
+      'Закрыта',
+      'Отменена'
     ),
     allowNull: false,
     defaultValue: 'Создана',

@@ -11,6 +11,9 @@ const {
 } = require('../models');
 const { Op } = require('sequelize');
 const { getStockStatus } = require('./productController');
+const { assertOrderHasSupplier } = require('../services/orderSupplierPolicyService');
+const { canReceiveAtWarehouse } = require('../services/orderStatusPolicyService');
+const { recalculateSupplierDebt } = require('./paymentController');
 
 /**
  * Получить список заявок, ожидающих приёмки
@@ -21,10 +24,11 @@ const getPendingReceipts = async (req, res) => {
     const { page = 1, limit = 20 } = req.query;
     const offset = (page - 1) * limit;
 
-    // Заявки со статусами "Забрана" или "В сборе"
+    // Обычная очередь склада сохраняет только заявки на этапе сбора.
     const { count, rows: orders } = await Order.findAndCountAll({
       where: {
         isActive: true,
+        supplierId: { [Op.ne]: null },
         status: {
           [Op.in]: ['Забрана', 'В сборе'],
         },
@@ -117,6 +121,24 @@ const receiveOrder = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Заявка не найдена',
+      });
+    }
+
+    try {
+      assertOrderHasSupplier(order);
+    } catch (error) {
+      return res.status(error.statusCode || 409).json({
+        success: false,
+        message: 'Сначала назначьте поставщика заявке',
+        code: error.code,
+      });
+    }
+
+    if (!canReceiveAtWarehouse(order.status, req.user.role)) {
+      return res.status(409).json({
+        success: false,
+        message: `Заявку в статусе «${order.status}» нельзя принять на склад`,
+        code: 'WAREHOUSE_RECEIPT_NOT_ALLOWED',
       });
     }
 
@@ -213,6 +235,8 @@ const receiveOrder = async (req, res) => {
         },
         { transaction }
       );
+
+      await recalculateSupplierDebt(order.supplierId, { transaction });
 
       await transaction.commit();
 

@@ -50,6 +50,9 @@ const {
   buildProductAssetData,
 } = require('../services/productAssetService');
 const {
+  createProductAssetImageVariants,
+} = require('../services/productAssetImageService');
+const {
   buildProductCategoryFilter,
 } = require('../services/productListQueryService');
 const {
@@ -141,12 +144,30 @@ const productMarketplaceInclude = [
 ];
 
 async function removeUploadedFile(file) {
-  if (!file?.path) return;
+  const filePaths = [file?.path, ...(file?.generatedVariantFilePaths || [])].filter(Boolean);
 
+  await Promise.all(filePaths.map(async (filePath) => {
+    try {
+      await fs.unlink(filePath);
+    } catch {
+      // Soft failure: database state is the source of truth, orphan cleanup can be handled separately.
+    }
+  }));
+}
+
+async function createUploadedFileImageVariants(file) {
   try {
-    await fs.unlink(file.path);
-  } catch {
-    // Soft failure: database state is the source of truth, orphan cleanup can be handled separately.
+    const variants = await createProductAssetImageVariants(file);
+    if (file) {
+      file.generatedVariantFilePaths = [
+        variants.thumbnailFilePath,
+        variants.previewFilePath,
+      ].filter(Boolean);
+    }
+    return variants;
+  } catch (error) {
+    console.warn(`Product asset image optimization failed for ${file?.originalname || 'unknown file'}:`, error.message);
+    return {};
   }
 }
 
@@ -572,6 +593,7 @@ const getProductAssets = async (req, res) => {
 const createProductAsset = async (req, res) => {
   const transaction = await sequelize.transaction();
   let transactionFinished = false;
+  let transactionCommitted = false;
 
   try {
     const { id } = req.params;
@@ -603,6 +625,7 @@ const createProductAsset = async (req, res) => {
       });
     }
 
+    const imageVariants = await createUploadedFileImageVariants(req.file);
     const assetData = buildProductAssetData({
       productId: product.id,
       uploadedBy: req.user.id,
@@ -610,6 +633,7 @@ const createProductAsset = async (req, res) => {
       file: req.file,
       notes,
       sortOrder,
+      imageVariants,
     });
 
     const asset = await ProductAsset.create(assetData, { transaction });
@@ -639,6 +663,7 @@ const createProductAsset = async (req, res) => {
 
     await transaction.commit();
     transactionFinished = true;
+    transactionCommitted = true;
 
     const createdAsset = await ProductAsset.findOne({
       where: { id: asset.id },
@@ -656,7 +681,7 @@ const createProductAsset = async (req, res) => {
       transactionFinished = true;
     }
 
-    await removeUploadedFile(req.file);
+    if (!transactionCommitted) await removeUploadedFile(req.file);
 
     if (/unsupported asset type|file is required|file type is not allowed|file is too large/i.test(error.message)) {
       return res.status(400).json({
@@ -1385,6 +1410,7 @@ const approveProductReview = async (req, res) => {
 const requestProductRevision = async (req, res) => {
   const transaction = await sequelize.transaction();
   let transactionFinished = false;
+  let transactionCommitted = false;
   const uploadedFiles = getUploadedProductAssetFiles(req);
 
   try {
@@ -1433,13 +1459,18 @@ const requestProductRevision = async (req, res) => {
 
     let attachments = [];
     if (uploadedFiles.length > 0) {
-      const assetRows = uploadedFiles.map((file) => buildProductAssetData({
+      const filesWithVariants = await Promise.all(uploadedFiles.map(async (file) => ({
+        file,
+        imageVariants: await createUploadedFileImageVariants(file),
+      })));
+      const assetRows = filesWithVariants.map(({ file, imageVariants }) => buildProductAssetData({
         productId: product.id,
         uploadedBy: req.user.id,
         assetType: PRODUCT_ASSET_TYPES.REVISION_ATTACHMENT,
         file,
         notes: plan.revisionRequestData.comment,
         revisionRequestId: revisionRequest.id,
+        imageVariants,
       }));
       attachments = await ProductAsset.bulkCreate(assetRows, { transaction, returning: true });
     }
@@ -1460,6 +1491,7 @@ const requestProductRevision = async (req, res) => {
 
     await transaction.commit();
     transactionFinished = true;
+    transactionCommitted = true;
 
     const updatedProduct = await Product.findOne({
       where: { id: product.id },
@@ -1484,7 +1516,7 @@ const requestProductRevision = async (req, res) => {
       transactionFinished = true;
     }
 
-    await removeUploadedFiles(uploadedFiles);
+    if (!transactionCommitted) await removeUploadedFiles(uploadedFiles);
 
     if (/not permitted/i.test(error.message)) {
       return res.status(403).json({

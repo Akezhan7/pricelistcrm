@@ -1,4 +1,4 @@
-import type { Product, ProductVariation, ProductWithPrice } from '../types';
+import type { Product, ProductVariation, ProductWithPrice, Supplier } from '../types';
 
 /** Строка товара в форме создания заявки / возврата */
 export type OrderLineForm = {
@@ -81,5 +81,38 @@ export function filterProductsBySearch<T extends Product>(products: T[], search:
     (p) =>
       p.name.toLowerCase().includes(q) ||
       (p.article || '').toLowerCase().includes(q)
+  );
+}
+
+export type SupplierSuggestion = {
+  supplierId: number;
+  supplier: Supplier;
+  matchedProductCount: number;
+  totalProductCount: number;
+};
+
+export function getSupplierSuggestions(lines: OrderLineForm[]): SupplierSuggestion[] {
+  const selectedProducts = new Map<number, Product>();
+  for (const line of lines) {
+    if (line.product) selectedProducts.set(line.productId, line.product);
+  }
+
+  const suggestions = new Map<number, SupplierSuggestion>();
+  selectedProducts.forEach((product) => {
+    for (const supplier of product.suppliers || []) {
+      const current = suggestions.get(supplier.id);
+      suggestions.set(supplier.id, {
+        supplierId: supplier.id,
+        supplier,
+        matchedProductCount: (current?.matchedProductCount || 0) + 1,
+        totalProductCount: selectedProducts.size,
+      });
+    }
+  });
+
+  return Array.from(suggestions.values()).sort(
+    (a, b) =>
+      b.matchedProductCount - a.matchedProductCount ||
+      a.supplier.name.localeCompare(b.supplier.name)
   );
 }

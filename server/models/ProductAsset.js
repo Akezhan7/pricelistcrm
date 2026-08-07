@@ -38,6 +38,16 @@ const ProductAsset = sequelize.define('ProductAsset', {
     allowNull: false,
     comment: 'Stored file path',
   },
+  thumbnailPath: {
+    type: DataTypes.STRING(500),
+    allowNull: true,
+    comment: 'Optimized thumbnail path',
+  },
+  previewPath: {
+    type: DataTypes.STRING(500),
+    allowNull: true,
+    comment: 'Optimized gallery preview path',
+  },
   originalName: {
     type: DataTypes.STRING(255),
     allowNull: true,

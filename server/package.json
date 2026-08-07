@@ -4,6 +4,8 @@
   "description": "CRM система для управления товарами и поставщиками",
   "scripts": {
     "start": "node index.js",
+    "deploy": "node scripts/deploy.js",
+    "deploy:dry-run": "node scripts/deploy.js --dry-run",
     "dev": "concurrently \"npm run server\" \"npm run client\"",
     "server": "nodemon index.js",
     "client": "cd ../client && npm start",
@@ -19,6 +21,8 @@
     "test:product-draft": "node scripts/testProductDraftService.js",
     "test:product-lifecycle-start": "node scripts/testProductLifecycleStartService.js",
     "test:product-assets": "node scripts/testProductAssetService.js",
+    "test:product-asset-images": "node scripts/testProductAssetImageService.js",
+    "assets:backfill-images": "node scripts/backfillProductAssetImageVariants.js",
     "test:product-list-query": "node scripts/testProductListQueryService.js",
     "test:product-review": "node scripts/testProductReviewService.js",
     "test:product-marketplace": "node scripts/testProductMarketplaceService.js",
@@ -29,6 +33,8 @@
     "test:workflow": "node scripts/testProductWorkflowService.js",
     "test:product-permissions": "node scripts/testProductPermissions.js",
     "test:product-history": "node scripts/testProductHistoryService.js",
+    "test:order-supplier-policy": "node scripts/testOrderSupplierPolicyService.js",
+    "test:order-status-policy": "node scripts/testOrderStatusPolicyService.js",
     "test:employee-tasks": "node scripts/testEmployeeTaskService.js",
     "test:product-designer-kpi": "node scripts/testProductDesignerKpiService.js",
     "test-connection": "node scripts/testConnection.js",
@@ -63,7 +69,8 @@
     "multer": "^1.4.5-lts.1",
     "pg": "^8.11.3",
     "pg-hstore": "^2.3.4",
-    "sequelize": "^6.32.1"
+    "sequelize": "^6.32.1",
+    "sharp": "^0.34.0"
   },
   "devDependencies": {
     "axios": "^1.13.2",

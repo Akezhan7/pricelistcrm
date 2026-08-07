@@ -48,7 +48,7 @@ const DashboardMetric: React.FC<DashboardMetricProps> = ({
 }) => (
   <div
     className={cn(
-      'rounded-card border bg-brand-white p-4 transition-colors duration-fast',
+      'dashboard-metric-card rounded-card border bg-brand-white p-4 transition-colors duration-fast',
       active
         ? 'border-brand-yellow/40 border-l-[3px] border-l-brand-yellow bg-brand-yellow/10'
         : 'border-border-subtle'
@@ -188,10 +188,10 @@ export const Dashboard: React.FC = () => {
 
   return (
     <Layout searchQuery={searchQuery} onSearchChange={setSearchQuery} fullHeight>
-      <div className="flex flex-col h-full gap-4 lg:gap-5 min-h-0">
+      <div className="dashboard-workspace flex flex-col h-full gap-4 lg:gap-5 min-h-0">
         {/* Command center header */}
-        <div className="sticky top-0 z-10 -mx-4 px-4 py-3 lg:py-0 lg:static lg:mx-0 lg:px-0 bg-surface-page/95 backdrop-blur-sm border-b border-border-subtle lg:border-0 space-y-4 shrink-0">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="dashboard-command-header sticky top-0 z-10 -mx-4 px-4 py-3 lg:py-0 lg:static lg:mx-0 lg:px-0 bg-surface-page/95 backdrop-blur-sm border-b border-border-subtle lg:border-0 space-y-4 shrink-0">
+          <div className="dashboard-title-row flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <div className="flex items-center gap-2 mb-1">
                 <LayoutDashboard className="h-5 w-5 text-brand-yellow shrink-0" aria-hidden />
@@ -200,7 +200,7 @@ export const Dashboard: React.FC = () => {
               <h1 className="text-h1 font-bold tracking-tight text-brand-black sm:text-display">
                 Рабочий стол
               </h1>
-              <p className="mt-1 text-body text-text-muted hidden sm:block">
+              <p className="dashboard-subtitle mt-1 text-body text-text-muted hidden sm:block">
                 Подбор товара и поставщика для новой заявки
               </p>
             </div>
@@ -215,7 +215,7 @@ export const Dashboard: React.FC = () => {
           </div>
 
           {/* Metrics strip */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className="dashboard-metrics grid grid-cols-3 gap-3">
             <DashboardMetric
               label="Товары"
               value={totalProducts}
@@ -287,7 +287,7 @@ export const Dashboard: React.FC = () => {
           </div>
 
           {/* Desktop workflow breadcrumb */}
-          <div className="hidden lg:flex items-center gap-2 text-caption text-text-muted">
+          <div className="dashboard-workflow-breadcrumb hidden lg:flex items-center gap-2 text-caption text-text-muted">
             <span
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-pill px-3 py-1.5 font-medium transition-colors',
@@ -312,7 +312,7 @@ export const Dashboard: React.FC = () => {
 
         {/* Active workflow context */}
         {(selectedProduct || selectedSupplier) && (
-          <Card className="border-brand-yellow/30 bg-surface-accent shadow-none hover:shadow-none flex-shrink-0">
+          <Card className="dashboard-active-context border-brand-yellow/30 bg-surface-accent shadow-none hover:shadow-none flex-shrink-0">
             <CardBody compact className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between py-3">
               <div className="min-w-0">
                 <p className="text-overline text-text-muted mb-0.5">Текущий подбор</p>
@@ -358,7 +358,7 @@ export const Dashboard: React.FC = () => {
         )}
 
         {/* Split panels */}
-        <div className="flex flex-col lg:flex-row gap-4 lg:gap-5 flex-1 min-h-0 lg:overflow-hidden">
+        <div className="dashboard-panels flex flex-col lg:flex-row gap-4 lg:gap-5 flex-1 min-h-0 lg:overflow-hidden">
           {/* Products panel — inset list zone */}
           <Card
             variant="default"
@@ -367,7 +367,7 @@ export const Dashboard: React.FC = () => {
               mobileStep !== 'products' && 'hidden lg:flex'
             )}
           >
-            <CardHeader inset>
+            <CardHeader inset className="dashboard-panel-header">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3 min-w-0">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-inset border border-border-subtle">
@@ -380,7 +380,7 @@ export const Dashboard: React.FC = () => {
                         {totalProducts}
                       </span>
                     </CardTitle>
-                    <CardDescription>
+                    <CardDescription className="dashboard-panel-description">
                       Выберите позицию для фильтрации поставщиков
                     </CardDescription>
                   </div>
@@ -396,7 +396,7 @@ export const Dashboard: React.FC = () => {
               </div>
             </CardHeader>
 
-            <div className="flex-1 min-h-0 flex flex-col p-3 md:p-4">
+            <div className="dashboard-panel-body flex-1 min-h-0 flex flex-col p-3 md:p-4">
               <div className="flex-1 min-h-0 flex flex-col rounded-xl bg-surface-inset border border-border-subtle overflow-hidden">
                 <ProductList
                   products={products}
@@ -406,6 +406,7 @@ export const Dashboard: React.FC = () => {
                   onRefresh={refreshData}
                   canEdit={canEdit}
                   compact
+                  className="dashboard-product-list"
                 />
               </div>
             </div>
@@ -419,7 +420,7 @@ export const Dashboard: React.FC = () => {
               (mobileStep !== 'suppliers' || !suppliersStepEnabled) && 'hidden lg:flex'
             )}
           >
-            <CardHeader>
+            <CardHeader className="dashboard-panel-header">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3 min-w-0 flex-1">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-surface-inset border border-border-subtle">
@@ -429,7 +430,7 @@ export const Dashboard: React.FC = () => {
                     <CardTitle className="truncate">
                       {getRightPanelTitle(selectedSupplier, selectedProduct)}
                     </CardTitle>
-                    <CardDescription>
+                    <CardDescription className="dashboard-panel-description">
                       {getRightPanelDescription(selectedSupplier, selectedProduct)}
                     </CardDescription>
                   </div>
@@ -438,7 +439,7 @@ export const Dashboard: React.FC = () => {
             </CardHeader>
 
             {!selectedProduct && !selectedSupplier && (
-              <div className="px-4 md:px-5 py-2.5 bg-surface-accent/60 border-b border-brand-yellow/15">
+              <div className="dashboard-supplier-hint px-4 md:px-5 py-2.5 bg-surface-accent/60 border-b border-brand-yellow/15">
                 <p className="text-caption text-text-muted">
                   <span className="font-medium text-brand-black">Подсказка:</span>{' '}
                   выберите товар слева, чтобы отфильтровать поставщиков по цене и наличию
@@ -446,7 +447,7 @@ export const Dashboard: React.FC = () => {
               </div>
             )}
 
-            <div className="flex-1 min-h-0 flex flex-col p-3 md:p-4">
+            <div className="dashboard-panel-body flex-1 min-h-0 flex flex-col p-3 md:p-4">
               <div className="flex-1 min-h-0 flex flex-col rounded-xl bg-surface-inset border border-border-subtle overflow-hidden">
                 {selectedSupplier ? (
                   <SupplierProductsPanel
@@ -463,6 +464,7 @@ export const Dashboard: React.FC = () => {
                     canEdit={canEdit}
                     onSelectSupplier={handleSelectSupplier}
                     selectedSupplierId={null}
+                    className="dashboard-supplier-cards"
                   />
                 )}
               </div>

@@ -288,6 +288,8 @@ export interface ProductAsset {
   revisionRequestId?: number | null;
   assetType: ProductAssetType;
   filePath: string;
+  thumbnailPath?: string | null;
+  previewPath?: string | null;
   originalName?: string | null;
   mimeType?: string | null;
   fileSize?: number | null;
@@ -575,7 +577,8 @@ export type OrderStatus =
   | 'В сборе'
   | 'Забрана'
   | 'Принята на складе'
-  | 'Закрыта';
+  | 'Закрыта'
+  | 'Отменена';
 
 export type OrderType = 'purchase' | 'return';
 
@@ -584,7 +587,7 @@ export type PaymentStatus = 'Не оплачено' | 'Частично опла
 export interface Order {
   id: number;
   orderNumber: string;
-  supplierId: number;
+  supplierId: number | null;
   supplier?: {
     id: number;
     name: string;
@@ -659,7 +662,7 @@ export interface OrderStatusHistory {
 }
 
 export interface CreateOrderDto {
-  supplierId: number;
+  supplierId: number | null;
   type?: OrderType;
   expectedDeliveryDate?: string;
   deliveryLocation?: string;
@@ -674,6 +677,7 @@ export interface CreateOrderDto {
 }
 
 export interface UpdateOrderDto {
+  supplierId?: number | null;
   expectedDeliveryDate?: string;
   deliveryLocation?: string;
   notes?: string;
@@ -690,6 +694,12 @@ export interface UpdateOrderDto {
 export interface ChangeOrderStatusDto {
   status: OrderStatus;
   comment?: string;
+}
+
+export interface OrderStatusOptions {
+  currentStatus: OrderStatus;
+  availableStatuses: OrderStatus[];
+  canReceiveAtWarehouse: boolean;
 }
 
 export interface OrderFilters {
@@ -713,6 +723,7 @@ export interface OrderStats {
   delivery?: number;
   received: number;
   closed: number;
+  cancelled: number;
   pending: number;
   inProgress: number;
   completed: number;

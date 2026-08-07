@@ -16,6 +16,8 @@ const {
   sequelize,
 } = require('../models');
 const { generateOrderNumber } = require('../services/orderNumberService');
+const { recalculateSupplierDebt } = require('./paymentController');
+const { canReceiveAtWarehouse } = require('../services/orderStatusPolicyService');
 const {
   buildLifecycleArrivalPlan,
   buildLifecyclePurchasePlan,
@@ -284,6 +286,9 @@ async function markProductArrived(req, res) {
       lock: true,
     });
     if (!order) throw requestError(409, 'Связанная заявка закупа не найдена');
+    if (!canReceiveAtWarehouse(order.status, req.user.role)) {
+      throw requestError(409, `Заявку в статусе «${order.status}» нельзя принять на склад`);
+    }
 
     const now = new Date();
     const plan = buildLifecycleArrivalPlan({
@@ -329,6 +334,7 @@ async function markProductArrived(req, res) {
       ...plan.history,
       metadata: { ...plan.history.metadata, warehouseReceiptId: receipt.id },
     }, { transaction });
+    await recalculateSupplierDebt(order.supplierId, { transaction });
 
     await transaction.commit();
     transactionFinished = true;

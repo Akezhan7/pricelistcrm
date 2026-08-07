@@ -59,6 +59,7 @@ type ProductListProps = {
   onLifecycleStatusFilterChange?: (status: ProductLifecycleStatus | '') => void;
   pageResetKey?: string | number;
   compact?: boolean;
+  className?: string;
 };
 
 function isLegacyCatalogProduct(product: Product) {
@@ -78,6 +79,7 @@ export const ProductList: React.FC<ProductListProps> = ({
   onLifecycleStatusFilterChange,
   pageResetKey,
   compact = false,
+  className,
 }) => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isCreateDraftModalOpen, setIsCreateDraftModalOpen] = useState(false);
@@ -223,10 +225,10 @@ export const ProductList: React.FC<ProductListProps> = ({
     searchQuery || localSearchQuery ? 'Товары не найдены' : 'Товары не добавлены';
 
   return (
-    <div className="flex flex-col flex-1" style={{ minHeight: 0 }}>
+    <div className={cn('flex flex-col flex-1', className)} style={{ minHeight: 0 }}>
       <div
         className={cn(
-          'px-4 py-3 border-b border-border-subtle grid grid-cols-1 gap-3 bg-surface-page/95 backdrop-blur-sm sticky top-0 z-10 shrink-0',
+          'product-list-toolbar px-4 py-3 border-b border-border-subtle grid grid-cols-1 gap-3 bg-surface-page/95 backdrop-blur-sm sticky top-0 z-10 shrink-0',
           !compact &&
             'md:grid-cols-[repeat(2,minmax(0,1fr))] xl:grid-cols-[auto_auto_minmax(12rem,14rem)_minmax(18rem,1fr)] xl:items-center'
         )}
@@ -340,7 +342,7 @@ export const ProductList: React.FC<ProductListProps> = ({
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto p-3 lg:p-4" style={{ minHeight: 0 }}>
+      <div className="product-list-scroll flex-1 overflow-y-auto p-3 lg:p-4" style={{ minHeight: 0 }}>
         {filteredProducts.length === 0 ? (
           <EmptyState
             icon={Package}
@@ -364,7 +366,7 @@ export const ProductList: React.FC<ProductListProps> = ({
             }
           />
         ) : (
-          <div className="space-y-2">
+          <div className="product-list-items space-y-2">
             {paginatedProducts.map((product) => (
               <ProductListItem
                 key={product.id}

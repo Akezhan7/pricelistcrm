@@ -18,6 +18,7 @@ interface SupplierProductCatalogProps {
   layout?: CatalogLayout;
   className?: string;
   listMaxHeight?: string;
+  emptyTitle?: string;
   /** pick: добавить в заявку */
   onPickProduct?: (product: ProductWithPrice) => void;
   pickedProductIds?: Set<number>;
@@ -41,6 +42,7 @@ export const SupplierProductCatalog: React.FC<SupplierProductCatalogProps> = ({
   layout = 'list',
   className = '',
   listMaxHeight = 'max-h-64',
+  emptyTitle,
   onPickProduct,
   pickedProductIds,
   selectedIds,
@@ -102,7 +104,7 @@ export const SupplierProductCatalog: React.FC<SupplierProductCatalogProps> = ({
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={Package}
-            title={search.trim() ? 'Товары не найдены' : 'У поставщика нет товаров'}
+            title={emptyTitle || (search.trim() ? 'Товары не найдены' : 'У поставщика нет товаров')}
             className="py-10"
           />
         ) : layout === 'grid' ? (

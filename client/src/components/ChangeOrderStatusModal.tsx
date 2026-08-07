@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle } from 'lucide-react';
 import ordersApi from '../services/ordersApi';
 import type { OrderStatus } from '../types';
@@ -7,6 +7,9 @@ import { FormFooter } from './ui/FormFooter';
 import { Select } from './ui/Select';
 import { Textarea } from './ui/Textarea';
 import { Alert } from './ui/Alert';
+import { Spinner } from './ui/Spinner';
+import { useConfirmDialog } from '../context/ConfirmDialogContext';
+import { formatPriceKZT } from '../utils/format';
 
 interface ChangeOrderStatusModalProps {
   isOpen: boolean;
@@ -15,6 +18,7 @@ interface ChangeOrderStatusModalProps {
   orderId: number;
   currentStatus: OrderStatus;
   orderNumber: string;
+  remainingAmount: number;
 }
 
 const ChangeOrderStatusModal: React.FC<ChangeOrderStatusModalProps> = ({
@@ -24,29 +28,37 @@ const ChangeOrderStatusModal: React.FC<ChangeOrderStatusModalProps> = ({
   orderId,
   currentStatus,
   orderNumber,
+  remainingAmount,
 }) => {
+  const { confirm } = useConfirmDialog();
   const [newStatus, setNewStatus] = useState<OrderStatus | ''>('');
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loadingOptions, setLoadingOptions] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [availableStatuses, setAvailableStatuses] = useState<OrderStatus[]>([]);
 
-  const getAvailableStatuses = (): OrderStatus[] => {
-    const statusFlow: Record<OrderStatus, OrderStatus[]> = {
-      'Создана': ['Отправлена поставщику', 'Закрыта'],
-      'Отправлена поставщику': ['Подтверждена', 'Частично подтверждена', 'Создана', 'Закрыта'],
-      'Частично подтверждена': ['Подтверждена', 'В сборе', 'Доставка', 'Отправлена поставщику', 'Закрыта'],
-      'Подтверждена': ['В сборе', 'Доставка', 'Частично подтверждена', 'Закрыта'],
-      'Доставка': ['Принята на складе', 'Подтверждена', 'Закрыта'],
-      'В сборе': ['Забрана', 'Доставка', 'Подтверждена', 'Закрыта'],
-      'Забрана': ['Принята на складе', 'Доставка', 'В сборе', 'Закрыта'],
-      'Принята на складе': ['Закрыта', 'Забрана', 'Доставка'],
-      'Закрыта': [],
+  useEffect(() => {
+    if (!isOpen) return;
+
+    let active = true;
+    setLoadingOptions(true);
+    setError(null);
+    ordersApi.getOrderStatusOptions(orderId)
+      .then((options) => {
+        if (active) setAvailableStatuses(options.availableStatuses);
+      })
+      .catch((err) => {
+        if (active) setError(err.message || 'Не удалось получить доступные статусы');
+      })
+      .finally(() => {
+        if (active) setLoadingOptions(false);
+      });
+
+    return () => {
+      active = false;
     };
-
-    return statusFlow[currentStatus] || [];
-  };
-
-  const availableStatuses = getAvailableStatuses();
+  }, [isOpen, orderId, currentStatus]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,6 +66,26 @@ const ChangeOrderStatusModal: React.FC<ChangeOrderStatusModalProps> = ({
     if (!newStatus) {
       setError('Выберите новый статус');
       return;
+    }
+
+    if (newStatus === 'Закрыта' && remainingAmount > 0) {
+      const approved = await confirm({
+        title: 'Закрыть заявку?',
+        message: `Неоплаченный остаток ${formatPriceKZT(remainingAmount)} сохранится в задолженности поставщика.`,
+        confirmLabel: 'Закрыть',
+        variant: 'default',
+      });
+      if (!approved) return;
+    }
+
+    if (newStatus === 'Отменена') {
+      const approved = await confirm({
+        title: 'Отменить заявку?',
+        message: 'Заявка останется в истории, но перестанет участвовать в рабочем процессе и задолженности.',
+        confirmLabel: 'Отменить заявку',
+        variant: 'danger',
+      });
+      if (!approved) return;
     }
 
     try {
@@ -79,6 +111,7 @@ const ChangeOrderStatusModal: React.FC<ChangeOrderStatusModalProps> = ({
     setNewStatus('');
     setComment('');
     setError(null);
+    setAvailableStatuses([]);
     onClose();
   };
 
@@ -115,7 +148,11 @@ const ChangeOrderStatusModal: React.FC<ChangeOrderStatusModalProps> = ({
         </Alert>
       )}
 
-      {availableStatuses.length > 0 ? (
+      {loadingOptions ? (
+        <div className="flex justify-center py-10">
+          <Spinner size="md" />
+        </div>
+      ) : availableStatuses.length > 0 ? (
         <form id="change-status-form" onSubmit={handleSubmit} className="space-y-4">
           <Select
             label="Новый статус"
@@ -147,6 +184,18 @@ const ChangeOrderStatusModal: React.FC<ChangeOrderStatusModalProps> = ({
           <Alert variant="info" title="Информация" icon={CheckCircle}>
             Изменение будет зафиксировано в истории заявки с указанием вашего имени и времени.
           </Alert>
+
+          {newStatus === 'Закрыта' && remainingAmount > 0 && (
+            <Alert variant="warning">
+              Остаток {formatPriceKZT(remainingAmount)} будет учтён как долг поставщику.
+            </Alert>
+          )}
+
+          {newStatus === 'Отменена' && (
+            <Alert variant="warning">
+              Отмена не удаляет заявку и не создаёт задолженность.
+            </Alert>
+          )}
         </form>
       ) : (
         <div className="bg-surface-muted border border-border rounded-card p-6 text-center">

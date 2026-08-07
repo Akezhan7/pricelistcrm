@@ -9,11 +9,13 @@ import type {
 } from '../types';
 import { Alert, Badge, Button, Input, Select, Spinner, Textarea } from './ui';
 import { RequirementsChecklist, type RequirementItem } from './RequirementsChecklist';
+import { ProductAssetsPanel } from './ProductAssetsPanel';
 
 type ProductMarketplacePanelProps = {
   product: Product;
   onChanged: () => void;
   onSaved?: () => void;
+  showMaterials?: boolean;
 };
 
 type MarketplaceFormState = {
@@ -91,6 +93,7 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
   product,
   onChanged,
   onSaved,
+  showMaterials = false,
 }) => {
   const [listing, setListing] = useState<ProductMarketplaceListing | null>(null);
   const [form, setForm] = useState<MarketplaceFormState>(initialFormState);
@@ -262,6 +265,17 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
         </div>
         <Badge variant="outline">Kaspi</Badge>
       </div>
+
+      {showMaterials && (
+        <ProductAssetsPanel
+          productId={product.id}
+          productName={product.name}
+          canEdit={false}
+          canSubmitContent={false}
+          onContentSubmitted={onChanged}
+          showProductHeader={false}
+        />
+      )}
 
       {error && <Alert variant="error">{error}</Alert>}
 

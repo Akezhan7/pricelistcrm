@@ -2,13 +2,15 @@ import React, { useState, useEffect } from 'react';
 import { Search, Package } from 'lucide-react';
 import ordersApi from '../services/ordersApi';
 import productsApi from '../services/productsApi';
+import suppliersApi from '../services/suppliersApi';
 import api from '../utils/api';
-import type { Order, Product, UpdateOrderDto, ProductVariation, OrderItem } from '../types';
+import type { Order, Product, Supplier, UpdateOrderDto, ProductVariation, OrderItem } from '../types';
 import { Modal } from './ui/Modal';
 import { FormFooter } from './ui/FormFooter';
 import { Alert } from './ui/Alert';
 import { Spinner } from './ui/Spinner';
 import { Input } from './ui/Input';
+import { Select } from './ui/Select';
 import { Textarea } from './ui/Textarea';
 import { OrderLineItemsEditor, type OrderLineItemEdit } from './forms/OrderLineItemsEditor';
 import { formatPriceKZT } from '../utils/format';
@@ -23,6 +25,8 @@ interface EditOrderModalProps {
 type OrderItemForm = OrderLineItemEdit;
 
 const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSuccess, order }) => {
+  const [supplierId, setSupplierId] = useState<number | null>(null);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('');
   const [deliveryLocation, setDeliveryLocation] = useState('');
   const [notes, setNotes] = useState('');
@@ -38,11 +42,11 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
   const [error, setError] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState(true);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (isOpen && order) {
       loadInitialData();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, order]);
 
   const loadInitialData = async () => {
@@ -51,13 +55,18 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
       setError(null);
 
       // Загрузить список товаров
-      const productsData = await productsApi.getProducts({ isActive: true });
+      const [productsData, suppliersData] = await Promise.all([
+        productsApi.getProducts({ isActive: true, limit: 1000 }),
+        suppliersApi.getSuppliers({ isActive: true, limit: 1000 }),
+      ]);
       const productsArray = Array.isArray(productsData) ? productsData : [];
       setProducts(productsArray);
       setFilteredProducts(productsArray);
+      setSuppliers(Array.isArray(suppliersData) ? suppliersData : []);
 
       // Инициализировать форму данными заявки
       setExpectedDeliveryDate(order.expectedDeliveryDate || '');
+      setSupplierId(order.supplierId || null);
       setDeliveryLocation(order.deliveryLocation || 'Точка Байсад');
       setNotes(order.notes || '');
 
@@ -252,6 +261,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
       const activeItems = items.filter(item => !item.isDeleted);
 
       const orderData: UpdateOrderDto = {
+        supplierId,
         expectedDeliveryDate: expectedDeliveryDate || undefined,
         deliveryLocation: deliveryLocation || undefined,
         notes: notes || undefined,
@@ -276,6 +286,8 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
   };
 
   const handleClose = () => {
+    setSupplierId(null);
+    setSuppliers([]);
     setExpectedDeliveryDate('');
     setDeliveryLocation('');
     setNotes('');
@@ -332,9 +344,20 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
             </Alert>
           )}
 
-          <p className="text-sm text-text-muted -mt-2">{order.supplier?.name}</p>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Select
+              label="Поставщик"
+              value={supplierId || ''}
+              onChange={(event) => setSupplierId(event.target.value ? Number(event.target.value) : null)}
+              disabled={order.status !== 'Создана'}
+            >
+              <option value="">Без поставщика</option>
+              {suppliers.map((supplier) => (
+                <option key={supplier.id} value={supplier.id}>
+                  {supplier.name} - {supplier.phone}
+                </option>
+              ))}
+            </Select>
             <Input
               label="Ожидаемая дата поставки"
               type="date"

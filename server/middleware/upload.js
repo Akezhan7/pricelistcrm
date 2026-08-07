@@ -153,6 +153,7 @@ const handleUploadError = (err, req, res, next) => {
 };
 
 module.exports = {
+  uploadsDir,
   upload,
   uploadReceipt,
   uploadProductAsset,

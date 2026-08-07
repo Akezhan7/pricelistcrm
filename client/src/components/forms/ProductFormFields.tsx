@@ -374,7 +374,7 @@ export const ProductFormFields: React.FC<ProductFormFieldsProps> = ({
 
               alt="Текущее изображение"
 
-              className="w-full h-32 object-cover rounded-xl border border-border-subtle"
+              className="block w-full h-auto max-h-[min(60vh,32rem)] object-contain rounded-xl border border-border-subtle bg-surface-inset"
 
               onError={(e) => {
 

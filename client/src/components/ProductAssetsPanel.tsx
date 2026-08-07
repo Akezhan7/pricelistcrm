@@ -7,6 +7,8 @@ import {
   calculateProductAssetUploadProgress,
   getDisplayAssetName,
   getGalleryImageAssets,
+  getProductAssetPreviewPath,
+  getProductAssetThumbnailPath,
   isPreviewableImageAsset,
   recommendAssetTypeForFiles,
 } from '../utils/productAssets';
@@ -419,6 +421,8 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
                 <div className="space-y-2">
                   {items.map((asset) => {
                     const assetUrl = getImageUrl(asset.filePath) || asset.filePath;
+                    const thumbnailPath = getProductAssetThumbnailPath(asset);
+                    const thumbnailUrl = getImageUrl(thumbnailPath) || thumbnailPath;
                     const assetName = getDisplayAssetName(asset);
                     const canPreview = isPreviewableImageAsset(asset);
                     return (
@@ -435,9 +439,11 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
                               title="Открыть галерею"
                             >
                               <img
-                                src={assetUrl}
+                                src={thumbnailUrl}
                                 alt={assetName || 'Материал'}
                                 className="h-full w-full object-cover"
+                                loading="lazy"
+                                decoding="async"
                               />
                             </button>
                           ) : (
@@ -547,9 +553,10 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
               />
               <div className="flex min-h-[18rem] items-center justify-center rounded-lg bg-surface-inset p-2 sm:min-h-[28rem]">
                 <img
-                  src={getImageUrl(activeGalleryAsset.filePath) || activeGalleryAsset.filePath}
+                  src={getImageUrl(getProductAssetPreviewPath(activeGalleryAsset)) || getProductAssetPreviewPath(activeGalleryAsset)}
                   alt={getDisplayAssetName(activeGalleryAsset)}
                   className="max-h-[65vh] max-w-full object-contain"
+                  decoding="async"
                 />
               </div>
               <IconButton
@@ -575,9 +582,11 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
                     title={getDisplayAssetName(asset)}
                   >
                     <img
-                      src={getImageUrl(asset.filePath) || asset.filePath}
+                      src={getImageUrl(getProductAssetThumbnailPath(asset)) || getProductAssetThumbnailPath(asset)}
                       alt={getDisplayAssetName(asset)}
                       className="h-full w-full object-cover"
+                      loading="lazy"
+                      decoding="async"
                     />
                   </button>
                 ))}

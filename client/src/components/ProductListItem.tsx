@@ -256,7 +256,7 @@ export const ProductListItem: React.FC<ProductListItemProps> = ({
 
     >
 
-      <div className="flex items-center gap-3 p-3 lg:p-4 min-h-[72px] lg:min-h-16">
+      <div className="product-list-item-main flex items-center gap-3 p-3 lg:p-4 min-h-[72px] lg:min-h-16">
 
         <div className="shrink-0">
 
@@ -378,7 +378,7 @@ export const ProductListItem: React.FC<ProductListItemProps> = ({
 
         <div
 
-          className="px-3 pb-3 lg:px-4 lg:pb-4 pt-0 border-t border-border-subtle lg:border-t-0"
+          className="product-list-item-footer px-3 pb-3 lg:px-4 lg:pb-4 pt-0 border-t border-border-subtle lg:border-t-0"
 
           onClick={(e) => e.stopPropagation()}
 

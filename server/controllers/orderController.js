@@ -6,6 +6,19 @@ const { createPriceHistoryRecord } = require('./priceHistoryController');
 const { formatOrderMessage, generateWhatsAppLink } = require('../utils/whatsappFormatter');
 const { generateOrderNumber } = require('../services/orderNumberService');
 const { buildOrderItemSyncPlan } = require('../services/orderItemSyncService');
+const {
+  normalizeOptionalSupplierId,
+  assertSupplierAllowedForOrderType,
+  assertOrderHasSupplier,
+} = require('../services/orderSupplierPolicyService');
+const {
+  ORDER_STATUSES,
+  DEBT_STATUSES,
+  getAvailableStatusTransitions,
+  assertStatusTransitionAllowed,
+  canReceiveAtWarehouse,
+  assertOrderWorkflowOpen,
+} = require('../services/orderStatusPolicyService');
 
 /**
  * Автоматический расчет статуса оплаты на основе сумм
@@ -123,9 +136,13 @@ exports.getOrders = async (req, res) => {
         [sequelize.fn('COUNT', sequelize.literal('CASE WHEN status = \'Принята на складе\' THEN 1 END')), 'received'],
         // Закрытые заявки
         [sequelize.fn('COUNT', sequelize.literal('CASE WHEN status = \'Закрыта\' THEN 1 END')), 'closed'],
+        // Отмененные заявки
+        [sequelize.fn('COUNT', sequelize.literal('CASE WHEN status = \'Отменена\' THEN 1 END')), 'cancelled'],
         // Финансовые показатели
         [sequelize.fn('SUM', sequelize.col('total_amount')), 'totalAmount'],
-        [sequelize.fn('SUM', sequelize.col('paid_amount')), 'totalPaid']
+        [sequelize.fn('SUM', sequelize.col('paid_amount')), 'totalPaid'],
+        [sequelize.fn('SUM', sequelize.literal(`CASE WHEN status IN ('${DEBT_STATUSES.join("','")}') THEN total_amount ELSE 0 END`)), 'debtAmount'],
+        [sequelize.fn('SUM', sequelize.literal(`CASE WHEN status IN ('${DEBT_STATUSES.join("','")}') THEN paid_amount ELSE 0 END`)), 'debtPaid']
       ],
       raw: true
     });
@@ -133,6 +150,8 @@ exports.getOrders = async (req, res) => {
     const statsResult = stats[0] || {};
     const totalAmount = parseFloat(statsResult.totalAmount || 0);
     const totalPaid = parseFloat(statsResult.totalPaid || 0);
+    const debtAmount = parseFloat(statsResult.debtAmount || 0);
+    const debtPaid = parseFloat(statsResult.debtPaid || 0);
 
     res.json({
       success: true,
@@ -154,6 +173,7 @@ exports.getOrders = async (req, res) => {
           delivery: parseInt(statsResult.delivery || 0),
           received: parseInt(statsResult.received || 0),
           closed: parseInt(statsResult.closed || 0),
+          cancelled: parseInt(statsResult.cancelled || 0),
           // Агрегированные показатели для удобства
           pending: parseInt(statsResult.created || 0) + parseInt(statsResult.sentToSupplier || 0),
           inProgress: parseInt(statsResult.confirmed || 0) + parseInt(statsResult.inCollection || 0) + parseInt(statsResult.collected || 0) + parseInt(statsResult.delivery || 0),
@@ -161,7 +181,7 @@ exports.getOrders = async (req, res) => {
           // Финансовые показатели
           totalAmount: totalAmount.toFixed(2),
           totalPaid: totalPaid.toFixed(2),
-          totalDebt: (totalAmount - totalPaid).toFixed(2)
+          totalDebt: Math.max(0, debtAmount - debtPaid).toFixed(2)
         }
       }
     });
@@ -261,10 +281,27 @@ exports.createOrder = async (req, res) => {
   try {
     const { supplierId, expectedDeliveryDate, deliveryLocation, notes, items, type } = req.body;
     const orderType = type === 'return' ? 'return' : 'purchase';
+    let normalizedSupplierId;
+
+    try {
+      normalizedSupplierId = normalizeOptionalSupplierId(supplierId);
+      assertSupplierAllowedForOrderType(orderType, normalizedSupplierId);
+    } catch (error) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: orderType === 'return'
+          ? 'Для оформления возврата выберите поставщика'
+          : 'Некорректный поставщик',
+        errors: [{ field: 'supplierId', message: error.message }],
+      });
+    }
 
     // Проверка существования поставщика
-    const supplier = await Supplier.findByPk(supplierId);
-    if (!supplier) {
+    const supplier = normalizedSupplierId
+      ? await Supplier.findOne({ where: { id: normalizedSupplierId, isActive: true } })
+      : null;
+    if (normalizedSupplierId && !supplier) {
       await transaction.rollback();
       return res.status(400).json({
         success: false,
@@ -325,7 +362,7 @@ exports.createOrder = async (req, res) => {
     // Создание заявки
     const order = await Order.create({
       orderNumber,
-      supplierId,
+      supplierId: normalizedSupplierId,
       type: orderType,
       expectedDeliveryDate: expectedDeliveryDate || null,
       deliveryLocation: deliveryLocation || 'Точка Байсад',
@@ -364,7 +401,9 @@ exports.createOrder = async (req, res) => {
     await transaction.commit();
 
     // Пересчитать задолженность поставщика
-    await recalculateSupplierDebt(supplierId);
+    if (normalizedSupplierId) {
+      await recalculateSupplierDebt(normalizedSupplierId);
+    }
 
     // Получение полной информации о созданной заявке
     const createdOrder = await Order.findByPk(order.id, {
@@ -421,7 +460,7 @@ exports.updateOrder = async (req, res) => {
 
   try {
     const { id } = req.params;
-    const { expectedDeliveryDate, deliveryLocation, notes, items } = req.body;
+    const { supplierId, expectedDeliveryDate, deliveryLocation, notes, items } = req.body;
 
     // Найти заявку
     const order = await Order.findOne({
@@ -444,6 +483,45 @@ exports.updateOrder = async (req, res) => {
         success: false,
         message: `Невозможно редактировать заявку. Текущий статус: ${order.status}. Редактировать можно только заявки в статусах: ${editableStatuses.join(', ')}`
       });
+    }
+
+    const previousSupplierId = order.supplierId;
+    if (Object.prototype.hasOwnProperty.call(req.body, 'supplierId')) {
+      let normalizedSupplierId;
+      try {
+        normalizedSupplierId = normalizeOptionalSupplierId(supplierId);
+        assertSupplierAllowedForOrderType(order.type, normalizedSupplierId);
+      } catch (error) {
+        await transaction.rollback();
+        return res.status(400).json({
+          success: false,
+          message: order.type === 'return'
+            ? 'Для возврата необходимо выбрать поставщика'
+            : 'Некорректный поставщик',
+        });
+      }
+
+      const currentSupplierId = previousSupplierId == null ? null : Number(previousSupplierId);
+      if (order.status !== 'Создана' && normalizedSupplierId !== currentSupplierId) {
+        await transaction.rollback();
+        return res.status(409).json({
+          success: false,
+          message: 'Поставщика можно изменить только у заявки в статусе «Создана»',
+        });
+      }
+
+      if (normalizedSupplierId) {
+        const supplier = await Supplier.findOne({
+          where: { id: normalizedSupplierId, isActive: true },
+          transaction,
+        });
+        if (!supplier) {
+          await transaction.rollback();
+          return res.status(400).json({ success: false, message: 'Поставщик не найден' });
+        }
+      }
+
+      order.supplierId = normalizedSupplierId;
     }
 
     // Обновление основной информации
@@ -536,7 +614,12 @@ exports.updateOrder = async (req, res) => {
     await transaction.commit();
 
     // Пересчитать задолженность поставщика
-    await recalculateSupplierDebt(order.supplierId);
+    if (previousSupplierId && Number(previousSupplierId) !== Number(order.supplierId)) {
+      await recalculateSupplierDebt(previousSupplierId);
+    }
+    if (order.supplierId) {
+      await recalculateSupplierDebt(order.supplierId);
+    }
 
     // Получение обновленной заявки
     const updatedOrder = await Order.findByPk(order.id, {
@@ -588,6 +671,38 @@ exports.updateOrder = async (req, res) => {
   }
 };
 
+exports.getOrderStatusOptions = async (req, res) => {
+  try {
+    const order = await Order.findOne({
+      where: { id: req.params.id, isActive: true },
+      attributes: ['id', 'status', 'supplierId'],
+    });
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Заявка не найдена' });
+    }
+
+    const hasSupplier = Boolean(order.supplierId);
+    res.json({
+      success: true,
+      data: {
+        currentStatus: order.status,
+        availableStatuses: hasSupplier
+          ? getAvailableStatusTransitions(order.status, req.user.role)
+          : [],
+        canReceiveAtWarehouse: hasSupplier && canReceiveAtWarehouse(order.status, req.user.role),
+      },
+    });
+  } catch (error) {
+    console.error('Ошибка получения доступных действий заявки:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка получения доступных действий заявки',
+      error: error.message,
+    });
+  }
+};
+
 /**
  * Изменить статус заявки
  * PATCH /api/orders/:id/status
@@ -613,25 +728,12 @@ exports.changeOrderStatus = async (req, res) => {
     const { id } = req.params;
     const { status, comment } = req.body;
 
-    // Все допустимые статусы в системе
-    const validStatuses = [
-      'Создана',
-      'Отправлена поставщику',
-      'Частично подтверждена',
-      'Подтверждена',
-      'Доставка',
-      'В сборе',
-      'Забрана',
-      'Принята на складе',
-      'Закрыта'
-    ];
-
-    if (!validStatuses.includes(status)) {
+    if (!ORDER_STATUSES.includes(status)) {
       await transaction.rollback();
       return res.status(400).json({
         success: false,
         message: 'Некорректный статус',
-        validStatuses
+        validStatuses: ORDER_STATUSES
       });
     }
 
@@ -648,8 +750,18 @@ exports.changeOrderStatus = async (req, res) => {
       });
     }
 
+    try {
+      assertOrderHasSupplier(order);
+    } catch (error) {
+      await transaction.rollback();
+      return res.status(error.statusCode || 409).json({
+        success: false,
+        message: 'Сначала назначьте поставщика заявке',
+        code: error.code,
+      });
+    }
+
     const currentStatus = order.status;
-    const userRole = req.user.role;
 
     // Если статус не меняется
     if (currentStatus === status) {
@@ -660,83 +772,17 @@ exports.changeOrderStatus = async (req, res) => {
       });
     }
 
-    // Определение допустимых переходов статусов
-    // Ключ = текущий статус, значение = массив допустимых следующих статусов
-    const statusFlow = {
-      'Создана': ['Отправлена поставщику', 'Закрыта'],
-      'Отправлена поставщику': ['Подтверждена', 'Частично подтверждена', 'Создана', 'Закрыта'],
-      'Частично подтверждена': ['Подтверждена', 'В сборе', 'Доставка', 'Отправлена поставщику', 'Закрыта'],
-      'Подтверждена': ['В сборе', 'Доставка', 'Частично подтверждена', 'Закрыта'],
-      'Доставка': ['Принята на складе', 'Подтверждена', 'Закрыта'],
-      'В сборе': ['Забрана', 'Доставка', 'Подтверждена', 'Закрыта'],
-      'Забрана': ['Принята на складе', 'Доставка', 'В сборе', 'Закрыта'],
-      'Принята на складе': ['Закрыта', 'Забрана', 'Доставка'],
-      'Закрыта': [] // Из закрытой заявки нельзя перейти никуда
-    };
-
-    // Роли и их права на переходы статусов
-    const rolePermissions = {
-      'admin': '*', // Все переходы
-      'purchase_manager': [
-        'Создана → Отправлена поставщику',
-        'Отправлена поставщику → Подтверждена',
-        'Отправлена поставщику → Частично подтверждена',
-        'Отправлена поставщику → Создана',
-        'Частично подтверждена → Подтверждена',
-        'Частично подтверждена → В сборе',
-        'Частично подтверждена → Доставка',
-        'Частично подтверждена → Отправлена поставщику',
-        'Подтверждена → В сборе',
-        'Подтверждена → Доставка',
-        'Подтверждена → Частично подтверждена',
-        'Доставка → Принята на складе',
-        'Доставка → Подтверждена',
-      ],
-      'warehouse_operator': [
-        'Доставка → Принята на складе',
-        'Забрана → Принята на складе',
-        'Принята на складе → Закрыта',
-      ],
-      'collector': [
-        'В сборе → Забрана',
-      ],
-      'driver': [
-        'В сборе → Забрана',
-        'Забрана → Доставка',
-        'Доставка → Принята на складе',
-        'Забрана → Принята на складе',
-      ],
-    };
-
-    // Проверка допустимости перехода
-    const allowedNextStatuses = statusFlow[currentStatus] || [];
-    if (!allowedNextStatuses.includes(status)) {
+    try {
+      assertStatusTransitionAllowed(currentStatus, status, req.user.role);
+    } catch (error) {
       await transaction.rollback();
-      return res.status(409).json({
+      return res.status(error.statusCode || 409).json({
         success: false,
-        message: `Невозможно изменить статус с "${currentStatus}" на "${status}"`,
-        allowedStatuses: allowedNextStatuses
-      });
-    }
-
-    // Проверка прав доступа
-    const transitionKey = `${currentStatus} → ${status}`;
-    let hasPermission = false;
-
-    if (rolePermissions[userRole] === '*') {
-      // Админ может всё
-      hasPermission = true;
-    } else if (rolePermissions[userRole]) {
-      // Проверяем есть ли этот переход в списке разрешённых для роли
-      hasPermission = rolePermissions[userRole].includes(transitionKey);
-    }
-
-    if (!hasPermission) {
-      await transaction.rollback();
-      return res.status(403).json({
-        success: false,
-        message: `Недостаточно прав для изменения статуса с "${currentStatus}" на "${status}"`,
-        yourRole: userRole
+        message: error.code === 'WAREHOUSE_RECEIPT_REQUIRED'
+          ? 'Статус «Принята на складе» устанавливается только через складскую приёмку'
+          : `Невозможно изменить статус с "${currentStatus}" на "${status}"`,
+        code: error.code,
+        allowedStatuses: getAvailableStatusTransitions(currentStatus, req.user.role),
       });
     }
 
@@ -753,6 +799,8 @@ exports.changeOrderStatus = async (req, res) => {
       comment: comment || null,
       changedAt: new Date()
     }, { transaction });
+
+    await recalculateSupplierDebt(order.supplierId, { transaction });
 
     await transaction.commit();
 
@@ -865,6 +913,26 @@ exports.updatePayment = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Заявка не найдена'
+      });
+    }
+
+    try {
+      assertOrderHasSupplier(order);
+    } catch (error) {
+      await transaction.rollback();
+      return res.status(error.statusCode || 409).json({
+        success: false,
+        message: 'Сначала назначьте поставщика заявке',
+        code: error.code,
+      });
+    }
+
+    if (order.status === 'Отменена') {
+      await transaction.rollback();
+      return res.status(409).json({
+        success: false,
+        message: 'Нельзя зарегистрировать оплату по отменённой заявке',
+        code: 'CANCELLED_ORDER_PAYMENT_NOT_ALLOWED',
       });
     }
 
@@ -1272,6 +1340,16 @@ exports.sendToWhatsApp = async (req, res) => {
       });
     }
 
+    try {
+      assertOrderWorkflowOpen(order);
+    } catch (error) {
+      return res.status(error.statusCode || 409).json({
+        success: false,
+        message: 'Закрытую или отменённую заявку нельзя повторно отправить поставщику',
+        code: error.code,
+      });
+    }
+
     if (!order.supplier?.whatsapp) {
       return res.status(400).json({
         success: false,
@@ -1372,6 +1450,19 @@ exports.confirmOrder = async (req, res) => {
       });
     }
 
+    try {
+      assertOrderHasSupplier(order);
+      assertOrderWorkflowOpen(order);
+    } catch (error) {
+      return res.status(error.statusCode || 409).json({
+        success: false,
+        message: error.code === 'ORDER_SUPPLIER_REQUIRED'
+          ? 'Сначала назначьте поставщика заявке'
+          : 'Закрытую или отменённую заявку нельзя подтверждать',
+        code: error.code,
+      });
+    }
+
     const transaction = await sequelize.transaction();
 
     try {
@@ -1459,6 +1550,19 @@ exports.partialConfirmOrder = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Заявка не найдена',
+      });
+    }
+
+    try {
+      assertOrderHasSupplier(order);
+      assertOrderWorkflowOpen(order);
+    } catch (error) {
+      return res.status(error.statusCode || 409).json({
+        success: false,
+        message: error.code === 'ORDER_SUPPLIER_REQUIRED'
+          ? 'Сначала назначьте поставщика заявке'
+          : 'Закрытую или отменённую заявку нельзя подтверждать',
+        code: error.code,
       });
     }
 
@@ -1556,6 +1660,19 @@ exports.assignCollector = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Заявка не найдена',
+      });
+    }
+
+    try {
+      assertOrderHasSupplier(order);
+      assertOrderWorkflowOpen(order);
+    } catch (error) {
+      return res.status(error.statusCode || 409).json({
+        success: false,
+        message: error.code === 'ORDER_SUPPLIER_REQUIRED'
+          ? 'Сначала назначьте поставщика заявке'
+          : 'Закрытой или отменённой заявке нельзя назначить сборщика',
+        code: error.code,
       });
     }
 
@@ -1659,6 +1776,19 @@ exports.markAsCollected = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Заявка не найдена',
+      });
+    }
+
+    try {
+      assertOrderHasSupplier(order);
+      assertOrderWorkflowOpen(order);
+    } catch (error) {
+      return res.status(error.statusCode || 409).json({
+        success: false,
+        message: error.code === 'ORDER_SUPPLIER_REQUIRED'
+          ? 'Сначала назначьте поставщика заявке'
+          : 'Закрытую или отменённую заявку нельзя отметить собранной',
+        code: error.code,
       });
     }
 

@@ -224,3 +224,100 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Keep the working lists useful on short laptop displays without changing mobile or roomy desktops. */
+@media (min-width: 1024px) and (max-height: 850px) {
+  .dashboard-workspace {
+    gap: 0.75rem;
+  }
+
+  .dashboard-command-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(28rem, 0.9fr);
+    align-items: end;
+    gap: 0.75rem;
+  }
+
+  .dashboard-command-header > * + * {
+    margin-top: 0;
+  }
+
+  .dashboard-title-row h1 {
+    font-size: 1.75rem;
+    line-height: 2.125rem;
+  }
+
+  .dashboard-subtitle,
+  .dashboard-workflow-breadcrumb,
+  .dashboard-panel-description,
+  .dashboard-supplier-hint {
+    display: none !important;
+  }
+
+  .dashboard-metrics {
+    gap: 0.5rem;
+  }
+
+  .dashboard-metric-card {
+    padding: 0.625rem 0.75rem;
+  }
+
+  .dashboard-metric-card > p {
+    margin-top: 0.125rem;
+    font-size: 1.125rem;
+    line-height: 1.5rem;
+  }
+
+  .dashboard-panels {
+    gap: 0.75rem;
+  }
+
+  .dashboard-panel-header {
+    padding: 0.75rem;
+  }
+
+  .dashboard-panel-body {
+    padding: 0.5rem;
+  }
+
+  .dashboard-product-list .product-list-toolbar {
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+
+  .dashboard-product-list .product-list-scroll,
+  .dashboard-supplier-cards .supplier-cards-scroll {
+    padding: 0.5rem;
+  }
+
+  .dashboard-product-list .product-list-items {
+    gap: 0.375rem;
+  }
+
+  .dashboard-product-list .product-list-item-main {
+    min-height: 3.5rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .dashboard-product-list .product-list-item-footer {
+    padding: 0 0.5rem 0.5rem;
+  }
+
+  .dashboard-supplier-cards .supplier-cards-toolbar {
+    padding: 0.5rem;
+  }
+
+  .dashboard-supplier-cards .supplier-cards-grid {
+    grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+    gap: 0.75rem;
+  }
+
+  .dashboard-supplier-cards .supplier-card-media {
+    display: none;
+  }
+
+  .dashboard-supplier-cards .supplier-card > div:last-child {
+    padding: 0.75rem;
+  }
+}

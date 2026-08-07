@@ -3,6 +3,8 @@ import {
   buildProductAssetUploadConfig,
   calculateProductAssetUploadProgress,
   getDisplayAssetName,
+  getProductAssetPreviewPath,
+  getProductAssetThumbnailPath,
   getGalleryImageAssets,
   recommendAssetTypeForFiles,
 } from './productAssets';
@@ -60,5 +62,18 @@ describe('productAssets helpers', () => {
       percent: 50,
     });
     expect(calculateProductAssetUploadProgress(150, 100, 100).percent).toBe(100);
+  });
+
+  it('selects optimized image paths with an original fallback', () => {
+    const optimizedAsset: ProductAsset = {
+      ...baseAsset,
+      thumbnailPath: '/uploads/slide-thumbnail.webp',
+      previewPath: '/uploads/slide-preview.webp',
+    };
+
+    expect(getProductAssetThumbnailPath(optimizedAsset)).toBe('/uploads/slide-thumbnail.webp');
+    expect(getProductAssetPreviewPath(optimizedAsset)).toBe('/uploads/slide-preview.webp');
+    expect(getProductAssetThumbnailPath(baseAsset)).toBe('/uploads/slide.jpg');
+    expect(getProductAssetPreviewPath(baseAsset)).toBe('/uploads/slide.jpg');
   });
 });

@@ -102,6 +102,14 @@ export function getDisplayAssetName(asset: ProductAsset) {
   return normalizeAssetName(rawName);
 }
 
+export function getProductAssetThumbnailPath(asset: ProductAsset) {
+  return asset.thumbnailPath || asset.filePath;
+}
+
+export function getProductAssetPreviewPath(asset: ProductAsset) {
+  return asset.previewPath || asset.filePath;
+}
+
 export function isPsdFileName(fileName?: string | null) {
   return getExtension(fileName) === '.psd';
 }

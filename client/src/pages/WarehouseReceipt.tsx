@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { Pagination } from '../components/Pagination';
 import warehouseApi from '../services/warehouseApi';
+import ordersApi from '../services/ordersApi';
 import { Order } from '../types';
 import { Package, CheckCircle, AlertTriangle, Edit3, ArrowLeft, ChevronRight } from 'lucide-react';
 import {
@@ -37,7 +39,19 @@ interface ReceiptItem {
   notes: string;
 }
 
+const buildReceiptItems = (order: Order): ReceiptItem[] =>
+  order.items?.map((item) => ({
+    productId: item.product?.id || item.productId,
+    productName: item.product?.internalName || item.product?.name || 'Неизвестный товар',
+    expectedQuantity: item.quantity,
+    receivedQuantity: item.quantity,
+    notes: '',
+  })) || [];
+
 export const WarehouseReceipt: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const requestedOrderId = Number(searchParams.get('orderId')) || null;
+  const requestedOrderHandledRef = useRef(false);
   const toast = useToast();
   const { confirm } = useConfirmDialog();
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
@@ -69,6 +83,15 @@ export const WarehouseReceipt: React.FC = () => {
       if (data.pagination) {
         setPagination(data.pagination);
       }
+
+      if (requestedOrderId && !requestedOrderHandledRef.current) {
+        requestedOrderHandledRef.current = true;
+        const requestedOrder = data.orders.find((order) => order.id === requestedOrderId)
+          || await ordersApi.getOrderById(requestedOrderId);
+        setSelectedOrder(requestedOrder);
+        setReceiptItems(buildReceiptItems(requestedOrder));
+        setGeneralNotes('');
+      }
     } catch (error) {
       console.error('Ошибка загрузки заявок:', error);
       toast.error('Не удалось загрузить заявки на приёмку');
@@ -84,15 +107,7 @@ export const WarehouseReceipt: React.FC = () => {
 
   const selectOrder = (order: Order) => {
     setSelectedOrder(order);
-    const items: ReceiptItem[] =
-      order.items?.map((item) => ({
-        productId: item.product?.id || 0,
-        productName: item.product?.internalName || item.product?.name || 'Неизвестный товар',
-        expectedQuantity: item.quantity,
-        receivedQuantity: item.quantity,
-        notes: '',
-      })) || [];
-    setReceiptItems(items);
+    setReceiptItems(buildReceiptItems(order));
     setGeneralNotes('');
   };
 
