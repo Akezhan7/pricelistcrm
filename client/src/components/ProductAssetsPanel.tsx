@@ -4,6 +4,7 @@ import api from '../utils/api';
 import getImageUrl from '../utils/image';
 import {
   buildProductAssetUploadConfig,
+  buildChunkUploadProgress,
   calculateProductAssetUploadProgress,
   getDisplayAssetName,
   getGalleryImageAssets,
@@ -11,6 +12,7 @@ import {
   getProductAssetThumbnailPath,
   isPreviewableImageAsset,
   recommendAssetTypeForFiles,
+  shouldUseChunkedUpload,
 } from '../utils/productAssets';
 import type { ProductAsset, ProductAssetType } from '../types';
 import {
@@ -196,10 +198,8 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
 
       for (let fileIndex = 0; fileIndex < files.length; fileIndex += 1) {
         const selectedFile = files[fileIndex];
-        const data = new FormData();
-        data.append('assetType', recommendAssetTypeForFiles([selectedFile], assetType));
-        data.append('asset', selectedFile);
-        if (notes.trim()) data.append('notes', notes.trim());
+        const selectedType = recommendAssetTypeForFiles([selectedFile], assetType);
+        let uploadId: string | null = null;
 
         try {
           setUploadProgress({
@@ -208,22 +208,103 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
             total: selectedFile.size,
             percent: 0,
           });
-          await api.post(`/products/${productId}/assets`, data, {
-            ...buildProductAssetUploadConfig(),
-            headers: { 'Content-Type': 'multipart/form-data' },
-            signal: abortController.signal,
-            onUploadProgress: (event) => {
+          if (shouldUseChunkedUpload(selectedFile.size)) {
+            const sessionResponse = await api.post(
+              `/products/${productId}/assets/upload-sessions`,
+              {
+                assetType: selectedType,
+                originalName: selectedFile.name,
+                mimeType: selectedFile.type || 'application/octet-stream',
+                fileSize: selectedFile.size,
+                notes: notes.trim() || null,
+              },
+              { signal: abortController.signal }
+            );
+            const session = sessionResponse.data.data as {
+              uploadId: string;
+              chunkSize: number;
+              totalChunks: number;
+            };
+            uploadId = session.uploadId;
+
+            for (let chunkIndex = 0; chunkIndex < session.totalChunks; chunkIndex += 1) {
+              const chunkStart = chunkIndex * session.chunkSize;
+              const chunk = selectedFile.slice(
+                chunkStart,
+                Math.min(chunkStart + session.chunkSize, selectedFile.size)
+              );
+              let lastError: unknown = null;
+
+              for (let attempt = 0; attempt < 3; attempt += 1) {
+                const chunkData = new FormData();
+                chunkData.append('chunk', chunk, selectedFile.name);
+                try {
+                  await api.put(
+                    `/products/${productId}/assets/upload-sessions/${session.uploadId}/chunks/${chunkIndex}`,
+                    chunkData,
+                    {
+                      ...buildProductAssetUploadConfig(),
+                      headers: { 'Content-Type': 'multipart/form-data' },
+                      signal: abortController.signal,
+                      onUploadProgress: (event) => {
+                        setUploadProgress({
+                          fileName: selectedFile.name,
+                          ...buildChunkUploadProgress(chunkStart, event.loaded, selectedFile.size),
+                        });
+                      },
+                    }
+                  );
+                  lastError = null;
+                  break;
+                } catch (chunkError) {
+                  lastError = chunkError;
+                  if ((chunkError as { code?: string })?.code === 'ERR_CANCELED') throw chunkError;
+                }
+              }
+
+              if (lastError) throw lastError;
               setUploadProgress({
                 fileName: selectedFile.name,
-                ...calculateProductAssetUploadProgress(
-                  event.loaded,
-                  event.total,
-                  selectedFile.size
-                ),
+                ...buildChunkUploadProgress(chunkStart, chunk.size, selectedFile.size),
               });
-            },
-          });
+            }
+
+            await api.post(
+              `/products/${productId}/assets/upload-sessions/${session.uploadId}/complete`,
+              undefined,
+              { ...buildProductAssetUploadConfig(), signal: abortController.signal }
+            );
+            uploadId = null;
+          } else {
+            const data = new FormData();
+            data.append('assetType', selectedType);
+            data.append('asset', selectedFile);
+            if (notes.trim()) data.append('notes', notes.trim());
+
+            await api.post(`/products/${productId}/assets`, data, {
+              ...buildProductAssetUploadConfig(),
+              headers: { 'Content-Type': 'multipart/form-data' },
+              signal: abortController.signal,
+              onUploadProgress: (event) => {
+                setUploadProgress({
+                  fileName: selectedFile.name,
+                  ...calculateProductAssetUploadProgress(
+                    event.loaded,
+                    event.total,
+                    selectedFile.size
+                  ),
+                });
+              },
+            });
+          }
         } catch (err: unknown) {
+          if (uploadId) {
+            try {
+              await api.delete(`/products/${productId}/assets/upload-sessions/${uploadId}`);
+            } catch {
+              // Expired upload sessions are also cleaned automatically by the server.
+            }
+          }
           const isCancelled = (err as { code?: string })?.code === 'ERR_CANCELED';
 
           if (isCancelled) {

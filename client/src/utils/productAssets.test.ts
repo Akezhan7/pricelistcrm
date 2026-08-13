@@ -1,12 +1,14 @@
 import type { ProductAsset } from '../types';
 import {
   buildProductAssetUploadConfig,
+  buildChunkUploadProgress,
   calculateProductAssetUploadProgress,
   getDisplayAssetName,
   getProductAssetPreviewPath,
   getProductAssetThumbnailPath,
   getGalleryImageAssets,
   recommendAssetTypeForFiles,
+  shouldUseChunkedUpload,
 } from './productAssets';
 
 const baseAsset: ProductAsset = {
@@ -62,6 +64,20 @@ describe('productAssets helpers', () => {
       percent: 50,
     });
     expect(calculateProductAssetUploadProgress(150, 100, 100).percent).toBe(100);
+  });
+
+  it('uses chunked transport for files larger than one upload chunk', () => {
+    expect(shouldUseChunkedUpload(10 * 1024 * 1024)).toBe(false);
+    expect(shouldUseChunkedUpload(10 * 1024 * 1024 + 1)).toBe(true);
+  });
+
+  it('calculates aggregate progress across uploaded chunks', () => {
+    expect(buildChunkUploadProgress(20, 5, 100)).toEqual({
+      loaded: 25,
+      total: 100,
+      percent: 25,
+    });
+    expect(buildChunkUploadProgress(90, 20, 100).percent).toBe(100);
   });
 
   it('selects optimized image paths with an original fallback', () => {

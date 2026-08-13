@@ -119,6 +119,14 @@ const uploadProductAsset = multer({
   },
 });
 
+const uploadProductAssetChunk = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024,
+    files: 1,
+  },
+});
+
 // Middleware для обработки ошибок загрузки
 const handleUploadError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
@@ -157,5 +165,6 @@ module.exports = {
   upload,
   uploadReceipt,
   uploadProductAsset,
+  uploadProductAssetChunk,
   handleUploadError,
 };

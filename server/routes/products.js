@@ -1,13 +1,22 @@
 const express = require('express');
 const { body } = require('express-validator');
 const { auth, requireRole } = require('../middleware/auth');
-const { upload, uploadProductAsset, handleUploadError } = require('../middleware/upload');
+const {
+  upload,
+  uploadProductAsset,
+  uploadProductAssetChunk: productAssetChunkMiddleware,
+  handleUploadError,
+} = require('../middleware/upload');
 const {
   getAllProducts,
   getProductWorkflowQueue,
   getProductById,
   getProductAssets,
   createProductAsset,
+  createProductAssetUploadSession,
+  uploadProductAssetChunk,
+  completeProductAssetUpload,
+  cancelProductAssetUpload,
   deleteProductAsset,
   createProductDraft,
   createProduct,
@@ -364,6 +373,32 @@ router.post('/:id/assets',
   uploadProductAsset.single('asset'),
   handleUploadError,
   createProductAsset
+);
+
+router.post('/:id/assets/upload-sessions',
+  auth,
+  requireRole('admin', 'designer'),
+  createProductAssetUploadSession
+);
+
+router.put('/:id/assets/upload-sessions/:uploadId/chunks/:chunkIndex',
+  auth,
+  requireRole('admin', 'designer'),
+  productAssetChunkMiddleware.single('chunk'),
+  handleUploadError,
+  uploadProductAssetChunk
+);
+
+router.post('/:id/assets/upload-sessions/:uploadId/complete',
+  auth,
+  requireRole('admin', 'designer'),
+  completeProductAssetUpload
+);
+
+router.delete('/:id/assets/upload-sessions/:uploadId',
+  auth,
+  requireRole('admin', 'designer'),
+  cancelProductAssetUpload
 );
 
 router.delete('/:id/assets/:assetId',

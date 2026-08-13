@@ -44,6 +44,7 @@ lerna-debug.log*
 # Uploads (images)
 server/uploads/*
 !server/uploads/.gitkeep
+.product-asset-upload-sessions/
 
 # Archives
 *.rar

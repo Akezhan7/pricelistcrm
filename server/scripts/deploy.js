@@ -7,6 +7,7 @@ const rootDir = path.resolve(serverDir, '..');
 const clientDir = path.join(rootDir, 'client');
 const dryRun = process.argv.includes('--dry-run');
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+const npmCliPath = process.env.npm_execpath;
 
 function formatCommand(command, args) {
   return [command, ...args].join(' ');
@@ -22,6 +23,7 @@ function run(command, args, cwd, options = {}) {
     cwd,
     env: process.env,
     encoding: 'utf8',
+    shell: options.shell || false,
     stdio: options.capture ? ['ignore', 'pipe', 'pipe'] : 'inherit',
   });
 
@@ -39,6 +41,14 @@ function run(command, args, cwd, options = {}) {
   }
 
   return options.capture ? (result.stdout || '').trim() : '';
+}
+
+function runNpm(args, cwd) {
+  if (npmCliPath && fs.existsSync(npmCliPath)) {
+    return run(process.execPath, [npmCliPath, ...args], cwd);
+  }
+
+  return run(npmCommand, args, cwd, { shell: process.platform === 'win32' });
 }
 
 function assertCleanWorktree() {
@@ -74,12 +84,12 @@ async function deploy() {
   }
 
   run('git', ['pull', '--ff-only', 'origin', branch], rootDir);
-  run(npmCommand, ['ci', '--omit=dev'], serverDir);
-  run(npmCommand, ['ci', '--include=dev'], clientDir);
-  run(npmCommand, ['run', 'build'], clientDir);
-  run(npmCommand, ['run', 'db:migrate'], serverDir);
+  runNpm(['ci', '--omit=dev'], serverDir);
+  runNpm(['ci', '--include=dev'], clientDir);
+  runNpm(['run', 'build'], clientDir);
+  runNpm(['run', 'db:migrate'], serverDir);
   console.log('\nUpdate completed. Starting the server in this PowerShell window.');
-  run(npmCommand, ['start'], serverDir);
+  runNpm(['start'], serverDir);
 }
 
 deploy().catch((error) => {

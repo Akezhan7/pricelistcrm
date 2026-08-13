@@ -53,6 +53,13 @@ const {
   createProductAssetImageVariants,
 } = require('../services/productAssetImageService');
 const {
+  assembleUploadSession,
+  createUploadSession,
+  removeUploadSession,
+  saveUploadChunk,
+} = require('../services/productAssetChunkUploadService');
+const { uploadsDir } = require('../middleware/upload');
+const {
   buildProductCategoryFilter,
 } = require('../services/productListQueryService');
 const {
@@ -695,6 +702,172 @@ const createProductAsset = async (req, res) => {
       success: false,
       message: 'Server error while uploading product asset',
     });
+  }
+};
+
+async function findManageableProductAssetTarget(productId, user) {
+  const product = await Product.findOne({ where: { id: productId, isActive: true } });
+  if (!product) {
+    const error = new Error('Product not found');
+    error.statusCode = 404;
+    throw error;
+  }
+  if (!canManageProductAssets(user, product)) {
+    const error = new Error('Only admin or assigned designer can upload product assets');
+    error.statusCode = 403;
+    throw error;
+  }
+  return product;
+}
+
+function sendChunkUploadError(res, error) {
+  const knownValidationError = /unsupported asset type|file is required|file type is not allowed|file is too large|invalid |upload session|chunk .* (?:missing|incomplete)|assembled file size/i.test(error.message);
+  const status = error.statusCode || (knownValidationError ? 400 : 500);
+  if (status >= 500) console.error('Product asset chunk upload error:', error);
+  return res.status(status).json({
+    success: false,
+    message: status >= 500 ? 'Server error while uploading product asset' : error.message,
+  });
+}
+
+const createProductAssetUploadSession = async (req, res) => {
+  try {
+    const product = await findManageableProductAssetTarget(req.params.id, req.user);
+    const session = await createUploadSession({
+      rootDir: uploadsDir,
+      productId: product.id,
+      uploadedBy: req.user.id,
+      assetType: req.body.assetType,
+      originalName: req.body.originalName,
+      mimeType: req.body.mimeType,
+      fileSize: req.body.fileSize,
+      notes: req.body.notes,
+    });
+
+    return res.status(201).json({
+      success: true,
+      data: {
+        uploadId: session.uploadId,
+        chunkSize: session.chunkSize,
+        totalChunks: session.totalChunks,
+      },
+    });
+  } catch (error) {
+    return sendChunkUploadError(res, error);
+  }
+};
+
+const uploadProductAssetChunk = async (req, res) => {
+  try {
+    const product = await findManageableProductAssetTarget(req.params.id, req.user);
+    if (!req.file?.buffer) {
+      const error = new Error('chunk is required');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    const result = await saveUploadChunk({
+      rootDir: uploadsDir,
+      uploadId: req.params.uploadId,
+      productId: product.id,
+      uploadedBy: req.user.id,
+      chunkIndex: req.params.chunkIndex,
+      buffer: req.file.buffer,
+    });
+
+    return res.json({ success: true, data: result });
+  } catch (error) {
+    return sendChunkUploadError(res, error);
+  }
+};
+
+const completeProductAssetUpload = async (req, res) => {
+  let file = null;
+  let transaction = null;
+  let committed = false;
+
+  try {
+    const product = await findManageableProductAssetTarget(req.params.id, req.user);
+    file = await assembleUploadSession({
+      rootDir: uploadsDir,
+      uploadId: req.params.uploadId,
+      productId: product.id,
+      uploadedBy: req.user.id,
+    });
+
+    transaction = await sequelize.transaction();
+    const imageVariants = await createUploadedFileImageVariants(file);
+    const assetData = buildProductAssetData({
+      productId: product.id,
+      uploadedBy: req.user.id,
+      assetType: file.assetType,
+      file,
+      notes: file.notes,
+      imageVariants,
+    });
+    const asset = await ProductAsset.create(assetData, { transaction });
+
+    if (asset.assetType === PRODUCT_ASSET_TYPES.PRODUCT_PHOTO && !product.image) {
+      await product.update({ image: asset.filePath }, { transaction });
+    }
+
+    await ProductActionHistory.create({
+      productId: product.id,
+      actorId: req.user.id,
+      actionType: 'content_uploaded',
+      fromStatus: product.lifecycleStatus,
+      toStatus: product.lifecycleStatus,
+      message: 'Product content asset uploaded',
+      metadata: {
+        assetId: asset.id,
+        assetType: asset.assetType,
+        filePath: asset.filePath,
+        originalName: asset.originalName,
+      },
+      createdAt: new Date(),
+    }, { transaction });
+
+    await transaction.commit();
+    committed = true;
+    try {
+      await removeUploadSession({
+        rootDir: uploadsDir,
+        uploadId: req.params.uploadId,
+        productId: product.id,
+        uploadedBy: req.user.id,
+      });
+    } catch (cleanupError) {
+      console.warn('Failed to remove completed product asset upload session:', cleanupError.message);
+    }
+
+    const createdAsset = await ProductAsset.findOne({
+      where: { id: asset.id },
+      include: productAssetInclude,
+    });
+    return res.status(201).json({
+      success: true,
+      message: 'Product asset uploaded',
+      data: { asset: createdAsset },
+    });
+  } catch (error) {
+    if (transaction && !committed) await transaction.rollback();
+    if (!committed && file) await removeUploadedFile(file);
+    return sendChunkUploadError(res, error);
+  }
+};
+
+const cancelProductAssetUpload = async (req, res) => {
+  try {
+    const product = await findManageableProductAssetTarget(req.params.id, req.user);
+    await removeUploadSession({
+      rootDir: uploadsDir,
+      uploadId: req.params.uploadId,
+      productId: product.id,
+      uploadedBy: req.user.id,
+    });
+    return res.json({ success: true });
+  } catch (error) {
+    return sendChunkUploadError(res, error);
   }
 };
 
@@ -3581,6 +3754,10 @@ module.exports = {
   getProductById,
   getProductAssets,
   createProductAsset,
+  createProductAssetUploadSession,
+  uploadProductAssetChunk,
+  completeProductAssetUpload,
+  cancelProductAssetUpload,
   deleteProductAsset,
   createProductDraft,
   createProduct,

@@ -8,6 +8,7 @@ const CP1251_HIGH_CHARS =
 
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
 const PRODUCT_ASSET_UPLOAD_TIMEOUT_MS = 10 * 60 * 1000;
+export const PRODUCT_ASSET_CHUNK_SIZE = 10 * 1024 * 1024;
 
 export type ProductAssetUploadProgress = {
   loaded: number;
@@ -29,6 +30,22 @@ export function calculateProductAssetUploadProgress(
   const percent = total > 0 ? Math.round((safeLoaded / total) * 100) : 0;
 
   return { loaded: safeLoaded, total, percent };
+}
+
+export function shouldUseChunkedUpload(fileSize: number) {
+  return fileSize > PRODUCT_ASSET_CHUNK_SIZE;
+}
+
+export function buildChunkUploadProgress(
+  completedBytes: number,
+  currentChunkLoaded: number,
+  fileSize: number
+): ProductAssetUploadProgress {
+  return calculateProductAssetUploadProgress(
+    completedBytes + currentChunkLoaded,
+    fileSize,
+    fileSize
+  );
 }
 
 function getExtension(value?: string | null) {
