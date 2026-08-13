@@ -9,6 +9,7 @@ import {
   getGalleryImageAssets,
   recommendAssetTypeForFiles,
   shouldUseChunkedUpload,
+  shouldRetryChunkUpload,
 } from './productAssets';
 
 const baseAsset: ProductAsset = {
@@ -78,6 +79,14 @@ describe('productAssets helpers', () => {
       percent: 25,
     });
     expect(buildChunkUploadProgress(90, 20, 100).percent).toBe(100);
+  });
+
+  it('retries only temporary chunk upload failures', () => {
+    expect(shouldRetryChunkUpload(undefined, 0)).toBe(true);
+    expect(shouldRetryChunkUpload(503, 1)).toBe(true);
+    expect(shouldRetryChunkUpload(429, 1)).toBe(true);
+    expect(shouldRetryChunkUpload(400, 0)).toBe(false);
+    expect(shouldRetryChunkUpload(503, 2)).toBe(false);
   });
 
   it('selects optimized image paths with an original fallback', () => {

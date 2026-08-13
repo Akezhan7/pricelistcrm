@@ -2,6 +2,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
+const PRODUCT_ASSET_CHUNK_FILE_LIMIT = 11 * 1024 * 1024;
+
 // Определяем директорию для загрузок.
 // По умолчанию используем папку `../../uploads` относительно middleware — это корневая папка проекта `/uploads`.
 // Ранее в коде использовалась `../uploads` (server/uploads), что приводило к рассинхронизации с express.static.
@@ -122,7 +124,7 @@ const uploadProductAsset = multer({
 const uploadProductAssetChunk = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 10 * 1024 * 1024,
+    fileSize: PRODUCT_ASSET_CHUNK_FILE_LIMIT,
     files: 1,
   },
 });
@@ -161,6 +163,7 @@ const handleUploadError = (err, req, res, next) => {
 };
 
 module.exports = {
+  PRODUCT_ASSET_CHUNK_FILE_LIMIT,
   uploadsDir,
   upload,
   uploadReceipt,

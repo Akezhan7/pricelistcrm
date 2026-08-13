@@ -12,6 +12,7 @@ import {
   getProductAssetThumbnailPath,
   isPreviewableImageAsset,
   recommendAssetTypeForFiles,
+  shouldRetryChunkUpload,
   shouldUseChunkedUpload,
 } from '../utils/productAssets';
 import type { ProductAsset, ProductAssetType } from '../types';
@@ -259,6 +260,8 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
                 } catch (chunkError) {
                   lastError = chunkError;
                   if ((chunkError as { code?: string })?.code === 'ERR_CANCELED') throw chunkError;
+                  const status = (chunkError as { response?: { status?: number } })?.response?.status;
+                  if (!shouldRetryChunkUpload(status, attempt)) throw chunkError;
                 }
               }
 

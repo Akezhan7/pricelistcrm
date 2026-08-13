@@ -36,6 +36,11 @@ export function shouldUseChunkedUpload(fileSize: number) {
   return fileSize > PRODUCT_ASSET_CHUNK_SIZE;
 }
 
+export function shouldRetryChunkUpload(status: number | undefined, attempt: number) {
+  if (attempt >= 2) return false;
+  return status === undefined || status === 408 || status === 429 || status >= 500;
+}
+
 export function buildChunkUploadProgress(
   completedBytes: number,
   currentChunkLoaded: number,

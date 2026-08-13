@@ -2,15 +2,56 @@ const assert = require('assert');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const express = require('express');
 
 const {
+  DEFAULT_CHUNK_SIZE,
   createUploadSession,
   saveUploadChunk,
   assembleUploadSession,
   removeUploadSession,
 } = require('../services/productAssetChunkUploadService');
+const {
+  PRODUCT_ASSET_CHUNK_FILE_LIMIT,
+  handleUploadError,
+  uploadProductAssetChunk,
+} = require('../middleware/upload');
+
+async function testChunkMiddlewareAcceptsCompleteChunk() {
+  const app = express();
+  app.post(
+    '/chunk',
+    uploadProductAssetChunk.single('chunk'),
+    handleUploadError,
+    (req, res) => res.json({ size: req.file.size })
+  );
+  const server = await new Promise((resolve) => {
+    const instance = app.listen(0, '127.0.0.1', () => resolve(instance));
+  });
+
+  try {
+    const { port } = server.address();
+    const form = new FormData();
+    form.append('chunk', new Blob([Buffer.alloc(DEFAULT_CHUNK_SIZE)]), 'chunk.psd');
+    const response = await fetch(`http://127.0.0.1:${port}/chunk`, {
+      method: 'POST',
+      body: form,
+    });
+
+    assert.strictEqual(response.status, 200);
+    assert.deepStrictEqual(await response.json(), { size: DEFAULT_CHUNK_SIZE });
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+}
 
 async function run() {
+  assert.ok(
+    PRODUCT_ASSET_CHUNK_FILE_LIMIT > DEFAULT_CHUNK_SIZE,
+    'Multer file limit must be larger than a complete upload chunk'
+  );
+  await testChunkMiddlewareAcceptsCompleteChunk();
+
   const rootDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'crm-asset-upload-'));
   const content = Buffer.from('large psd content split into several chunks');
   const chunkSize = 12;
