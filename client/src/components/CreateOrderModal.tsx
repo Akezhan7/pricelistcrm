@@ -7,8 +7,10 @@ import type { Supplier, CreateOrderDto, ProductVariation, ProductWithPrice } fro
 import {
   type OrderLineForm,
   buildMainOrderLine,
+  getMainOrderLineQuantities,
   getSupplierListPrice,
   getSupplierSuggestions,
+  updateMainOrderLineQuantity,
 } from '../utils/orderItems';
 import { SupplierProductCatalog } from './SupplierProductCatalog';
 import { draftLinesToForm, useOrderDraft } from '../context/OrderDraftContext';
@@ -66,6 +68,10 @@ const CreateOrderModal: React.FC = () => {
       new Set(
         items.filter((i) => !i.productVariationId).map((i) => i.productId)
       ),
+    [items]
+  );
+  const catalogQuantities = useMemo(
+    () => getMainOrderLineQuantities(items),
     [items]
   );
 
@@ -214,6 +220,10 @@ const CreateOrderModal: React.FC = () => {
       next[index] = { ...next[index], quantity };
       return next;
     });
+  };
+
+  const handleCatalogQuantityChange = (productId: number, quantity: number) => {
+    setItems((prev) => updateMainOrderLineQuantity(prev, productId, quantity));
   };
 
   const handleUpdatePrice = (index: number, price: number) => {
@@ -431,6 +441,8 @@ const CreateOrderModal: React.FC = () => {
                   emptyTitle="Товары не найдены"
                   onPickProduct={handleAddProduct}
                   pickedProductIds={pickedProductIds}
+                  quantities={catalogQuantities}
+                  onQuantityChange={handleCatalogQuantityChange}
                 />
 
                 <div className="mt-4">

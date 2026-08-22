@@ -84,6 +84,32 @@ export function filterProductsBySearch<T extends Product>(products: T[], search:
   );
 }
 
+function normalizeOrderQuantity(quantity: number): number {
+  return Number.isFinite(quantity) && quantity >= 1 ? Math.floor(quantity) : 1;
+}
+
+export function getMainOrderLineQuantities(lines: OrderLineForm[]): Record<number, number> {
+  return lines.reduce<Record<number, number>>((quantities, line) => {
+    if (!line.productVariationId) {
+      quantities[line.productId] = line.quantity;
+    }
+    return quantities;
+  }, {});
+}
+
+export function updateMainOrderLineQuantity(
+  lines: OrderLineForm[],
+  productId: number,
+  quantity: number
+): OrderLineForm[] {
+  const normalizedQuantity = normalizeOrderQuantity(quantity);
+  return lines.map((line) => (
+    line.productId === productId && !line.productVariationId
+      ? { ...line, quantity: normalizedQuantity }
+      : line
+  ));
+}
+
 export type SupplierSuggestion = {
   supplierId: number;
   supplier: Supplier;

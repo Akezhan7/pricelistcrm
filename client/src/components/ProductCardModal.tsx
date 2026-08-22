@@ -25,7 +25,7 @@ import { ProductAssetsPanel } from './ProductAssetsPanel';
 import { ProductWarehousePanel } from './ProductWarehousePanel';
 import { ProductActionTimeline } from './ProductActionTimeline';
 import { ProductSuppliersModal } from './ProductSuppliersModal';
-import { Alert, Badge, Button, Modal, Spinner } from './ui';
+import { Alert, Badge, Button, Input, Modal, Spinner } from './ui';
 
 type ProductCardModalProps = {
   product: Product | null;
@@ -140,13 +140,25 @@ function MainProductTab({
   const [image, setImage] = useState<File | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [saving, setSaving] = useState(false);
+  const [savingKpiWeight, setSavingKpiWeight] = useState(false);
+  const [kpiWeight, setKpiWeight] = useState(String(product.kpiWeight ?? ''));
   const [error, setError] = useState('');
 
   const canEdit = Boolean(product.permissions?.allowedActions.includes('edit_product_card'));
+  const canManageKpiWeight = Boolean(
+    product.permissions?.allowedActions.includes('manage_kpi_weight')
+    && product.kpiWeight !== null
+    && product.kpiWeight !== undefined
+  );
+  const parsedKpiWeight = Number(kpiWeight);
+  const kpiWeightValid = Number.isFinite(parsedKpiWeight)
+    && parsedKpiWeight > 0
+    && parsedKpiWeight <= 99.99;
 
   useEffect(() => {
     setFormData(formDataFromProduct(product));
     setImage(null);
+    setKpiWeight(String(product.kpiWeight ?? ''));
     setError('');
   }, [product]);
 
@@ -195,6 +207,24 @@ function MainProductTab({
     }
   };
 
+  const handleKpiWeightSave = async () => {
+    if (!canManageKpiWeight || !kpiWeightValid) return;
+
+    setSavingKpiWeight(true);
+    setError('');
+    try {
+      await api.patch(`/products/${product.id}/kpi-weight`, {
+        kpiWeight: parsedKpiWeight,
+      });
+      toast.success('KPI-вес обновлён');
+      await onSaved();
+    } catch (saveError) {
+      setError(getErrorMessage(saveError, 'Не удалось обновить KPI-вес'));
+    } finally {
+      setSavingKpiWeight(false);
+    }
+  };
+
   if (!canEdit) {
     return (
       <div className="space-y-4">
@@ -215,23 +245,51 @@ function MainProductTab({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="space-y-4">
       {error && <Alert variant="error">{error}</Alert>}
-      <ProductFormFields
-        data={formData}
-        onChange={setFormData}
-        categories={categories}
-        image={image}
-        onImageChange={setImage}
-        currentImageUrl={product.image || null}
-        mode="edit"
-      />
-      <div className="flex justify-end border-t border-border-subtle pt-4">
-        <Button type="submit" leftIcon={Save} loading={saving} disabled={saving}>
-          Сохранить основное
-        </Button>
-      </div>
-    </form>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <ProductFormFields
+          data={formData}
+          onChange={setFormData}
+          categories={categories}
+          image={image}
+          onImageChange={setImage}
+          currentImageUrl={product.image || null}
+          mode="edit"
+        />
+        <div className="flex justify-end border-t border-border-subtle pt-4">
+          <Button type="submit" leftIcon={Save} loading={saving} disabled={saving}>
+            Сохранить основное
+          </Button>
+        </div>
+      </form>
+      {canManageKpiWeight && (
+        <section className="flex flex-col gap-3 border-t border-border-subtle pt-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="max-w-xs flex-1">
+            <Input
+              label="KPI-вес карточки"
+              type="number"
+              min="0.01"
+              max="99.99"
+              step="0.01"
+              value={kpiWeight}
+              onChange={(event) => setKpiWeight(event.target.value)}
+              error={kpiWeight && !kpiWeightValid ? 'Введите число от 0.01 до 99.99' : undefined}
+            />
+          </div>
+          <Button
+            type="button"
+            variant="secondary"
+            leftIcon={Save}
+            loading={savingKpiWeight}
+            disabled={savingKpiWeight || !kpiWeightValid}
+            onClick={handleKpiWeightSave}
+          >
+            Сохранить KPI-вес
+          </Button>
+        </section>
+      )}
+    </div>
   );
 }
 

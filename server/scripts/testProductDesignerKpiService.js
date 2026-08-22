@@ -3,6 +3,7 @@ const assert = require('assert');
 const {
   buildApproveReviewKpiPlan,
   buildDesignerKpiReport,
+  buildUpdateKpiWeightPlan,
   normalizeKpiWeight,
 } = require('../services/productDesignerKpiService');
 
@@ -60,6 +61,52 @@ function testBuildApproveReviewKpiPlanRequiresDesigner() {
   );
 }
 
+function testBuildUpdateKpiWeightPlan() {
+  const now = new Date('2026-08-22T10:00:00Z');
+  const plan = buildUpdateKpiWeightPlan({
+    actor: { id: 7, role: 'admin', canManageKpiWeights: true },
+    product: { id: 101, lifecycleStatus: 'in_sale', kpiWeight: '1.00' },
+    kpiEntry: { id: 15, weight: '1.00' },
+    kpiWeight: '2.5',
+    now,
+  });
+
+  assert.deepStrictEqual(plan.productUpdate, { kpiWeight: 2.5 });
+  assert.deepStrictEqual(plan.kpiEntryUpdate, { weight: 2.5 });
+  assert.deepStrictEqual(plan.historyEntry, {
+    productId: 101,
+    actorId: 7,
+    actionType: 'kpi_weight_updated',
+    fromStatus: 'in_sale',
+    toStatus: 'in_sale',
+    message: 'Product KPI weight updated',
+    metadata: { oldKpiWeight: 1, newKpiWeight: 2.5, kpiEntryId: 15 },
+    createdAt: now,
+  });
+}
+
+function testUpdateKpiWeightRequiresPermissionAndEntry() {
+  assert.throws(
+    () => buildUpdateKpiWeightPlan({
+      actor: { id: 8, role: 'admin', canManageKpiWeights: false },
+      product: { id: 101, kpiWeight: 1 },
+      kpiEntry: { id: 15, weight: 1 },
+      kpiWeight: 2,
+    }),
+    /not permitted/i
+  );
+
+  assert.throws(
+    () => buildUpdateKpiWeightPlan({
+      actor: { id: 7, role: 'admin', canManageKpiWeights: true },
+      product: { id: 101, kpiWeight: 1 },
+      kpiEntry: null,
+      kpiWeight: 2,
+    }),
+    /KPI entry is required/i
+  );
+}
+
 function testBuildDesignerKpiReport() {
   const entries = [
     {
@@ -109,6 +156,8 @@ function testBuildDesignerKpiReport() {
 testNormalizeKpiWeight();
 testBuildApproveReviewKpiPlan();
 testBuildApproveReviewKpiPlanRequiresDesigner();
+testBuildUpdateKpiWeightPlan();
+testUpdateKpiWeightRequiresPermissionAndEntry();
 testBuildDesignerKpiReport();
 
 console.log('Product designer KPI service test passed');

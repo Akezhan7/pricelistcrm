@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Search, Check, Plus, Loader2, Edit, Users, Package, X } from 'lucide-react';
+import { Search, Check, Plus, Minus, Loader2, Edit, Users, Package, X } from 'lucide-react';
 import type { ProductWithPrice } from '../types';
 import { filterProductsBySearch, getSupplierListPrice } from '../utils/orderItems';
 import { ProductListItem } from './ProductListItem';
@@ -115,6 +115,7 @@ export const SupplierProductCatalog: React.FC<SupplierProductCatalogProps> = ({
               const isHighlighted = isSelected || isPicked;
 
               if (mode === 'pick') {
+                const quantity = quantities?.[product.id] || 1;
                 return (
                   <ProductListItem
                     key={product.id}
@@ -126,17 +127,42 @@ export const SupplierProductCatalog: React.FC<SupplierProductCatalogProps> = ({
                     selected={isHighlighted}
                     className="col-span-full"
                   >
-                    {onPickProduct && (
+                    {isPicked && onQuantityChange ? (
+                      <div className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border-subtle bg-surface-inset/60 p-1">
+                        <IconButton
+                          icon={Minus}
+                          title="Уменьшить количество"
+                          size="sm"
+                          variant="ghost"
+                          disabled={quantity <= 1}
+                          onClick={() => onQuantityChange(product.id, quantity - 1)}
+                        />
+                        <input
+                          type="number"
+                          min={1}
+                          value={quantity}
+                          aria-label={`Количество: ${product.name}`}
+                          onChange={(event) => onQuantityChange(product.id, Number(event.target.value))}
+                          className="h-8 w-14 rounded-md border border-border bg-brand-white px-1 text-center text-body tabular-nums focus:border-brand-yellow focus:outline-none focus:ring-2 focus:ring-brand-yellow/20"
+                        />
+                        <IconButton
+                          icon={Plus}
+                          title="Увеличить количество"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => onQuantityChange(product.id, quantity + 1)}
+                        />
+                      </div>
+                    ) : onPickProduct ? (
                       <IconButton
                         icon={Plus}
-                        title={isPicked ? 'Уже в заявке' : 'Добавить в заявку'}
+                        title="Добавить в заявку"
                         size="md"
                         variant="ghost"
-                        disabled={isPicked}
                         className="text-accent hover:bg-surface-inset disabled:opacity-40"
                         onClick={() => onPickProduct(product)}
                       />
-                    )}
+                    ) : null}
                   </ProductListItem>
                 );
               }
@@ -213,17 +239,42 @@ export const SupplierProductCatalog: React.FC<SupplierProductCatalogProps> = ({
                     </div>
                   )}
 
-                  {mode === 'pick' && onPickProduct && (
+                  {mode === 'pick' && isPicked && onQuantityChange ? (
+                    <div className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-border-subtle bg-surface-inset/60 p-1">
+                      <IconButton
+                        icon={Minus}
+                        title="Уменьшить количество"
+                        size="sm"
+                        variant="ghost"
+                        disabled={(quantities?.[product.id] || 1) <= 1}
+                        onClick={() => onQuantityChange(product.id, (quantities?.[product.id] || 1) - 1)}
+                      />
+                      <input
+                        type="number"
+                        min={1}
+                        value={quantities?.[product.id] || 1}
+                        aria-label={`Количество: ${product.name}`}
+                        onChange={(event) => onQuantityChange(product.id, Number(event.target.value))}
+                        className="h-8 w-14 rounded-md border border-border bg-brand-white px-1 text-center text-body tabular-nums focus:border-brand-yellow focus:outline-none focus:ring-2 focus:ring-brand-yellow/20"
+                      />
+                      <IconButton
+                        icon={Plus}
+                        title="Увеличить количество"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onQuantityChange(product.id, (quantities?.[product.id] || 1) + 1)}
+                      />
+                    </div>
+                  ) : mode === 'pick' && onPickProduct ? (
                     <IconButton
                       icon={Plus}
-                      title={isPicked ? 'Уже в заявке' : 'Добавить в заявку'}
+                      title="Добавить в заявку"
                       size="md"
                       variant="ghost"
-                      disabled={isPicked}
                       className="text-accent hover:bg-surface-inset disabled:opacity-40"
                       onClick={() => onPickProduct(product)}
                     />
-                  )}
+                  ) : null}
 
                   {canEdit && (onEditProduct || onManageSuppliers) && (
                     <div className="inline-flex items-center gap-0.5 rounded-lg border border-border-subtle bg-surface-inset/60 p-0.5">

@@ -87,7 +87,52 @@ function buildStartLifecyclePlan({
   };
 }
 
+function normalizeProductIds(productIds) {
+  if (!Array.isArray(productIds) || productIds.length === 0) {
+    throw new Error('productIds must contain at least one product');
+  }
+
+  return Array.from(new Set(
+    productIds.map((id) => toPositiveInteger(id, 'productIds'))
+  ));
+}
+
+function buildBulkStartLifecyclePlan({
+  actor,
+  productIds,
+  products,
+  payload = {},
+  now = new Date(),
+}) {
+  const normalizedProductIds = normalizeProductIds(productIds);
+
+  if (!Array.isArray(products) || products.length !== normalizedProductIds.length) {
+    throw new Error('not all selected products were found');
+  }
+
+  const productsById = new Map(products.map((product) => [Number(product.id), product]));
+  const orderedProducts = normalizedProductIds.map((productId) => productsById.get(productId));
+
+  if (orderedProducts.some((product) => !product)) {
+    throw new Error('not all selected products were found');
+  }
+
+  const plans = orderedProducts.map((product) =>
+    buildStartLifecyclePlan({ actor, product, payload, now })
+  );
+
+  return {
+    productIds: normalizedProductIds,
+    updates: plans.map((plan, index) => ({
+      productId: normalizedProductIds[index],
+      update: plan.productUpdate,
+    })),
+    historyEntries: plans.map((plan) => plan.historyEntry),
+  };
+}
+
 module.exports = {
   STARTABLE_LIFECYCLE_STATUSES,
+  buildBulkStartLifecyclePlan,
   buildStartLifecyclePlan,
 };

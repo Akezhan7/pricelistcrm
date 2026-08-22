@@ -14,6 +14,7 @@ const PRODUCT_PERMISSION_ACTIONS = Object.freeze({
   MANAGE_SALE_LAUNCH: 'manage_sale_launch',
   MANAGE_SUPPLIERS: 'manage_product_suppliers',
   MANAGE_VARIATIONS: 'manage_product_variations',
+  MANAGE_KPI_WEIGHT: 'manage_kpi_weight',
   DELETE_PRODUCT: 'delete_product',
   VIEW_HISTORY: 'view_product_history',
 });
@@ -73,6 +74,10 @@ function getSupportingActions({ user, product }) {
   if (isAdmin) {
     actions.push(PRODUCT_PERMISSION_ACTIONS.EDIT_PRODUCT_CARD);
     actions.push(PRODUCT_PERMISSION_ACTIONS.DELETE_PRODUCT);
+  }
+
+  if (isAdmin && user.canManageKpiWeights === true) {
+    actions.push(PRODUCT_PERMISSION_ACTIONS.MANAGE_KPI_WEIGHT);
   }
 
   if (hasRole(user, 'admin', 'purchase_manager')) {

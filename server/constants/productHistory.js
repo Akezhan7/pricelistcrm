@@ -10,6 +10,7 @@ const PRODUCT_ACTION_TYPES = Object.freeze({
   REVISION_REQUESTED: 'revision_requested',
   REVISION_RESUBMITTED: 'revision_resubmitted',
   APPROVED: 'approved',
+  KPI_WEIGHT_UPDATED: 'kpi_weight_updated',
   MARKETPLACE_UPDATED: 'marketplace_updated',
   MARKETPLACE_PLACEMENT_READY: 'marketplace_placement_ready',
   SUPPLIER_LINKED: 'supplier_linked',

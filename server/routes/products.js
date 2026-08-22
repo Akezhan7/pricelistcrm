@@ -22,7 +22,9 @@ const {
   createProduct,
   assignDesignerToProduct,
   bulkAssignDesignerToProducts,
+  bulkStartProductLifecycle,
   startProductLifecycle,
+  updateProductKpiWeight,
   submitProductContent,
   submitProductReview,
   approveProductReview,
@@ -217,6 +219,17 @@ router.post('/:id/lifecycle/approve',
   approveProductReview
 );
 
+router.patch('/:id/kpi-weight',
+  auth,
+  requireRole('admin'),
+  [
+    body('kpiWeight')
+      .isFloat({ gt: 0, max: 99.99 })
+      .withMessage('kpiWeight must be a positive number up to 99.99'),
+  ],
+  updateProductKpiWeight
+);
+
 router.post('/:id/lifecycle/request-revision',
   auth,
   requireRole('admin'),
@@ -355,6 +368,22 @@ router.post('/bulk/assign-designer',
     body('designerId').isInt({ min: 1 }).withMessage('designerId must be a positive integer'),
   ],
   bulkAssignDesignerToProducts
+);
+
+router.post('/lifecycle/bulk-start',
+  auth,
+  requireRole('admin'),
+  [
+    body('productIds')
+      .isArray({ min: 1 })
+      .withMessage('productIds must contain at least one product'),
+    body('productIds.*')
+      .isInt({ min: 1 })
+      .withMessage('productIds must contain positive integer ids'),
+    body('targetStatus').isString().isLength({ min: 1, max: 40 }),
+    body('designerId').optional({ values: 'falsy' }).isInt({ min: 1 }),
+  ],
+  bulkStartProductLifecycle
 );
 
 router.post('/:id/lifecycle/start',

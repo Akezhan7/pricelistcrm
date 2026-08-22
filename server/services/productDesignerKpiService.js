@@ -1,4 +1,5 @@
 const MAX_KPI_WEIGHT = 99.99;
+const { PRODUCT_ACTION_TYPES } = require('../constants/productHistory');
 
 function toPlain(row) {
   return row?.toJSON ? row.toJSON() : row;
@@ -50,6 +51,48 @@ function buildApproveReviewKpiPlan({ actor, product, kpiWeight, now = new Date()
     historyMetadata: {
       kpiWeight: normalizedWeight,
       designerId: Number(product.designerId),
+    },
+  };
+}
+
+function buildUpdateKpiWeightPlan({
+  actor,
+  product,
+  kpiEntry,
+  kpiWeight,
+  now = new Date(),
+}) {
+  if (actor?.role !== 'admin' || actor?.canManageKpiWeights !== true) {
+    throw new Error('KPI weight update is not permitted');
+  }
+
+  if (!product) {
+    throw new Error('Product is required');
+  }
+
+  if (!kpiEntry) {
+    throw new Error('KPI entry is required before weight can be updated');
+  }
+
+  const normalizedWeight = normalizeKpiWeight(kpiWeight);
+  const oldWeight = normalizeKpiWeight(kpiEntry.weight);
+
+  return {
+    productUpdate: { kpiWeight: normalizedWeight },
+    kpiEntryUpdate: { weight: normalizedWeight },
+    historyEntry: {
+      productId: Number(product.id),
+      actorId: Number(actor.id),
+      actionType: PRODUCT_ACTION_TYPES.KPI_WEIGHT_UPDATED,
+      fromStatus: product.lifecycleStatus || null,
+      toStatus: product.lifecycleStatus || null,
+      message: 'Product KPI weight updated',
+      metadata: {
+        oldKpiWeight: oldWeight,
+        newKpiWeight: normalizedWeight,
+        kpiEntryId: Number(kpiEntry.id),
+      },
+      createdAt: now,
     },
   };
 }
@@ -135,5 +178,6 @@ function buildDesignerKpiReport(entries = []) {
 module.exports = {
   buildApproveReviewKpiPlan,
   buildDesignerKpiReport,
+  buildUpdateKpiWeightPlan,
   normalizeKpiWeight,
 };

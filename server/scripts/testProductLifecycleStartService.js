@@ -1,6 +1,9 @@
 const assert = require('assert');
 const { PRODUCT_LIFECYCLE_STATUSES } = require('../constants/productLifecycle');
-const { buildStartLifecyclePlan } = require('../services/productLifecycleStartService');
+const {
+  buildBulkStartLifecyclePlan,
+  buildStartLifecyclePlan,
+} = require('../services/productLifecycleStartService');
 
 function makeLegacyProduct(overrides = {}) {
   return {
@@ -91,10 +94,44 @@ function testRejectsNonAdmin() {
   );
 }
 
+function testBuildsBulkLifecyclePlan() {
+  const now = new Date('2026-07-13T12:00:00Z');
+  const plan = buildBulkStartLifecyclePlan({
+    actor: { id: 1, role: 'admin' },
+    productIds: [102, 101, 102],
+    products: [makeLegacyProduct({ id: 101 }), makeLegacyProduct({ id: 102 })],
+    payload: { targetStatus: PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE },
+    now,
+  });
+
+  assert.deepStrictEqual(plan.productIds, [102, 101]);
+  assert.deepStrictEqual(plan.updates.map((item) => item.productId), [102, 101]);
+  assert.strictEqual(plan.historyEntries.length, 2);
+  assert.ok(plan.historyEntries.every((entry) => entry.createdAt === now));
+}
+
+function testRejectsBulkPlanWhenOneProductIsNotLegacy() {
+  assert.throws(
+    () =>
+      buildBulkStartLifecyclePlan({
+        actor: { id: 1, role: 'admin' },
+        productIds: [101, 102],
+        products: [
+          makeLegacyProduct({ id: 101 }),
+          makeLegacyProduct({ id: 102, lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.NEW }),
+        ],
+        payload: { targetStatus: PRODUCT_LIFECYCLE_STATUSES.NEW },
+      }),
+    /Only legacy catalog products/
+  );
+}
+
 testStartAsNew();
 testStartWithDesignerRequiresDesignerId();
 testStartWithDesigner();
 testRejectsActiveLifecycle();
 testRejectsNonAdmin();
+testBuildsBulkLifecyclePlan();
+testRejectsBulkPlanWhenOneProductIsNotLegacy();
 
 console.log('Product lifecycle start service test passed');

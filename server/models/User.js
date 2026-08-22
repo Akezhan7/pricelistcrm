@@ -42,6 +42,12 @@ const User = sequelize.define('User', {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
   },
+  canManageKpiWeights: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    comment: 'Allows changing KPI weight after product review approval',
+  },
 }, {
   hooks: {
     beforeCreate: async (user) => {

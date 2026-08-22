@@ -21,6 +21,8 @@ type StartStatusOption = {
 type StartProductLifecycleModalProps = {
   isOpen: boolean;
   product: Product | null;
+  productIds?: number[];
+  selectedCount?: number;
   onClose: () => void;
   onSuccess: () => void;
 };
@@ -53,6 +55,8 @@ function getErrorMessage(error: unknown, fallback: string) {
 export const StartProductLifecycleModal: React.FC<StartProductLifecycleModalProps> = ({
   isOpen,
   product,
+  productIds = [],
+  selectedCount = 0,
   onClose,
   onSuccess,
 }) => {
@@ -69,7 +73,10 @@ export const StartProductLifecycleModal: React.FC<StartProductLifecycleModalProp
   );
   const selectedOption = startStatusOptions.find((option) => option.value === targetStatus);
   const requiresDesigner = targetStatus === 'assigned_to_designer';
-  const canSubmit = Boolean(product && (!requiresDesigner || designerId));
+  const isBulk = productIds.length > 0;
+  const canSubmit = Boolean(
+    (product || isBulk) && (!requiresDesigner || designerId)
+  );
 
   useEffect(() => {
     if (!isOpen) return;
@@ -95,21 +102,36 @@ export const StartProductLifecycleModal: React.FC<StartProductLifecycleModalProp
   }, [isOpen]);
 
   const handleSubmit = async () => {
-    if (!product) return;
+    if (!product && !isBulk) return;
 
     setSaving(true);
     setError('');
 
     try {
-      await api.post(`/products/${product.id}/lifecycle/start`, {
+      const payload = {
         targetStatus,
         designerId: requiresDesigner ? Number(designerId) : null,
-      });
-      toast.success('Товар запущен в lifecycle');
+      };
+
+      if (isBulk) {
+        await api.post('/products/lifecycle/bulk-start', {
+          ...payload,
+          productIds,
+        });
+        toast.success(`Запущено в lifecycle: ${selectedCount}`);
+      } else if (product) {
+        await api.post(`/products/${product.id}/lifecycle/start`, payload);
+        toast.success('Товар запущен в lifecycle');
+      }
       onSuccess();
       onClose();
     } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Не удалось запустить lifecycle товара'));
+      setError(getErrorMessage(
+        err,
+        isBulk
+          ? 'Не удалось запустить lifecycle выбранных товаров'
+          : 'Не удалось запустить lifecycle товара'
+      ));
     } finally {
       setSaving(false);
     }
@@ -119,7 +141,7 @@ export const StartProductLifecycleModal: React.FC<StartProductLifecycleModalProp
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Запустить lifecycle"
+      title={isBulk ? 'Массовый запуск lifecycle' : 'Запустить lifecycle'}
       size="md"
     >
       <div className="space-y-4">
@@ -128,6 +150,15 @@ export const StartProductLifecycleModal: React.FC<StartProductLifecycleModalProp
             <p className="text-caption text-text-muted">Товар</p>
             <p className="text-card-title text-brand-black">{product.name}</p>
             <p className="mt-1 text-caption text-text-muted">{product.article}</p>
+          </div>
+        )}
+
+        {isBulk && (
+          <div className="rounded-lg border border-border-subtle bg-surface-muted p-3">
+            <p className="text-caption text-text-muted">Выбрано товаров</p>
+            <p className="text-section-title text-brand-black tabular-nums">
+              {selectedCount}
+            </p>
           </div>
         )}
 

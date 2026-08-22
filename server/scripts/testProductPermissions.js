@@ -33,6 +33,20 @@ function testAdminHasFullProductAccess() {
   assert(permissions.allowedActions.includes(PRODUCT_PERMISSION_ACTIONS.MANAGE_MARKETPLACE));
 }
 
+function testOnlyPrivilegedAdminCanManageKpiWeight() {
+  const privileged = getProductPermissions({
+    user: { id: 1, role: 'admin', canManageKpiWeights: true },
+    product: { id: 100, isActive: true, lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE },
+  });
+  const regular = getProductPermissions({
+    user: { id: 2, role: 'admin', canManageKpiWeights: false },
+    product: { id: 100, isActive: true, lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE },
+  });
+
+  assert(privileged.allowedActions.includes(PRODUCT_PERMISSION_ACTIONS.MANAGE_KPI_WEIGHT));
+  assert(!regular.allowedActions.includes(PRODUCT_PERMISSION_ACTIONS.MANAGE_KPI_WEIGHT));
+}
+
 function testDesignerMustBeAssigned() {
   const assigned = permissionsFor('designer', {
     lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.ASSIGNED_TO_DESIGNER,
@@ -128,6 +142,7 @@ function testAuthenticatedUsersCanViewImmutableHistory() {
 
 function run() {
   testAdminHasFullProductAccess();
+  testOnlyPrivilegedAdminCanManageKpiWeight();
   testDesignerMustBeAssigned();
   testOperationalRolesStayInTheirArea();
   testWarehouseLocationCanBeEditedOutsideWarehouseStage();

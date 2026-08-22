@@ -43,6 +43,7 @@ const {
   buildProductDraftData,
 } = require('../services/productDraftService');
 const {
+  buildBulkStartLifecyclePlan,
   buildStartLifecyclePlan,
 } = require('../services/productLifecycleStartService');
 const {
@@ -80,6 +81,9 @@ const {
   buildResubmitRevisionPlan,
   buildSubmitReviewPlan,
 } = require('../services/productReviewService');
+const {
+  buildUpdateKpiWeightPlan,
+} = require('../services/productDesignerKpiService');
 const {
   MARKETPLACE_KEYS,
   buildKaspiLegacyProductUpdate,
@@ -1298,6 +1302,115 @@ const startProductLifecycle = async (req, res) => {
   }
 };
 
+const bulkStartProductLifecycle = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(400).json({
+        success: false,
+        message: 'Validation errors',
+        errors: errors.array(),
+      });
+    }
+
+    const { productIds, targetStatus, designerId } = req.body;
+
+    if (targetStatus === PRODUCT_LIFECYCLE_ACTIONS.ASSIGN_DESIGNER) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(400).json({
+        success: false,
+        message: 'Use lifecycle status key, not action key',
+      });
+    }
+
+    if (targetStatus === PRODUCT_LIFECYCLE_STATUSES.ASSIGNED_TO_DESIGNER) {
+      if (!designerId) {
+        await transaction.rollback();
+        transactionFinished = true;
+        return res.status(400).json({
+          success: false,
+          message: 'designerId is required',
+        });
+      }
+
+      const designer = await User.findOne({
+        where: { id: designerId, role: 'designer', isActive: true },
+        transaction,
+      });
+
+      if (!designer) {
+        await transaction.rollback();
+        transactionFinished = true;
+        return res.status(400).json({
+          success: false,
+          message: 'Designer not found',
+        });
+      }
+    }
+
+    const requestedProductIds = Array.from(new Set(productIds.map((id) => Number(id))));
+    const products = await Product.findAll({
+      where: {
+        id: { [Op.in]: requestedProductIds },
+        isActive: true,
+      },
+      transaction,
+      lock: true,
+    });
+
+    const plan = buildBulkStartLifecyclePlan({
+      actor: req.user,
+      productIds,
+      products,
+      payload: { targetStatus, designerId },
+      now: new Date(),
+    });
+
+    const productsById = new Map(products.map((product) => [Number(product.id), product]));
+    for (const item of plan.updates) {
+      await productsById.get(item.productId).update(item.update, { transaction });
+    }
+
+    await ProductActionHistory.bulkCreate(plan.historyEntries, { transaction });
+    await transaction.commit();
+    transactionFinished = true;
+
+    return res.json({
+      success: true,
+      message: 'Selected product lifecycles started',
+      data: { startedCount: plan.productIds.length },
+    });
+  } catch (error) {
+    if (!transactionFinished) {
+      await transaction.rollback();
+      transactionFinished = true;
+    }
+
+    if (
+      /Only admin|Only legacy|Unsupported|designerId|productIds|not all selected/i.test(
+        error.message
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    console.error('Error starting product lifecycles in bulk:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while starting product lifecycles in bulk',
+    });
+  }
+};
+
 const submitProductContent = async (req, res) => {
   const transaction = await sequelize.transaction();
   let transactionFinished = false;
@@ -1576,6 +1689,82 @@ const approveProductReview = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Server error while approving product review',
+    });
+  }
+};
+
+const updateProductKpiWeight = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(400).json({
+        success: false,
+        message: 'Validation errors',
+        errors: errors.array(),
+      });
+    }
+
+    const product = await Product.findOne({
+      where: { id: req.params.id, isActive: true },
+      transaction,
+      lock: true,
+    });
+
+    if (!product) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(404).json({ success: false, message: 'Product not found' });
+    }
+
+    const kpiEntry = await ProductDesignerKpiEntry.findOne({
+      where: { productId: product.id },
+      transaction,
+      lock: true,
+    });
+
+    const plan = buildUpdateKpiWeightPlan({
+      actor: req.user,
+      product,
+      kpiEntry,
+      kpiWeight: req.body.kpiWeight,
+      now: new Date(),
+    });
+
+    await product.update(plan.productUpdate, { transaction });
+    await kpiEntry.update(plan.kpiEntryUpdate, { transaction });
+    await ProductActionHistory.create(plan.historyEntry, { transaction });
+
+    await transaction.commit();
+    transactionFinished = true;
+
+    return res.json({
+      success: true,
+      message: 'Product KPI weight updated',
+      data: { kpiWeight: plan.productUpdate.kpiWeight },
+    });
+  } catch (error) {
+    if (!transactionFinished) {
+      await transaction.rollback();
+      transactionFinished = true;
+    }
+
+    if (/not permitted/i.test(error.message)) {
+      return res.status(403).json({ success: false, message: error.message });
+    }
+
+    if (/is required|valid number|greater than zero|must not exceed/i.test(error.message)) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    console.error('Error updating product KPI weight:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while updating product KPI weight',
     });
   }
 };
@@ -3763,7 +3952,9 @@ module.exports = {
   createProduct,
   assignDesignerToProduct,
   bulkAssignDesignerToProducts,
+  bulkStartProductLifecycle,
   startProductLifecycle,
+  updateProductKpiWeight,
   submitProductContent,
   submitProductReview,
   approveProductReview,

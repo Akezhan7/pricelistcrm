@@ -45,6 +45,10 @@ import { ProductCardModal } from './ProductCardModal';
 import api from '../utils/api';
 import { PRODUCT_LIFECYCLE_FILTERS } from '../constants/productLifecycle';
 import { cn } from '../utils/cn';
+import {
+  getBulkSelectableProductIds,
+  type ProductBulkActionMode,
+} from '../utils/productBulkSelection';
 
 type ProductListProps = {
   products: Product[];
@@ -84,6 +88,7 @@ export const ProductList: React.FC<ProductListProps> = ({
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isCreateDraftModalOpen, setIsCreateDraftModalOpen] = useState(false);
   const [isAssignDesignerModalOpen, setIsAssignDesignerModalOpen] = useState(false);
+  const [isBulkLifecycleModalOpen, setIsBulkLifecycleModalOpen] = useState(false);
   const [selectedProductIds, setSelectedProductIds] = useState<Set<number>>(new Set());
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -103,7 +108,7 @@ export const ProductList: React.FC<ProductListProps> = ({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, localSearchQuery, pageResetKey]);
+  }, [searchQuery, localSearchQuery, lifecycleStatusFilter, pageResetKey]);
 
   const filteredProducts = useMemo(() => {
     let filtered = products;
@@ -137,13 +142,34 @@ export const ProductList: React.FC<ProductListProps> = ({
 
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
   const bulkAssignEnabled = canAssignDesigner && lifecycleStatusFilter === 'new';
+  const bulkLifecycleEnabled = canAssignDesigner && lifecycleStatusFilter === 'in_sale';
+  const bulkSelectionEnabled = bulkAssignEnabled || bulkLifecycleEnabled;
+  const bulkActionMode: ProductBulkActionMode | null = bulkAssignEnabled
+    ? 'assign_designer'
+    : bulkLifecycleEnabled
+      ? 'start_lifecycle'
+      : null;
 
-  const selectableProductsOnPage = useMemo(
-    () =>
-      bulkAssignEnabled
-        ? paginatedProducts.filter((product) => product.lifecycleStatus === 'new')
-        : [],
-    [bulkAssignEnabled, paginatedProducts]
+  useEffect(() => {
+    const lastAvailablePage = Math.max(1, totalPages);
+    if (currentPage > lastAvailablePage) {
+      setCurrentPage(lastAvailablePage);
+    }
+  }, [currentPage, totalPages]);
+
+  const selectableProductIds = useMemo(
+    () => bulkActionMode ? getBulkSelectableProductIds(products, bulkActionMode) : [],
+    [bulkActionMode, products]
+  );
+  const selectableProductIdSet = useMemo(
+    () => new Set(selectableProductIds),
+    [selectableProductIds]
+  );
+  const selectableProductIdsOnPage = useMemo(
+    () => bulkActionMode
+      ? getBulkSelectableProductIds(paginatedProducts, bulkActionMode)
+      : [],
+    [bulkActionMode, paginatedProducts]
   );
 
   const selectedProductIdsArray = useMemo(
@@ -152,21 +178,20 @@ export const ProductList: React.FC<ProductListProps> = ({
   );
 
   const allSelectableOnPageSelected =
-    selectableProductsOnPage.length > 0 &&
-    selectableProductsOnPage.every((product) => selectedProductIds.has(product.id));
+    selectableProductIdsOnPage.length > 0 &&
+    selectableProductIdsOnPage.every((productId) => selectedProductIds.has(productId));
 
   useEffect(() => {
-    if (!bulkAssignEnabled) {
+    if (!bulkSelectionEnabled) {
       setSelectedProductIds(new Set());
       return;
     }
 
-    const existingIds = new Set(products.map((product) => product.id));
     setSelectedProductIds((prev) => {
-      const next = new Set(Array.from(prev).filter((id) => existingIds.has(id)));
+      const next = new Set(Array.from(prev).filter((id) => selectableProductIdSet.has(id)));
       return next.size === prev.size ? prev : next;
     });
-  }, [bulkAssignEnabled, products]);
+  }, [bulkSelectionEnabled, selectableProductIdSet]);
 
   const handleDeleteProduct = async () => {
     if (!productToDelete) return;
@@ -208,15 +233,24 @@ export const ProductList: React.FC<ProductListProps> = ({
     setSelectedProductIds((prev) => {
       const next = new Set(prev);
       if (allSelectableOnPageSelected) {
-        selectableProductsOnPage.forEach((product) => next.delete(product.id));
+        selectableProductIdsOnPage.forEach((productId) => next.delete(productId));
       } else {
-        selectableProductsOnPage.forEach((product) => next.add(product.id));
+        selectableProductIdsOnPage.forEach((productId) => next.add(productId));
       }
       return next;
     });
   };
 
+  const selectAllEligibleProducts = () => {
+    setSelectedProductIds(new Set(selectableProductIds));
+  };
+
   const handleDesignerAssigned = () => {
+    setSelectedProductIds(new Set());
+    onRefresh();
+  };
+
+  const handleBulkLifecycleStarted = () => {
     setSelectedProductIds(new Set());
     onRefresh();
   };
@@ -296,27 +330,38 @@ export const ProductList: React.FC<ProductListProps> = ({
         </div>
       </div>
 
-      {bulkAssignEnabled && (
+      {bulkSelectionEnabled && (
         <div className="px-4 py-2.5 border-b border-border-subtle bg-surface-muted/70 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between shrink-0">
-          <label className="inline-flex items-center gap-2 text-body text-brand-black cursor-pointer select-none">
-            <input
-              type="checkbox"
-              className="sr-only"
-              checked={allSelectableOnPageSelected}
-              disabled={selectableProductsOnPage.length === 0}
-              onChange={togglePageSelection}
-            />
-            {allSelectableOnPageSelected ? (
-              <CheckSquare className="h-4 w-4 text-brand-yellow-dark" aria-hidden />
-            ) : (
-              <Square className="h-4 w-4 text-text-muted" aria-hidden />
-            )}
-            <span>
-              {selectedProductIds.size > 0
-                ? `Выбрано ${selectedProductIds.size}`
-                : 'Выбрать товары на странице'}
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="inline-flex items-center gap-2 text-body text-brand-black cursor-pointer select-none">
+              <input
+                type="checkbox"
+                className="sr-only"
+                checked={allSelectableOnPageSelected}
+                disabled={selectableProductIdsOnPage.length === 0}
+                onChange={togglePageSelection}
+              />
+              {allSelectableOnPageSelected ? (
+                <CheckSquare className="h-4 w-4 text-brand-yellow-dark" aria-hidden />
+              ) : (
+                <Square className="h-4 w-4 text-text-muted" aria-hidden />
+              )}
+              <span>{allSelectableOnPageSelected ? 'Страница выбрана' : 'Выбрать страницу'}</span>
+            </label>
+            <span className="text-caption text-text-muted tabular-nums">
+              Выбрано: {selectedProductIds.size}
             </span>
-          </label>
+            {bulkAssignEnabled && selectedProductIds.size < selectableProductIds.length && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={selectAllEligibleProducts}
+              >
+                Выбрать все новые ({selectableProductIds.length})
+              </Button>
+            )}
+          </div>
           <div className="flex items-center gap-2">
             {selectedProductIds.size > 0 && (
               <Button
@@ -332,11 +377,17 @@ export const ProductList: React.FC<ProductListProps> = ({
               type="button"
               variant="primary"
               size="sm"
-              leftIcon={UserPlus}
+              leftIcon={bulkAssignEnabled ? UserPlus : Rocket}
               disabled={selectedProductIds.size === 0}
-              onClick={() => setIsAssignDesignerModalOpen(true)}
+              onClick={() => {
+                if (bulkAssignEnabled) {
+                  setIsAssignDesignerModalOpen(true);
+                } else {
+                  setIsBulkLifecycleModalOpen(true);
+                }
+              }}
             >
-              Передать дизайнеру
+              {bulkAssignEnabled ? 'Передать дизайнеру' : 'Запустить lifecycle'}
             </Button>
           </div>
         </div>
@@ -376,7 +427,7 @@ export const ProductList: React.FC<ProductListProps> = ({
                   onSelectProduct(selectedProduct?.id === product.id ? null : product)
                 }
                 children={
-                  bulkAssignEnabled && product.lifecycleStatus === 'new' ? (
+                  bulkSelectionEnabled && selectableProductIdSet.has(product.id) ? (
                     <label
                       className="inline-flex h-9 w-9 items-center justify-center rounded-lg hover:bg-surface-inset cursor-pointer"
                       title="Выбрать товар"
@@ -609,6 +660,15 @@ export const ProductList: React.FC<ProductListProps> = ({
         product={productForLifecycleStart}
         onClose={() => setProductForLifecycleStart(null)}
         onSuccess={onRefresh}
+      />
+
+      <StartProductLifecycleModal
+        isOpen={isBulkLifecycleModalOpen}
+        product={null}
+        productIds={selectedProductIdsArray}
+        selectedCount={selectedProductIds.size}
+        onClose={() => setIsBulkLifecycleModalOpen(false)}
+        onSuccess={handleBulkLifecycleStarted}
       />
     </div>
   );

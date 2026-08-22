@@ -24,6 +24,7 @@ export const ProductsPage: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [totalProducts, setTotalProducts] = useState(0);
   const [lifecycleStatusFilter, setLifecycleStatusFilter] = useState<ProductLifecycleStatus | ''>('');
   const [categoryName, setCategoryName] = useState('');
@@ -57,6 +58,7 @@ export const ProductsPage: React.FC = () => {
       if (productsRequestRef.current === requestController) {
         productsRequestRef.current = null;
         setLoading(false);
+        setHasLoaded(true);
       }
     }
   }, [categoryId, lifecycleStatusFilter]);
@@ -97,7 +99,7 @@ export const ProductsPage: React.FC = () => {
   const countLabel =
     totalProducts === 1 ? 'позиция' : totalProducts < 5 ? 'позиции' : 'позиций';
 
-  if (loading) {
+  if (loading && !hasLoaded) {
     return (
       <Layout>
         <div className="flex flex-col items-center justify-center h-64 gap-4">
