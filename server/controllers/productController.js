@@ -40,6 +40,7 @@ const {
   buildDesignerAssignedHistoryEntry,
 } = require('../services/productBulkLifecycleService');
 const {
+  buildNewProductLifecycleData,
   buildProductDraftData,
 } = require('../services/productDraftService');
 const {
@@ -2591,6 +2592,7 @@ const createProduct = async (req, res) => {
       }
     }
 
+    const now = new Date();
     const product = await Product.create({
       name,
       article,
@@ -2604,7 +2606,7 @@ const createProduct = async (req, res) => {
       minStock: minStock !== undefined ? parseInt(minStock) : 0,
       categoryId: categoryId || null,
       image: req.file ? `/uploads/${req.file.filename}` : null,
-      createdByUserId: req.user.id,
+      ...buildNewProductLifecycleData({ actorId: req.user.id, now }),
     }, { transaction });
 
     // Добавление поставщиков, если они указаны
@@ -2632,6 +2634,7 @@ const createProduct = async (req, res) => {
         article: product.article,
         supplierIds: Array.isArray(suppliers) ? suppliers.map((supplier) => Number(supplier.id)) : [],
       },
+      now,
     }), { transaction });
 
     await transaction.commit();

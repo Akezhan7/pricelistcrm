@@ -1,7 +1,28 @@
 const assert = require('assert');
 
 const { PRODUCT_LIFECYCLE_STATUSES } = require('../constants/productLifecycle');
-const { buildProductDraftData } = require('../services/productDraftService');
+const {
+  buildNewProductLifecycleData,
+  buildProductDraftData,
+} = require('../services/productDraftService');
+
+function testBuildNewProductLifecycleData() {
+  const createdAt = new Date('2026-08-22T12:00:00Z');
+
+  assert.deepStrictEqual(
+    buildNewProductLifecycleData({ actorId: 42, now: createdAt }),
+    {
+      lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.NEW,
+      lifecycleStartedAt: createdAt,
+      lifecycleCompletedAt: null,
+      assignedToUserId: null,
+      designerId: null,
+      reviewedByUserId: null,
+      kpiWeight: null,
+      createdByUserId: 42,
+    }
+  );
+}
 
 function runProductDraftServiceTest() {
   const createdAt = new Date('2026-07-07T12:00:00Z');
@@ -29,6 +50,10 @@ function runProductDraftServiceTest() {
     lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.NEW,
     lifecycleStartedAt: createdAt,
     lifecycleCompletedAt: null,
+    assignedToUserId: null,
+    designerId: null,
+    reviewedByUserId: null,
+    kpiWeight: null,
     createdByUserId: 42,
     launchNotes: 'Found at supplier stand',
   });
@@ -56,5 +81,6 @@ function runProductDraftServiceTest() {
   );
 }
 
+testBuildNewProductLifecycleData();
 runProductDraftServiceTest();
 console.log('Product draft service test passed');

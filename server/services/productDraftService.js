@@ -27,6 +27,19 @@ function normalizeMoney(value, fieldName) {
   return parsed;
 }
 
+function buildNewProductLifecycleData({ actorId, now = new Date() }) {
+  return {
+    lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.NEW,
+    lifecycleStartedAt: now,
+    lifecycleCompletedAt: null,
+    assignedToUserId: null,
+    designerId: null,
+    reviewedByUserId: null,
+    kpiWeight: null,
+    createdByUserId: actorId,
+  };
+}
+
 function buildProductDraftData({
   name,
   costPrice,
@@ -49,14 +62,12 @@ function buildProductDraftData({
     internalName: normalizedName,
     currentStock: 0,
     minStock: 0,
-    lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.NEW,
-    lifecycleStartedAt: now,
-    lifecycleCompletedAt: null,
-    createdByUserId: actorId,
+    ...buildNewProductLifecycleData({ actorId, now }),
     launchNotes: comment ? String(comment).trim() || null : null,
   };
 }
 
 module.exports = {
+  buildNewProductLifecycleData,
   buildProductDraftData,
 };
