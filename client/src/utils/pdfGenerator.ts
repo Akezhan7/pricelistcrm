@@ -300,7 +300,7 @@ const createReconciliationHTML = (data: ReconciliationReport): HTMLElement => {
         <tr style="background:${i % 2 === 0 ? BRAND.white : BRAND.zebra};">
           <td style="padding:6px 8px;border-bottom:1px solid ${BRAND.border};">${formatDate(m.date)}</td>
           <td style="padding:6px 8px;border-bottom:1px solid ${BRAND.border};">${kindLabel[m.kind] || m.kind}</td>
-          <td style="padding:6px 8px;border-bottom:1px solid ${BRAND.border};font-weight:600;">${m.documentNumber}</td>
+          <td style="padding:6px 8px;border-bottom:1px solid ${BRAND.border};font-weight:600;">${m.documentNumber}${m.comment ? `<div style="margin-top:2px;font-size:9px;font-weight:400;color:${BRAND.textMuted};">${m.comment}</div>` : ''}</td>
           <td style="padding:6px 8px;border-bottom:1px solid ${BRAND.border};text-align:right;">${m.purchase ? formatNumber(m.purchase) : ''}</td>
           <td style="padding:6px 8px;border-bottom:1px solid ${BRAND.border};text-align:right;color:${BRAND.yellowDark};">${m.returned ? formatNumber(m.returned) : ''}</td>
           <td style="padding:6px 8px;border-bottom:1px solid ${BRAND.border};text-align:right;color:#059669;">${m.payment ? formatNumber(m.payment) : ''}</td>

@@ -15,6 +15,7 @@ interface LayoutProps {
 }
 
 const PAGE_TITLES: Record<string, string> = {
+  '/procurement-list': 'Закупочный лист',
   '/dashboard': 'Главная',
   '/orders': 'Заявки',
   '/products': 'Товары',

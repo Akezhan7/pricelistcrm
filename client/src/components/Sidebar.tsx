@@ -26,6 +26,7 @@ import {
   BarChart3,
   Tag,
   X,
+  ShoppingBasket,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -119,6 +120,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
       label: 'Прайс',
       icon: <Tag className="w-5 h-5 flex-shrink-0" />,
       path: '/price-list',
+    },
+    {
+      id: 'procurement-list',
+      label: 'Закупочный лист',
+      icon: <ShoppingBasket className="w-5 h-5 flex-shrink-0" />,
+      path: '/procurement-list',
+      requiredRole: ['admin', 'purchase_manager', 'warehouse_operator', 'collector'],
     },
     {
       id: 'stock',

@@ -187,7 +187,12 @@ export const ReconciliationModal: React.FC<ReconciliationModalProps> = ({
                       <TableCell className="tabular-nums">{formatDate(m.date)}</TableCell>
                       <TableCell>{kindLabel[m.kind] || m.kind}</TableCell>
                       <TableCell className="text-body-medium text-brand-black">
-                        {m.documentNumber}
+                        <div>{m.documentNumber}</div>
+                        {m.comment && (
+                          <div className="mt-1 text-caption font-normal text-text-muted">
+                            {m.comment}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell className="text-right tabular-nums">
                         {m.purchase ? formatPriceKZT(m.purchase) : '—'}

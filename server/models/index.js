@@ -10,6 +10,7 @@ const Row = require('./Row');
 const Order = require('./Order');
 const OrderItem = require('./OrderItem');
 const OrderStatusHistory = require('./OrderStatusHistory');
+const OrderSettlementHistory = require('./OrderSettlementHistory');
 const Payment = require('./Payment');
 const PriceHistory = require('./PriceHistory');
 
@@ -31,6 +32,8 @@ const ProductDesignerKpiEntry = require('./ProductDesignerKpiEntry');
 const EmployeeTask = require('./EmployeeTask');
 const EmployeeTaskHistory = require('./EmployeeTaskHistory');
 const EmployeeTaskComment = require('./EmployeeTaskComment');
+const ProcurementList = require('./ProcurementList');
+const ProcurementListItem = require('./ProcurementListItem');
 
 // Импортируем связи (все связи определены в associations.js)
 require('./associations');
@@ -48,6 +51,7 @@ module.exports = {
   Order,
   OrderItem,
   OrderStatusHistory,
+  OrderSettlementHistory,
   Payment,
   PriceHistory,
   // Новые модели
@@ -68,4 +72,6 @@ module.exports = {
   EmployeeTask,
   EmployeeTaskHistory,
   EmployeeTaskComment,
+  ProcurementList,
+  ProcurementListItem,
 };

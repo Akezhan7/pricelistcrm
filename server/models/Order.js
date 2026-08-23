@@ -76,6 +76,13 @@ const Order = sequelize.define('Order', {
     defaultValue: 'Не оплачено',
     comment: 'Статус оплаты',
   },
+  settlementType: {
+    type: DataTypes.STRING(24),
+    allowNull: false,
+    defaultValue: 'standard',
+    validate: { isIn: [['standard', 'consignment']] },
+    comment: 'Условие расчёта: обычная закупка или под реализацию',
+  },
   notes: {
     type: DataTypes.TEXT,
     allowNull: true,
@@ -111,6 +118,10 @@ const Order = sequelize.define('Order', {
     {
       fields: ['payment_status'],
       name: 'orders_payment_status_idx',
+    },
+    {
+      fields: ['settlement_type'],
+      name: 'orders_settlement_type_idx',
     },
     {
       fields: ['created_by'],

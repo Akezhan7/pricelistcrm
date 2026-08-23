@@ -18,12 +18,13 @@ function getOrderDateKey(date = new Date()) {
   return `${year}${month}${day}`;
 }
 
-async function buildNextOrderNumberCandidate(date = new Date()) {
+async function buildNextOrderNumberCandidate(date = new Date(), transaction = null) {
   const prefix = `ORD-${getOrderDateKey(date)}-`;
   const lastOrder = await Order.findOne({
     where: { orderNumber: { [Op.like]: `${prefix}%` } },
     order: [['orderNumber', 'DESC']],
     attributes: ['orderNumber'],
+    transaction,
   });
 
   let nextNumber = 1;
@@ -39,12 +40,13 @@ async function buildNextOrderNumberCandidate(date = new Date()) {
   return `${prefix}${String(nextNumber).padStart(3, '0')}`;
 }
 
-async function generateOrderNumber() {
+async function generateOrderNumber({ transaction = null, date = new Date() } = {}) {
   for (let attempt = 0; attempt < 5; attempt += 1) {
-    const candidate = await buildNextOrderNumberCandidate();
+    const candidate = await buildNextOrderNumberCandidate(date, transaction);
     const exists = await Order.findOne({
       where: { orderNumber: candidate },
       attributes: ['id'],
+      transaction,
     });
     if (!exists) return candidate;
   }

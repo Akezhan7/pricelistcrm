@@ -24,6 +24,7 @@ import { DesignerKpiReport } from './pages/DesignerKpiReport';
 import { SuppliersPage } from './pages/SuppliersPage';
 import { SupplierDetailsPage } from './pages/SupplierDetailsPage';
 import { PriceListPage } from './pages/PriceListPage';
+import { ProcurementListPage } from './pages/ProcurementListPage';
 import { OrderDraftProvider } from './context/OrderDraftContext';
 import CreateOrderModal from './components/CreateOrderModal';
 
@@ -164,6 +165,15 @@ const AppRoutes: React.FC = () => {
         }
       />
       
+      <Route
+        path="/procurement-list"
+        element={
+          <ProtectedRoute>
+            <ProcurementListPage />
+          </ProtectedRoute>
+        }
+      />
+
       <Route
         path="/stock"
         element={

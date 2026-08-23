@@ -581,6 +581,7 @@ export type OrderStatus =
   | 'Отменена';
 
 export type OrderType = 'purchase' | 'return';
+export type OrderSettlementType = 'standard' | 'consignment';
 
 export type PaymentStatus = 'Не оплачено' | 'Частично оплачено' | 'Оплачено';
 
@@ -596,6 +597,7 @@ export interface Order {
     address?: string;
   };
   type?: OrderType;
+  settlementType: OrderSettlementType;
   expectedDeliveryDate?: string;
   deliveryLocation: string;
   totalAmount: string | number;
@@ -611,6 +613,7 @@ export interface Order {
   };
   items?: OrderItem[];
   statusHistory?: OrderStatusHistory[];
+  settlementHistory?: OrderSettlementHistory[];
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -661,9 +664,24 @@ export interface OrderStatusHistory {
   changedAt: string;
 }
 
+export interface OrderSettlementHistory {
+  id: number;
+  orderId: number;
+  oldSettlementType: OrderSettlementType;
+  newSettlementType: OrderSettlementType;
+  changedBy: number;
+  changer?: {
+    id: number;
+    name: string;
+  };
+  comment?: string;
+  createdAt: string;
+}
+
 export interface CreateOrderDto {
   supplierId: number | null;
   type?: OrderType;
+  settlementType?: OrderSettlementType;
   expectedDeliveryDate?: string;
   deliveryLocation?: string;
   notes?: string;
@@ -678,6 +696,7 @@ export interface CreateOrderDto {
 
 export interface UpdateOrderDto {
   supplierId?: number | null;
+  settlementType?: OrderSettlementType;
   expectedDeliveryDate?: string;
   deliveryLocation?: string;
   notes?: string;

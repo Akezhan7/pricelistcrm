@@ -1,11 +1,15 @@
 const { Op } = require('sequelize');
 const sequelize = require('../config/database');
-const { Order, OrderItem, OrderStatusHistory, Product, Supplier, User, Payment, ProductVariation, OrderConfirmation, CollectorTask, ProductLifecyclePurchase } = require('../models');
+const { Order, OrderItem, OrderStatusHistory, OrderSettlementHistory, Product, Supplier, User, Payment, ProductVariation, OrderConfirmation, CollectorTask, ProductLifecyclePurchase } = require('../models');
 const { recalculateSupplierDebt } = require('./paymentController');
 const { createPriceHistoryRecord } = require('./priceHistoryController');
 const { formatOrderMessage, generateWhatsAppLink } = require('../utils/whatsappFormatter');
 const { generateOrderNumber } = require('../services/orderNumberService');
 const { buildOrderItemSyncPlan } = require('../services/orderItemSyncService');
+const {
+  buildSettlementChange,
+  normalizeSettlementType,
+} = require('../services/orderSettlementService');
 const {
   normalizeOptionalSupplierId,
   assertSupplierAllowedForOrderType,
@@ -141,8 +145,11 @@ exports.getOrders = async (req, res) => {
         // Финансовые показатели
         [sequelize.fn('SUM', sequelize.col('total_amount')), 'totalAmount'],
         [sequelize.fn('SUM', sequelize.col('paid_amount')), 'totalPaid'],
-        [sequelize.fn('SUM', sequelize.literal(`CASE WHEN status IN ('${DEBT_STATUSES.join("','")}') THEN total_amount ELSE 0 END`)), 'debtAmount'],
-        [sequelize.fn('SUM', sequelize.literal(`CASE WHEN status IN ('${DEBT_STATUSES.join("','")}') THEN paid_amount ELSE 0 END`)), 'debtPaid']
+        [sequelize.fn('SUM', sequelize.literal(
+          "CASE WHEN status IN ('" + DEBT_STATUSES.join("','") + "') "
+          + "THEN CASE WHEN type = 'return' THEN -total_amount "
+          + "ELSE total_amount - paid_amount END ELSE 0 END"
+        )), 'debtAmount']
       ],
       raw: true
     });
@@ -151,7 +158,6 @@ exports.getOrders = async (req, res) => {
     const totalAmount = parseFloat(statsResult.totalAmount || 0);
     const totalPaid = parseFloat(statsResult.totalPaid || 0);
     const debtAmount = parseFloat(statsResult.debtAmount || 0);
-    const debtPaid = parseFloat(statsResult.debtPaid || 0);
 
     res.json({
       success: true,
@@ -181,7 +187,7 @@ exports.getOrders = async (req, res) => {
           // Финансовые показатели
           totalAmount: totalAmount.toFixed(2),
           totalPaid: totalPaid.toFixed(2),
-          totalDebt: Math.max(0, debtAmount - debtPaid).toFixed(2)
+          totalDebt: Math.max(0, debtAmount).toFixed(2)
         }
       }
     });
@@ -244,6 +250,17 @@ exports.getOrderById = async (req, res) => {
             }
           ],
           order: [['changedAt', 'ASC']]
+        },
+        {
+          model: OrderSettlementHistory,
+          as: 'settlementHistory',
+          separate: true,
+          order: [['createdAt', 'ASC']],
+          include: [{
+            model: User,
+            as: 'changer',
+            attributes: ['id', 'name']
+          }]
         }
       ]
     });
@@ -279,9 +296,18 @@ exports.createOrder = async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
-    const { supplierId, expectedDeliveryDate, deliveryLocation, notes, items, type } = req.body;
+    const {
+      supplierId,
+      expectedDeliveryDate,
+      deliveryLocation,
+      notes,
+      items,
+      type,
+      settlementType,
+    } = req.body;
     const orderType = type === 'return' ? 'return' : 'purchase';
     let normalizedSupplierId;
+    let normalizedSettlementType;
 
     try {
       normalizedSupplierId = normalizeOptionalSupplierId(supplierId);
@@ -294,6 +320,16 @@ exports.createOrder = async (req, res) => {
           ? 'Для оформления возврата выберите поставщика'
           : 'Некорректный поставщик',
         errors: [{ field: 'supplierId', message: error.message }],
+      });
+    }
+    try {
+      normalizedSettlementType = normalizeSettlementType(orderType, settlementType);
+    } catch (error) {
+      await transaction.rollback();
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+        errors: [{ field: 'settlementType', message: error.message }],
       });
     }
 
@@ -370,6 +406,7 @@ exports.createOrder = async (req, res) => {
       paidAmount: 0,
       status: 'Создана',
       paymentStatus: 'Не оплачено',
+      settlementType: normalizedSettlementType,
       notes,
       createdBy: req.user.id,
       isActive: true
@@ -460,7 +497,14 @@ exports.updateOrder = async (req, res) => {
 
   try {
     const { id } = req.params;
-    const { supplierId, expectedDeliveryDate, deliveryLocation, notes, items } = req.body;
+    const {
+      supplierId,
+      expectedDeliveryDate,
+      deliveryLocation,
+      notes,
+      items,
+      settlementType,
+    } = req.body;
 
     // Найти заявку
     const order = await Order.findOne({
@@ -486,6 +530,7 @@ exports.updateOrder = async (req, res) => {
     }
 
     const previousSupplierId = order.supplierId;
+    let settlementHistoryData = null;
     if (Object.prototype.hasOwnProperty.call(req.body, 'supplierId')) {
       let normalizedSupplierId;
       try {
@@ -528,6 +573,26 @@ exports.updateOrder = async (req, res) => {
     if (expectedDeliveryDate !== undefined) order.expectedDeliveryDate = expectedDeliveryDate;
     if (deliveryLocation !== undefined) order.deliveryLocation = deliveryLocation;
     if (notes !== undefined) order.notes = notes;
+    if (Object.prototype.hasOwnProperty.call(req.body, 'settlementType')) {
+      let normalizedSettlementType;
+      try {
+        normalizedSettlementType = normalizeSettlementType(order.type, settlementType);
+      } catch (error) {
+        await transaction.rollback();
+        return res.status(400).json({ success: false, message: error.message });
+      }
+      if (normalizedSettlementType !== order.settlementType) {
+        settlementHistoryData = {
+          orderId: order.id,
+          oldSettlementType: order.settlementType,
+          newSettlementType: normalizedSettlementType,
+          changedBy: req.user.id,
+          comment: 'Условие расчёта изменено при редактировании заявки',
+          createdAt: new Date(),
+        };
+        order.settlementType = normalizedSettlementType;
+      }
+    }
 
     // Обновление товаров если они переданы
     if (items && items.length > 0) {
@@ -611,6 +676,9 @@ exports.updateOrder = async (req, res) => {
     }
 
     await order.save({ transaction });
+    if (settlementHistoryData) {
+      await OrderSettlementHistory.create(settlementHistoryData, { transaction });
+    }
     await transaction.commit();
 
     // Пересчитать задолженность поставщика
@@ -892,6 +960,65 @@ exports.deleteOrder = async (req, res) => {
 };
 
 /**
+ * Изменить условие расчёта принятой заявки
+ * PATCH /api/orders/:id/settlement
+ */
+exports.changeSettlementType = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
+  try {
+    const order = await Order.findOne({
+      where: { id: req.params.id, isActive: true },
+      transaction,
+      lock: true,
+    });
+    if (!order) {
+      const error = new Error('Заявка не найдена');
+      error.statusCode = 404;
+      throw error;
+    }
+
+    const change = buildSettlementChange({
+      order,
+      actor: req.user,
+      settlementType: req.body.settlementType,
+      comment: req.body.comment,
+    });
+
+    await order.update(
+      { settlementType: change.newSettlementType },
+      { transaction }
+    );
+    const history = await OrderSettlementHistory.create({
+      orderId: order.id,
+      ...change,
+      createdAt: new Date(),
+    }, { transaction });
+    await recalculateSupplierDebt(order.supplierId, { transaction });
+
+    await transaction.commit();
+    transactionFinished = true;
+
+    return res.json({
+      success: true,
+      message: change.newSettlementType === 'consignment'
+        ? 'Заявка отмечена как «Под реализацию»'
+        : 'Для заявки выбрана обычная оплата',
+      data: { order, history },
+    });
+  } catch (error) {
+    if (!transactionFinished) await transaction.rollback();
+    const status = error.statusCode || error.status || 500;
+    if (status >= 500) console.error('Ошибка изменения условия расчёта:', error);
+    return res.status(status).json({
+      success: false,
+      message: status >= 500 ? 'Ошибка изменения условия расчёта' : error.message,
+    });
+  }
+};
+
+/**
  * Обновить оплату заявки
  * PATCH /api/orders/:id/payment
  * Доступ: admin, purchase_manager, accountant
@@ -996,10 +1123,8 @@ exports.updatePayment = async (req, res) => {
       changedAt: new Date()
     }, { transaction });
 
+    await recalculateSupplierDebt(order.supplierId, { transaction });
     await transaction.commit();
-
-    // Пересчитать задолженность поставщика
-    await recalculateSupplierDebt(order.supplierId);
 
     // Получение обновленной заявки
     const updatedOrder = await Order.findByPk(order.id, {

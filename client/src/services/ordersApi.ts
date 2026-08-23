@@ -7,6 +7,8 @@ import type {
   ChangeOrderStatusDto,
   OrderStatusOptions,
   OrderFilters,
+  OrderSettlementHistory,
+  OrderSettlementType,
   ApiResponse
 } from '../types';
 
@@ -91,6 +93,22 @@ class OrdersApi {
 
     if (!response.data.success || !response.data.data) {
       throw new Error(response.data.message || 'Ошибка получения доступных действий');
+    }
+
+    return response.data.data;
+  }
+
+  async changeSettlementType(id: number, settlementType: OrderSettlementType, comment?: string): Promise<{
+    order: Order;
+    history: OrderSettlementHistory;
+  }> {
+    const response = await api.patch<ApiResponse<{
+      order: Order;
+      history: OrderSettlementHistory;
+    }>>(`${this.baseUrl}/${id}/settlement`, { settlementType, comment });
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.message || 'Ошибка изменения условия расчёта');
     }
 
     return response.data.data;

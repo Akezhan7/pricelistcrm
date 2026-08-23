@@ -1,6 +1,18 @@
 const { validationResult } = require('express-validator');
 const { Op } = require('sequelize');
-const { Supplier, Product, ProductSupplier, Market, Sector, Row, Order, Payment, User } = require('../models');
+const {
+  Supplier,
+  Product,
+  ProductSupplier,
+  Market,
+  Sector,
+  Row,
+  Order,
+  Payment,
+  User,
+  WarehouseReceipt,
+} = require('../models');
+const { DEBT_STATUSES } = require('../services/orderStatusPolicyService');
 const path = require('path');
 const fs = require('fs').promises;
 
@@ -516,23 +528,45 @@ const getReconciliation = async (req, res) => {
       toDate.setHours(23, 59, 59, 999);
     }
 
-    const periodWhere = {};
-    if (fromDate || toDate) {
-      periodWhere[Op.and] = [];
-      if (fromDate) periodWhere[Op.and].push({ createdAt: { [Op.gte]: fromDate } });
-      if (toDate) periodWhere[Op.and].push({ createdAt: { [Op.lte]: toDate } });
-    }
-
     // 1) Заявки на поставку и возвраты за период
     const orders = await Order.findAll({
       where: {
         supplierId: id,
         isActive: true,
-        ...periodWhere,
+        status: { [Op.in]: DEBT_STATUSES },
       },
-      attributes: ['id', 'orderNumber', 'type', 'totalAmount', 'paidAmount', 'status', 'createdAt'],
+      attributes: [
+        'id',
+        'orderNumber',
+        'type',
+        'settlementType',
+        'totalAmount',
+        'paidAmount',
+        'status',
+        'createdAt',
+      ],
+      include: [{
+        model: WarehouseReceipt,
+        as: 'warehouseReceipts',
+        attributes: ['receivedAt'],
+        required: false,
+      }],
       order: [['createdAt', 'ASC']],
     });
+    const accountingOrders = orders.map((order) => {
+      const plainOrder = order.toJSON();
+      const receiptDates = (plainOrder.warehouseReceipts || [])
+        .map((receipt) => new Date(receipt.receivedAt))
+        .filter((date) => !Number.isNaN(date.getTime()));
+      const accountingDate = receiptDates.length > 0
+        ? new Date(Math.min(...receiptDates.map((date) => date.getTime())))
+        : new Date(plainOrder.createdAt);
+      return { ...plainOrder, accountingDate };
+    });
+    const periodOrders = accountingOrders.filter((order) => (
+      (!fromDate || order.accountingDate >= fromDate)
+      && (!toDate || order.accountingDate <= toDate)
+    ));
 
     // 2) Платежи за период
     const paymentsWhere = { supplierId: id };
@@ -550,14 +584,9 @@ const getReconciliation = async (req, res) => {
     // 3) Расчёт открывающего сальдо: всё, что было до from
     let openingBalance = 0;
     if (fromDate) {
-      const beforeOrders = await Order.findAll({
-        where: {
-          supplierId: id,
-          isActive: true,
-          createdAt: { [Op.lt]: fromDate },
-        },
-        attributes: ['totalAmount', 'type'],
-      });
+      const beforeOrders = accountingOrders.filter(
+        (order) => order.accountingDate < fromDate
+      );
 
       const beforePayments = await Payment.findAll({
         where: {
@@ -581,14 +610,21 @@ const getReconciliation = async (req, res) => {
 
     // 4) Формируем единый список движений
     const movements = [
-      ...orders.map((o) => ({
-        date: o.createdAt,
+      ...periodOrders.map((o) => ({
+        date: o.accountingDate,
         kind: o.type === 'return' ? 'return' : 'purchase',
         documentNumber: o.orderNumber,
         purchase: o.type === 'return' ? 0 : parseFloat(o.totalAmount),
         returned: o.type === 'return' ? parseFloat(o.totalAmount) : 0,
         payment: 0,
-        comment: o.status,
+        comment: [
+          o.status,
+          o.type !== 'return'
+            ? o.settlementType === 'consignment'
+              ? 'Под реализацию'
+              : 'Обычная закупка'
+            : null,
+        ].filter(Boolean).join(' · '),
       })),
       ...payments.map((p) => ({
         date: p.paymentDate,

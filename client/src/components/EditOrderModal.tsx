@@ -4,7 +4,7 @@ import ordersApi from '../services/ordersApi';
 import productsApi from '../services/productsApi';
 import suppliersApi from '../services/suppliersApi';
 import api from '../utils/api';
-import type { Order, Product, Supplier, UpdateOrderDto, ProductVariation, OrderItem } from '../types';
+import type { Order, Product, Supplier, UpdateOrderDto, ProductVariation, OrderItem, OrderSettlementType } from '../types';
 import { Modal } from './ui/Modal';
 import { FormFooter } from './ui/FormFooter';
 import { Alert } from './ui/Alert';
@@ -26,6 +26,7 @@ type OrderItemForm = OrderLineItemEdit;
 
 const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSuccess, order }) => {
   const [supplierId, setSupplierId] = useState<number | null>(null);
+  const [settlementType, setSettlementType] = useState<OrderSettlementType>('standard');
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('');
   const [deliveryLocation, setDeliveryLocation] = useState('');
@@ -67,6 +68,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
       // Инициализировать форму данными заявки
       setExpectedDeliveryDate(order.expectedDeliveryDate || '');
       setSupplierId(order.supplierId || null);
+      setSettlementType(order.settlementType || 'standard');
       setDeliveryLocation(order.deliveryLocation || 'Точка Байсад');
       setNotes(order.notes || '');
 
@@ -262,6 +264,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
 
       const orderData: UpdateOrderDto = {
         supplierId,
+        settlementType: order.type === 'return' ? 'standard' : settlementType,
         expectedDeliveryDate: expectedDeliveryDate || undefined,
         deliveryLocation: deliveryLocation || undefined,
         notes: notes || undefined,
@@ -287,6 +290,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
 
   const handleClose = () => {
     setSupplierId(null);
+    setSettlementType('standard');
     setSuppliers([]);
     setExpectedDeliveryDate('');
     setDeliveryLocation('');
@@ -358,6 +362,16 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
                 </option>
               ))}
             </Select>
+            {order.type !== 'return' && (
+              <Select
+                label="Условие расчёта"
+                value={settlementType}
+                onChange={(event) => setSettlementType(event.target.value as OrderSettlementType)}
+              >
+                <option value="standard">Обычная закупка</option>
+                <option value="consignment">Под реализацию</option>
+              </Select>
+            )}
             <Input
               label="Ожидаемая дата поставки"
               type="date"

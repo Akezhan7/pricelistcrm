@@ -41,6 +41,7 @@ router.post('/',
   checkRole(['admin', 'purchase_manager']),
   body('supplierId').optional({ nullable: true }).isInt({ min: 1 }),
   body('type').optional().isIn(['purchase', 'return']),
+  body('settlementType').optional().isIn(['standard', 'consignment']),
   body('expectedDeliveryDate').optional({ nullable: true }).isISO8601(),
   body('deliveryLocation').optional().isString().trim().isLength({ max: 200 }),
   body('notes').optional({ nullable: true }).isString().trim(),
@@ -79,6 +80,16 @@ router.patch('/:id/payment',
   orderController.updatePayment
 );
 
+router.patch('/:id/settlement',
+  auth,
+  checkRole(['admin', 'purchase_manager', 'accountant']),
+  param('id').isInt(),
+  body('settlementType').notEmpty().isIn(['standard', 'consignment']),
+  body('comment').optional({ nullable: true }).isString().trim().isLength({ max: 500 }),
+  handleValidationErrors,
+  orderController.changeSettlementType
+);
+
 router.get('/:id',
   auth,
   param('id').isInt(),
@@ -91,6 +102,7 @@ router.put('/:id',
   checkRole(['admin', 'purchase_manager']),
   param('id').isInt(),
   body('supplierId').optional({ nullable: true }).isInt({ min: 1 }),
+  body('settlementType').optional().isIn(['standard', 'consignment']),
   body('expectedDeliveryDate').optional({ nullable: true }).isISO8601(),
   body('deliveryLocation').optional().isString().trim().isLength({ max: 200 }),
   body('notes').optional({ nullable: true }).isString().trim(),

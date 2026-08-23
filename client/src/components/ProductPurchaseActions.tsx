@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { PackageCheck, ShoppingCart } from 'lucide-react';
+import { ListPlus, PackageCheck, ShoppingCart } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { toast } from '../context/ToastContext';
 import productsApi, { ProductLifecycleOperations } from '../services/productsApi';
+import procurementListsApi from '../services/procurementListsApi';
 import type { Product, ProductWorkflowItem } from '../types';
 import { formatPriceKZT } from '../utils/format';
 import { Alert, Badge, Button, Input, Select, Spinner, Textarea } from './ui';
@@ -22,10 +24,12 @@ export const ProductPurchaseActions: React.FC<ProductPurchaseActionsProps> = ({
   product,
   onChanged,
 }) => {
+  const navigate = useNavigate();
   const [details, setDetails] = useState<Product | null>(null);
   const [operations, setOperations] = useState<ProductLifecycleOperations | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [addingToList, setAddingToList] = useState(false);
   const [error, setError] = useState('');
   const [supplierId, setSupplierId] = useState('');
   const [quantity, setQuantity] = useState('1');
@@ -92,6 +96,25 @@ export const ProductPurchaseActions: React.FC<ProductPurchaseActionsProps> = ({
       setError(getErrorMessage(saveError, 'Не удалось оформить закуп'));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleAddToProcurementList = async () => {
+    setAddingToList(true);
+    setError('');
+    try {
+      await procurementListsApi.addItem(product.id, {
+        requestedQuantity: Number(quantity),
+        selectedSupplierId: Number(supplierId),
+        purchasePrice: Number(purchasePrice),
+        notes: notes.trim() || null,
+      });
+      toast.success('Товар добавлен в закупочный лист');
+      navigate('/procurement-list');
+    } catch (saveError) {
+      setError(getErrorMessage(saveError, 'Не удалось добавить товар в закупочный лист'));
+    } finally {
+      setAddingToList(false);
     }
   };
 
@@ -216,12 +239,22 @@ export const ProductPurchaseActions: React.FC<ProductPurchaseActionsProps> = ({
           </div>
           <RequirementsChecklist items={purchaseRequirements} />
           {canEdit && (
-            <div className="flex justify-end">
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                leftIcon={ListPlus}
+                loading={addingToList}
+                disabled={saving || addingToList || !purchaseReady}
+                onClick={handleAddToProcurementList}
+              >
+                Добавить в закупочный лист
+              </Button>
               <Button
                 type="button"
                 leftIcon={ShoppingCart}
                 loading={saving}
-                disabled={saving || !purchaseReady}
+                disabled={saving || addingToList || !purchaseReady}
                 onClick={handlePurchase}
               >
                 Оформить закуп

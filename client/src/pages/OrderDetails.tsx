@@ -22,6 +22,7 @@ import {
   ClipboardCheck,
   MoreVertical,
   XCircle,
+  HandCoins,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { Layout } from '../components/Layout';
@@ -59,7 +60,7 @@ import {
 } from '../theme/statusColors';
 import { formatPriceKZT } from '../utils/format';
 import { cn } from '../utils/cn';
-import type { Order, OrderStatus, OrderStatusOptions } from '../types';
+import type { Order, OrderSettlementType, OrderStatus, OrderStatusOptions } from '../types';
 
 type HeaderAction = {
   key: string;
@@ -78,6 +79,11 @@ const resolveStatusBadgeClass = (status: string): string => {
     return getOrderStatusColor(status as OrderStatus);
   }
   return deliveryStatusColors[status] ?? getOrderStatusColor('Создана');
+};
+
+const settlementTypeLabel: Record<OrderSettlementType, string> = {
+  standard: 'Обычная закупка',
+  consignment: 'Под реализацию',
 };
 
 interface FinanceStatProps {
@@ -116,6 +122,7 @@ const OrderDetails: React.FC = () => {
   const [showUpdatePricesModal, setShowUpdatePricesModal] = useState(false);
   const [showEditOrderModal, setShowEditOrderModal] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
+  const [settlementLoading, setSettlementLoading] = useState(false);
   const [payments, setPayments] = useState<any[]>([]);
   const [whatsappLoading, setWhatsappLoading] = useState(false);
   const [showConfirmationForm, setShowConfirmationForm] = useState(false);
@@ -231,6 +238,25 @@ const OrderDetails: React.FC = () => {
       toast.error(error.message || 'Ошибка при регистрации оплаты');
     } finally {
       setPaymentLoading(false);
+    }
+  };
+
+  const handleSettlementChange = async (settlementType: OrderSettlementType) => {
+    if (!order) return;
+
+    try {
+      setSettlementLoading(true);
+      await ordersApi.changeSettlementType(order.id, settlementType);
+      await loadOrder();
+      toast.success(
+        settlementType === 'consignment'
+          ? 'Заявка отмечена как «Под реализацию»'
+          : 'Для заявки выбрана обычная оплата'
+      );
+    } catch (err: any) {
+      toast.error(err.message || 'Ошибка изменения условия расчёта');
+    } finally {
+      setSettlementLoading(false);
     }
   };
 
@@ -422,6 +448,24 @@ const OrderDetails: React.FC = () => {
       });
     }
 
+    if (
+      canManagePayments &&
+      order.type !== 'return' &&
+      ['Принята на складе', 'Закрыта'].includes(order.status)
+    ) {
+      const nextSettlementType: OrderSettlementType =
+        order.settlementType === 'consignment' ? 'standard' : 'consignment';
+      actions.push({
+        key: 'settlement',
+        label: nextSettlementType === 'consignment' ? 'Под реализацию' : 'Обычная оплата',
+        icon: HandCoins,
+        onClick: () => handleSettlementChange(nextSettlementType),
+        variant: 'outline',
+        loading: settlementLoading,
+        disabled: settlementLoading,
+      });
+    }
+
     if (canEditOrders && order.supplierId && statusOptions?.availableStatuses.length) {
       actions.push({
         key: 'status',
@@ -454,6 +498,7 @@ const OrderDetails: React.FC = () => {
     statusOptions,
     navigate,
     showCollectorAssign,
+    settlementLoading,
   ]);
 
   const primaryActions = headerActions.filter((a) => a.primary);
@@ -609,6 +654,11 @@ const OrderDetails: React.FC = () => {
                     <Badge statusClass={getPaymentStatusColor(order.paymentStatus)}>
                       {order.paymentStatus}
                     </Badge>
+                    {order.type !== 'return' && (
+                      <Badge variant={order.settlementType === 'consignment' ? 'warning' : 'default'}>
+                        {settlementTypeLabel[order.settlementType || 'standard']}
+                      </Badge>
+                    )}
                   </div>
                 </div>
 
@@ -919,6 +969,37 @@ const OrderDetails: React.FC = () => {
                   </div>
                 </div>
               ))}
+              {order.settlementHistory?.map((history) => (
+                <div key={`settlement-${history.id}`} className="flex gap-4">
+                  <div className="flex-shrink-0">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-warning-light text-warning-dark">
+                      <HandCoins className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 flex flex-wrap items-center gap-2">
+                      <Badge variant="default" className="text-xs">
+                        {settlementTypeLabel[history.oldSettlementType]}
+                      </Badge>
+                      <span className="text-text-muted">→</span>
+                      <Badge
+                        variant={history.newSettlementType === 'consignment' ? 'warning' : 'default'}
+                        className="text-xs"
+                      >
+                        {settlementTypeLabel[history.newSettlementType]}
+                      </Badge>
+                    </div>
+                    <div className="text-sm text-text-muted">
+                      {history.changer?.name} • {new Date(history.createdAt).toLocaleString('ru-RU')}
+                    </div>
+                    {history.comment && (
+                      <div className="mt-2 rounded-xl border border-border-subtle bg-surface-inset p-3 text-sm text-brand-black">
+                        {history.comment}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
             </CardBody>
           </Card>
 
@@ -970,6 +1051,22 @@ const OrderDetails: React.FC = () => {
               <h2 className="text-section-title font-semibold text-brand-black">Финансы</h2>
             </CardHeader>
             <CardBody className="space-y-4">
+              {order.type !== 'return' && (
+                <div className="rounded-xl border border-border-subtle bg-brand-white p-4">
+                  <p className="text-caption font-medium text-text-muted">Условие расчёта</p>
+                  <div className="mt-2 flex items-center gap-2">
+                    <HandCoins className="h-5 w-5 text-text-muted" />
+                    <span className="font-semibold text-brand-black">
+                      {settlementTypeLabel[order.settlementType || 'standard']}
+                    </span>
+                  </div>
+                  {order.settlementType === 'consignment' && (
+                    <p className="mt-2 text-caption text-text-muted">
+                      Неоплаченный остаток учитывается в долге после приёмки. Платёж регистрируется отдельно.
+                    </p>
+                  )}
+                </div>
+              )}
               <div className="grid grid-cols-1 gap-3">
                 <FinanceStat
                   label="Общая сумма"

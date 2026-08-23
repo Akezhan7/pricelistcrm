@@ -2,6 +2,7 @@ const { Op } = require('sequelize');
 const sequelize = require('../config/database');
 const { Payment, Order, Supplier, User } = require('../models');
 const { DEBT_STATUSES } = require('../services/orderStatusPolicyService');
+const { calculateOrderDebtContribution } = require('../services/orderSettlementService');
 
 /**
  * Автоматический расчет статуса оплаты на основе сумм
@@ -35,17 +36,24 @@ const recalculateSupplierDebt = async (supplierId, options = {}) => {
       isActive: true,
       status: { [Op.in]: DEBT_STATUSES },
     },
-    attributes: ['totalAmount', 'paidAmount'],
+    attributes: [
+      'type',
+      'status',
+      'settlementType',
+      'totalAmount',
+      'paidAmount',
+      'isActive',
+    ],
     transaction: options.transaction,
   });
 
-  let totalDebt = 0;
-  for (const order of orders) {
-    const remaining = parseFloat(order.totalAmount) - parseFloat(order.paidAmount);
-    if (remaining > 0) {
-      totalDebt += remaining;
-    }
-  }
+  const totalDebt = Math.max(
+    0,
+    orders.reduce(
+      (sum, order) => sum + calculateOrderDebtContribution(order),
+      0
+    )
+  );
 
   // Обновляем поле debt в таблице поставщиков
   await Supplier.update(
@@ -174,6 +182,7 @@ const getPaymentsBySupplier = async (req, res) => {
       where: {
         supplierId,
         isActive: true,
+        type: 'purchase',
         paymentStatus: {
           [Op.in]: ['Не оплачено', 'Частично оплачено']
         },
@@ -370,7 +379,7 @@ const createPayment = async (req, res) => {
     }
 
     // Пересчет задолженности поставщика
-    await recalculateSupplierDebt(supplierId);
+    await recalculateSupplierDebt(supplierId, { transaction });
 
     await transaction.commit();
 
@@ -576,7 +585,7 @@ const updatePayment = async (req, res) => {
       }
 
       // Пересчет задолженности
-      await recalculateSupplierDebt(supplierId);
+      await recalculateSupplierDebt(supplierId, { transaction });
     }
 
     await transaction.commit();
@@ -694,7 +703,7 @@ const deletePayment = async (req, res) => {
     }
 
     // Пересчет задолженности
-    await recalculateSupplierDebt(supplierId);
+    await recalculateSupplierDebt(supplierId, { transaction });
 
     await transaction.commit();
 

@@ -10,6 +10,7 @@ const User = require('./User');
 const Order = require('./Order');
 const OrderItem = require('./OrderItem');
 const OrderStatusHistory = require('./OrderStatusHistory');
+const OrderSettlementHistory = require('./OrderSettlementHistory');
 const Payment = require('./Payment');
 const PriceHistory = require('./PriceHistory');
 const Category = require('./Category');
@@ -29,6 +30,8 @@ const ProductDesignerKpiEntry = require('./ProductDesignerKpiEntry');
 const EmployeeTask = require('./EmployeeTask');
 const EmployeeTaskHistory = require('./EmployeeTaskHistory');
 const EmployeeTaskComment = require('./EmployeeTaskComment');
+const ProcurementList = require('./ProcurementList');
+const ProcurementListItem = require('./ProcurementListItem');
 
 // Связи между рынками и секторами
 Market.hasMany(Sector, {
@@ -213,6 +216,30 @@ OrderStatusHistory.belongsTo(User, {
   onUpdate: 'CASCADE',
 });
 
+Order.hasMany(OrderSettlementHistory, {
+  foreignKey: 'orderId',
+  as: 'settlementHistory',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE',
+});
+
+OrderSettlementHistory.belongsTo(Order, {
+  foreignKey: 'orderId',
+  as: 'order',
+});
+
+OrderSettlementHistory.belongsTo(User, {
+  foreignKey: 'changedBy',
+  as: 'changer',
+  onDelete: 'RESTRICT',
+  onUpdate: 'CASCADE',
+});
+
+User.hasMany(OrderSettlementHistory, {
+  foreignKey: 'changedBy',
+  as: 'orderSettlementChanges',
+});
+
 User.hasMany(OrderStatusHistory, {
   foreignKey: 'changedBy',
   as: 'statusChanges',
@@ -304,6 +331,78 @@ Category.hasMany(Product, {
 Product.belongsTo(Category, {
   foreignKey: 'categoryId',
   as: 'category',
+});
+
+ProcurementList.belongsTo(User, {
+  foreignKey: 'createdByUserId',
+  as: 'creator',
+  onDelete: 'RESTRICT',
+  onUpdate: 'CASCADE',
+});
+
+User.hasMany(ProcurementList, {
+  foreignKey: 'createdByUserId',
+  as: 'createdProcurementLists',
+});
+
+ProcurementList.hasMany(ProcurementListItem, {
+  foreignKey: 'procurementListId',
+  as: 'items',
+  onDelete: 'CASCADE',
+  onUpdate: 'CASCADE',
+});
+
+ProcurementListItem.belongsTo(ProcurementList, {
+  foreignKey: 'procurementListId',
+  as: 'list',
+});
+
+ProcurementListItem.belongsTo(Product, {
+  foreignKey: 'productId',
+  as: 'product',
+  onDelete: 'RESTRICT',
+  onUpdate: 'CASCADE',
+});
+
+Product.hasMany(ProcurementListItem, {
+  foreignKey: 'productId',
+  as: 'procurementListItems',
+});
+
+ProcurementListItem.belongsTo(Supplier, {
+  foreignKey: 'selectedSupplierId',
+  as: 'selectedSupplier',
+  onDelete: 'SET NULL',
+  onUpdate: 'CASCADE',
+});
+
+Supplier.hasMany(ProcurementListItem, {
+  foreignKey: 'selectedSupplierId',
+  as: 'procurementListItems',
+});
+
+ProcurementListItem.belongsTo(OrderItem, {
+  foreignKey: 'orderItemId',
+  as: 'generatedOrderItem',
+  onDelete: 'RESTRICT',
+  onUpdate: 'CASCADE',
+});
+
+OrderItem.hasOne(ProcurementListItem, {
+  foreignKey: 'orderItemId',
+  as: 'procurementListItem',
+});
+
+ProcurementListItem.belongsTo(User, {
+  foreignKey: 'addedByUserId',
+  as: 'addedBy',
+  onDelete: 'RESTRICT',
+  onUpdate: 'CASCADE',
+});
+
+User.hasMany(ProcurementListItem, {
+  foreignKey: 'addedByUserId',
+  as: 'addedProcurementListItems',
 });
 
 Product.belongsTo(User, {

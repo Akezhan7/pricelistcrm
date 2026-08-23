@@ -25,6 +25,7 @@ const warehouseRoutes = require('./routes/warehouse');
 const exportRoutes = require('./routes/export');
 const analyticsRoutes = require('./routes/analytics');
 const taskRoutes = require('./routes/tasks');
+const procurementListRoutes = require('./routes/procurementLists');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -156,6 +157,7 @@ app.use('/api/warehouse', warehouseRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/procurement-lists', procurementListRoutes);
 
 // Базовый маршрут
 app.get('/api', (req, res) => {

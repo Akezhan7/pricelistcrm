@@ -37,6 +37,8 @@
     "test:order-status-policy": "node scripts/testOrderStatusPolicyService.js",
     "test:employee-tasks": "node scripts/testEmployeeTaskService.js",
     "test:product-designer-kpi": "node scripts/testProductDesignerKpiService.js",
+    "test:procurement-list": "node scripts/testProcurementListService.js",
+    "test:order-settlement": "node scripts/testOrderSettlementService.js",
     "test-connection": "node scripts/testConnection.js",
     "db:migrate": "node scripts/runMigrations.js up",
     "db:migrate:undo": "node scripts/runMigrations.js down",

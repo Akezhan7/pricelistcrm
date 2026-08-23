@@ -3,7 +3,7 @@ import ordersApi from '../services/ordersApi';
 import suppliersApi from '../services/suppliersApi';
 import productsApi from '../services/productsApi';
 import api from '../utils/api';
-import type { Supplier, CreateOrderDto, ProductVariation, ProductWithPrice } from '../types';
+import type { Supplier, CreateOrderDto, ProductVariation, ProductWithPrice, OrderSettlementType } from '../types';
 import {
   type OrderLineForm,
   buildMainOrderLine,
@@ -30,6 +30,7 @@ const SUPPLIERS_LIST_LIMIT = 1000;
 
 const EMPTY_FORM = {
   supplierId: null as number | null,
+  settlementType: 'standard' as OrderSettlementType,
   expectedDeliveryDate: '',
   deliveryLocation: 'Точка Байсад',
   notes: '',
@@ -49,6 +50,7 @@ const CreateOrderModal: React.FC = () => {
   const isReturn = orderType === 'return';
 
   const [supplierId, setSupplierId] = useState<number | null>(EMPTY_FORM.supplierId);
+  const [settlementType, setSettlementType] = useState<OrderSettlementType>(EMPTY_FORM.settlementType);
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState(EMPTY_FORM.expectedDeliveryDate);
   const [deliveryLocation, setDeliveryLocation] = useState(EMPTY_FORM.deliveryLocation);
   const [notes, setNotes] = useState(EMPTY_FORM.notes);
@@ -96,6 +98,7 @@ const CreateOrderModal: React.FC = () => {
 
   const resetForm = () => {
     setSupplierId(EMPTY_FORM.supplierId);
+    setSettlementType(EMPTY_FORM.settlementType);
     setExpectedDeliveryDate(EMPTY_FORM.expectedDeliveryDate);
     setDeliveryLocation(EMPTY_FORM.deliveryLocation);
     setNotes(EMPTY_FORM.notes);
@@ -125,6 +128,7 @@ const CreateOrderModal: React.FC = () => {
 
     const sid = draft?.supplierId ? draft.supplierId : null;
     setSupplierId(sid);
+    setSettlementType(EMPTY_FORM.settlementType);
     setItems(draftLinesToForm(draft));
     setDeliveryLocation(draft?.deliveryLocation ?? EMPTY_FORM.deliveryLocation);
     setExpectedDeliveryDate(draft?.expectedDeliveryDate ?? EMPTY_FORM.expectedDeliveryDate);
@@ -293,6 +297,7 @@ const CreateOrderModal: React.FC = () => {
       const orderData: CreateOrderDto = {
         supplierId,
         type: orderType,
+        settlementType: isReturn ? 'standard' : settlementType,
         expectedDeliveryDate: expectedDeliveryDate || undefined,
         deliveryLocation: deliveryLocation || undefined,
         notes: notes || undefined,
@@ -378,6 +383,17 @@ const CreateOrderModal: React.FC = () => {
                 </option>
               ))}
             </Select>
+
+            {!isReturn && (
+              <Select
+                label="Условие расчёта"
+                value={settlementType}
+                onChange={(event) => setSettlementType(event.target.value as OrderSettlementType)}
+              >
+                <option value="standard">Обычная закупка</option>
+                <option value="consignment">Под реализацию</option>
+              </Select>
+            )}
 
             {!isReturn && !supplierId && (
               <div className="md:col-span-2">
