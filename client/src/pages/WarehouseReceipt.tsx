@@ -32,6 +32,7 @@ import { formatPriceKZT } from '../utils/format';
 import { cn } from '../utils/cn';
 
 interface ReceiptItem {
+  orderItemId: number;
   productId: number;
   productName: string;
   expectedQuantity: number;
@@ -41,6 +42,7 @@ interface ReceiptItem {
 
 const buildReceiptItems = (order: Order): ReceiptItem[] =>
   order.items?.map((item) => ({
+    orderItemId: item.id,
     productId: item.product?.id || item.productId,
     productName: item.product?.internalName || item.product?.name || 'Неизвестный товар',
     expectedQuantity: item.quantity,
@@ -111,18 +113,18 @@ export const WarehouseReceipt: React.FC = () => {
     setGeneralNotes('');
   };
 
-  const updateReceivedQuantity = (productId: number, value: string) => {
+  const updateReceivedQuantity = (orderItemId: number, value: string) => {
     const quantity = parseInt(value) || 0;
     setReceiptItems((items) =>
       items.map((item) =>
-        item.productId === productId ? { ...item, receivedQuantity: quantity } : item
+        item.orderItemId === orderItemId ? { ...item, receivedQuantity: quantity } : item
       )
     );
   };
 
-  const updateItemNotes = (productId: number, notes: string) => {
+  const updateItemNotes = (orderItemId: number, notes: string) => {
     setReceiptItems((items) =>
-      items.map((item) => (item.productId === productId ? { ...item, notes } : item))
+      items.map((item) => (item.orderItemId === orderItemId ? { ...item, notes } : item))
     );
   };
 
@@ -168,6 +170,7 @@ export const WarehouseReceipt: React.FC = () => {
       setSubmitting(true);
 
       const items = receiptItems.map((item) => ({
+        orderItemId: item.orderItemId,
         productId: item.productId,
         expectedQuantity: item.expectedQuantity,
         receivedQuantity: item.receivedQuantity,
@@ -350,7 +353,7 @@ export const WarehouseReceipt: React.FC = () => {
             <div className="md:hidden space-y-3">
               <p className="text-overline text-text-muted">Сверка товаров</p>
               {receiptItems.map((item) => (
-                <Card key={item.productId} variant="inset" className="shadow-none">
+                <Card key={item.orderItemId} variant="inset" className="shadow-none">
                   <CardBody className="p-4 space-y-3">
                     <div className="flex items-start justify-between gap-3">
                       <p className="text-body-medium text-brand-black">{item.productName}</p>
@@ -367,7 +370,7 @@ export const WarehouseReceipt: React.FC = () => {
                           type="number"
                           min={0}
                           value={item.receivedQuantity}
-                          onChange={(e) => updateReceivedQuantity(item.productId, e.target.value)}
+                          onChange={(e) => updateReceivedQuantity(item.orderItemId, e.target.value)}
                           className="text-center tabular-nums"
                         />
                       </div>
@@ -376,7 +379,7 @@ export const WarehouseReceipt: React.FC = () => {
                       type="text"
                       placeholder="Комментарий..."
                       value={item.notes}
-                      onChange={(e) => updateItemNotes(item.productId, e.target.value)}
+                      onChange={(e) => updateItemNotes(item.orderItemId, e.target.value)}
                     />
                   </CardBody>
                 </Card>
@@ -401,7 +404,7 @@ export const WarehouseReceipt: React.FC = () => {
                 </TableHead>
                 <TableBody>
                   {receiptItems.map((item) => (
-                    <TableRow key={item.productId}>
+                    <TableRow key={item.orderItemId}>
                       <TableCell>
                         <div className="text-body-medium text-brand-black">{item.productName}</div>
                       </TableCell>
@@ -416,7 +419,7 @@ export const WarehouseReceipt: React.FC = () => {
                           min={0}
                           value={item.receivedQuantity}
                           onChange={(e) =>
-                            updateReceivedQuantity(item.productId, e.target.value)
+                            updateReceivedQuantity(item.orderItemId, e.target.value)
                           }
                           className="w-24 mx-auto text-center tabular-nums"
                         />
@@ -429,7 +432,7 @@ export const WarehouseReceipt: React.FC = () => {
                             type="text"
                             placeholder="Комментарий..."
                             value={item.notes}
-                            onChange={(e) => updateItemNotes(item.productId, e.target.value)}
+                            onChange={(e) => updateItemNotes(item.orderItemId, e.target.value)}
                           />
                         </div>
                       </TableCell>

@@ -12,6 +12,11 @@ const WarehouseReceiptItem = sequelize.define('WarehouseReceiptItem', {
     allowNull: false,
     comment: 'ID приёмки',
   },
+  orderItemId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: 'Строка заявки, по которой выполнена приёмка',
+  },
   productId: {
     type: DataTypes.INTEGER,
     allowNull: false,
@@ -55,6 +60,10 @@ const WarehouseReceiptItem = sequelize.define('WarehouseReceiptItem', {
     {
       fields: ['product_id'],
       name: 'warehouse_receipt_items_product_id_idx',
+    },
+    {
+      fields: ['order_item_id'],
+      name: 'warehouse_receipt_items_order_item_idx',
     },
     {
       fields: ['receipt_id', 'product_id'],

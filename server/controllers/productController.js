@@ -63,6 +63,7 @@ const {
 const { uploadsDir } = require('../middleware/upload');
 const {
   buildProductCategoryFilter,
+  buildProductSearchFilter,
 } = require('../services/productListQueryService');
 const {
   buildProductWorkflowQuery,
@@ -328,15 +329,7 @@ const getAllProducts = async (req, res) => {
       }
     }
 
-    if (search) {
-      whereClause[Op.or] = [
-        { name: { [Op.like]: `%${search}%` } },
-        { article: { [Op.like]: `%${search}%` } },
-        { internalName: { [Op.like]: `%${search}%` } },
-        { kaspiName: { [Op.like]: `%${search}%` } },
-        { kaspiArticle: { [Op.like]: `%${search}%` } },
-      ];
-    }
+    Object.assign(whereClause, buildProductSearchFilter(search));
 
     const products = await Product.findAndCountAll({
       where: whereClause,

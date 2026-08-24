@@ -643,6 +643,7 @@ export interface OrderItem {
     sku?: string;
   };
   quantity: number;
+  orderedQuantity?: number | null;
   priceAtPurchase: string | number;
   totalPrice: string | number;
   notes?: string;
@@ -1016,6 +1017,7 @@ export type WarehouseReceiptType = 'full' | 'partial';
 export interface WarehouseReceiptItem {
   id: number;
   receiptId: number;
+  orderItemId?: number | null;
   productId: number;
   product?: {
     id: number;
@@ -1056,6 +1058,7 @@ export interface WarehouseReceipt {
 export interface ReceiveOrderDto {
   receiptType: 'full' | 'partial';
   items: Array<{
+    orderItemId: number;
     productId: number;
     expectedQuantity: number;
     receivedQuantity: number;

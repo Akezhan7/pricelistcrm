@@ -8,12 +8,17 @@ const {
   WarehouseReceipt,
   WarehouseReceiptItem,
   OrderStatusHistory,
+  ProductLifecyclePurchase,
+  ProductActionHistory,
 } = require('../models');
 const { Op } = require('sequelize');
+const { validationResult } = require('express-validator');
 const { getStockStatus } = require('./productController');
 const { assertOrderHasSupplier } = require('../services/orderSupplierPolicyService');
 const { canReceiveAtWarehouse } = require('../services/orderStatusPolicyService');
 const { recalculateSupplierDebt } = require('./paymentController');
+const { buildWarehouseReceiptPlan } = require('../services/warehouseReceiptService');
+const { PRODUCT_LIFECYCLE_STATUSES } = require('../constants/productLifecycle');
 
 /**
  * Получить список заявок, ожидающих приёмки
@@ -88,205 +93,182 @@ const getPendingReceipts = async (req, res) => {
  * POST /api/warehouse/receive/:orderId
  */
 const receiveOrder = async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      message: 'Проверьте данные приёмки',
+      errors: errors.array(),
+    });
+  }
+
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
   try {
-    const { orderId } = req.params;
-    const { items, notes } = req.body;
-
-    // items: [{ productId, expectedQuantity, receivedQuantity, notes }]
-
-    if (!items || !Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Необходимо указать товары для приёмки',
-      });
+    const order = await Order.findOne({
+      where: { id: req.params.orderId, isActive: true },
+      transaction,
+      lock: true,
+    });
+    if (!order) {
+      const error = new Error('Заявка не найдена');
+      error.statusCode = 404;
+      throw error;
     }
 
-    const order = await Order.findOne({
-      where: { id: orderId, isActive: true },
+    assertOrderHasSupplier(order);
+    if (!canReceiveAtWarehouse(order.status, req.user.role)) {
+      const error = new Error(`Заявку в статусе «${order.status}» нельзя принять на склад`);
+      error.statusCode = 409;
+      error.code = 'WAREHOUSE_RECEIPT_NOT_ALLOWED';
+      throw error;
+    }
+
+    const orderItems = await OrderItem.findAll({
+      where: { orderId: order.id },
+      include: [{ model: Product, as: 'product', required: true }],
+      transaction,
+      order: [['id', 'ASC']],
+    });
+    const plan = buildWarehouseReceiptPlan({
+      order: { ...order.get({ plain: true }), items: orderItems },
+      items: req.body.items,
+    });
+    const now = new Date();
+    const receipt = await WarehouseReceipt.create({
+      orderId: order.id,
+      receivedBy: req.user.id,
+      receiptType: plan.hasDiscrepancy ? 'partial' : 'full',
+      receivedAt: now,
+      notes: req.body.notes || '',
+    }, { transaction });
+
+    const lifecyclePurchases = await ProductLifecyclePurchase.findAll({
+      where: { orderItemId: { [Op.in]: plan.orderItemUpdates.map((item) => item.id) } },
+      transaction,
+      lock: true,
+    });
+    const lifecyclePurchaseByOrderItemId = new Map(
+      lifecyclePurchases.map((purchase) => [Number(purchase.orderItemId), purchase])
+    );
+    const orderItemsById = new Map(orderItems.map((item) => [Number(item.id), item]));
+
+    for (const update of plan.orderItemUpdates) {
+      const orderItem = orderItemsById.get(update.id);
+      const receiptItem = plan.receiptItems.find((item) => item.orderItemId === update.id);
+      const product = orderItem.product;
+      const lifecyclePurchase = lifecyclePurchaseByOrderItemId.get(update.id);
+
+      await orderItem.update({
+        orderedQuantity: update.orderedQuantity,
+        quantity: update.quantity,
+        totalPrice: update.totalPrice,
+      }, { transaction });
+      await product.update({
+        currentStock: Number(product.currentStock || 0) + update.quantity,
+        ...(lifecyclePurchase && product.lifecycleStatus === PRODUCT_LIFECYCLE_STATUSES.PURCHASE
+          ? {
+              lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.WAREHOUSE,
+              lifecycleCompletedAt: null,
+              assignedToUserId: null,
+            }
+          : {}),
+      }, {
+        transaction,
+        userId: req.user.id,
+        orderId: order.id,
+        changeType: 'receipt',
+        reason: `Приёмка товара по заявке ${order.orderNumber}`,
+        notes: receiptItem.notes
+          || `Принято ${update.quantity} шт, заказано ${update.orderedQuantity} шт`,
+      });
+
+      if (lifecyclePurchase) {
+        await lifecyclePurchase.update({
+          receivedQuantity: update.quantity,
+          arrivedAt: now,
+          arrivedBy: req.user.id,
+        }, { transaction });
+        await ProductActionHistory.create({
+          productId: product.id,
+          actorId: req.user.id,
+          actionType: 'warehouse_arrival_marked',
+          fromStatus: PRODUCT_LIFECYCLE_STATUSES.PURCHASE,
+          toStatus: PRODUCT_LIFECYCLE_STATUSES.WAREHOUSE,
+          message: 'Product received from grouped supplier order',
+          metadata: {
+            orderId: order.id,
+            warehouseReceiptId: receipt.id,
+            expectedQuantity: update.orderedQuantity,
+            receivedQuantity: update.quantity,
+          },
+          createdAt: now,
+        }, { transaction });
+      }
+    }
+
+    await WarehouseReceiptItem.bulkCreate(
+      plan.receiptItems.map((item) => ({ receiptId: receipt.id, ...item })),
+      { transaction }
+    );
+
+    const oldStatus = order.status;
+    await order.update({
+      status: 'Принята на складе',
+      totalAmount: plan.totalAmount.toFixed(2),
+      paymentStatus: plan.paymentStatus,
+    }, { transaction });
+    await OrderStatusHistory.create({
+      orderId: order.id,
+      oldStatus,
+      newStatus: 'Принята на складе',
+      changedBy: req.user.id,
+      comment: plan.hasDiscrepancy
+        ? `Принято с расхождениями. Итоговая сумма: ${plan.totalAmount.toFixed(2)} ₸. ${req.body.notes || ''}`.trim()
+        : `Принято полностью. ${req.body.notes || ''}`.trim(),
+      changedAt: now,
+    }, { transaction });
+    await recalculateSupplierDebt(order.supplierId, { transaction });
+
+    await transaction.commit();
+    transactionFinished = true;
+
+    const createdReceipt = await WarehouseReceipt.findByPk(receipt.id, {
       include: [
+        { model: User, as: 'receiver', attributes: ['id', 'name', 'email'] },
         {
-          model: OrderItem,
+          model: WarehouseReceiptItem,
           as: 'items',
-          include: [
-            {
-              model: Product,
-              as: 'product',
-            },
-          ],
+          include: [{
+            model: Product,
+            as: 'product',
+            attributes: ['id', 'name', 'internalName', 'article', 'currentStock', 'minStock'],
+          }],
         },
+        { model: Order, as: 'order', attributes: ['id', 'orderNumber', 'status', 'totalAmount'] },
       ],
     });
 
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: 'Заявка не найдена',
-      });
-    }
-
-    try {
-      assertOrderHasSupplier(order);
-    } catch (error) {
-      return res.status(error.statusCode || 409).json({
-        success: false,
-        message: 'Сначала назначьте поставщика заявке',
-        code: error.code,
-      });
-    }
-
-    if (!canReceiveAtWarehouse(order.status, req.user.role)) {
-      return res.status(409).json({
-        success: false,
-        message: `Заявку в статусе «${order.status}» нельзя принять на склад`,
-        code: 'WAREHOUSE_RECEIPT_NOT_ALLOWED',
-      });
-    }
-
-    const transaction = await sequelize.transaction();
-
-    try {
-      // Определяем тип приёмки (full/partial)
-      let hasDiscrepancy = false;
-      const receiptItems = [];
-
-      for (const item of items) {
-        const orderItem = order.items.find(oi => oi.productId === item.productId);
-
-        if (!orderItem) {
-          throw new Error(`Товар с ID ${item.productId} не найден в заявке`);
-        }
-
-        const expectedQty = item.expectedQuantity || orderItem.quantity;
-        const receivedQty = item.receivedQuantity || 0;
-        const discrepancy = expectedQty - receivedQty;
-
-        if (discrepancy !== 0) {
-          hasDiscrepancy = true;
-        }
-
-        receiptItems.push({
-          productId: item.productId,
-          expectedQuantity: expectedQty,
-          receivedQuantity: receivedQty,
-          discrepancy,
-          notes: item.notes || '',
-        });
-
-        // Обновляем остаток товара с контекстом для логирования
-        const product = orderItem.product;
-        await product.update(
-          {
-            currentStock: product.currentStock + receivedQty,
-          },
-          { 
-            transaction,
-            // Передаём контекст для хука StockHistory
-            userId: req.user.id,
-            orderId: order.id,
-            changeType: 'receipt',
-            reason: `Приёмка товара по заявке ${order.orderNumber}`,
-            notes: item.notes || `Принято ${receivedQty} шт${discrepancy !== 0 ? `, расхождение ${discrepancy} шт` : ''}`,
-          }
-        );
-
-        console.log(`[STOCK UPDATE] Product #${product.id} (${product.name}): ${product.currentStock - receivedQty} + ${receivedQty} = ${product.currentStock}`);
-      }
-
-      // Создаём запись приёмки
-      const receipt = await WarehouseReceipt.create(
-        {
-          orderId: order.id,
-          receivedBy: req.user.id,
-          receiptType: hasDiscrepancy ? 'partial' : 'full',
-          receivedAt: new Date(),
-          notes: notes || '',
-        },
-        { transaction }
-      );
-
-      // Создаём записи по каждому товару
-      for (const item of receiptItems) {
-        await WarehouseReceiptItem.create(
-          {
-            receiptId: receipt.id,
-            ...item,
-          },
-          { transaction }
-        );
-      }
-
-      // Обновляем статус заявки
-      const oldStatus = order.status;
-      await order.update(
-        { status: 'Принята на складе' },
-        { transaction }
-      );
-
-      // Логируем изменение статуса
-      await OrderStatusHistory.create(
-        {
-          orderId: order.id,
-          oldStatus,
-          newStatus: 'Принята на складе',
-          changedBy: req.user.id,
-          notes: hasDiscrepancy
-            ? `Принято с расхождениями. ${notes || ''}`
-            : `Принято полностью. ${notes || ''}`,
-        },
-        { transaction }
-      );
-
-      await recalculateSupplierDebt(order.supplierId, { transaction });
-
-      await transaction.commit();
-
-      // Получаем полную информацию о приёмке
-      const createdReceipt = await WarehouseReceipt.findByPk(receipt.id, {
-        include: [
-          {
-            model: User,
-            as: 'receiver',
-            attributes: ['id', 'name', 'email'],
-          },
-          {
-            model: WarehouseReceiptItem,
-            as: 'items',
-            include: [
-              {
-                model: Product,
-                as: 'product',
-                attributes: ['id', 'name', 'internalName', 'article', 'currentStock', 'minStock'],
-              },
-            ],
-          },
-          {
-            model: Order,
-            as: 'order',
-            attributes: ['id', 'orderNumber', 'status'],
-          },
-        ],
-      });
-
-      res.json({
-        success: true,
-        message: hasDiscrepancy
-          ? 'Приёмка завершена с расхождениями. Остатки обновлены.'
-          : 'Приёмка завершена успешно. Остатки обновлены.',
-        data: {
-          receipt: createdReceipt,
-          hasDiscrepancy,
-        },
-      });
-    } catch (error) {
-      await transaction.rollback();
-      throw error;
-    }
+    return res.json({
+      success: true,
+      message: plan.hasDiscrepancy
+        ? 'Приёмка завершена. Заявка пересчитана по фактическому количеству.'
+        : 'Приёмка завершена успешно.',
+      data: { receipt: createdReceipt, hasDiscrepancy: plan.hasDiscrepancy },
+    });
   } catch (error) {
-    console.error('Ошибка приёмки заявки:', error);
-    res.status(500).json({
+    if (!transactionFinished) await transaction.rollback();
+    const status = error.statusCode || 500;
+    if (status >= 500) console.error('Ошибка приёмки заявки:', error);
+    return res.status(status).json({
       success: false,
-      message: 'Ошибка приёмки заявки',
-      error: error.message,
+      message: error.code === 'ORDER_RECEIPT_OVERPAYMENT'
+        ? 'Фактическая сумма заявки меньше уже зарегистрированной оплаты. Сначала скорректируйте оплату.'
+        : status >= 500
+          ? 'Ошибка приёмки заявки'
+          : error.message,
+      code: error.code,
     });
   }
 };

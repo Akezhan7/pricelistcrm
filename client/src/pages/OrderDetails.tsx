@@ -780,7 +780,14 @@ const OrderDetails: React.FC = () => {
                         )}
                       </TableCell>
                       <TableCell className="text-right font-medium text-brand-black">
-                        {item.quantity}
+                        <div>{item.quantity}</div>
+                        {item.orderedQuantity !== null
+                          && item.orderedQuantity !== undefined
+                          && item.orderedQuantity !== item.quantity && (
+                            <div className="mt-1 text-caption font-normal text-text-muted">
+                              Заказано: {item.orderedQuantity}
+                            </div>
+                          )}
                       </TableCell>
                       <TableCell className="text-right text-brand-black">
                         {formatPriceKZT(item.priceAtPurchase)}

@@ -614,6 +614,16 @@ Order.hasMany(StockHistory, {
   as: 'stockChanges',
 });
 
+WarehouseReceiptItem.belongsTo(OrderItem, {
+  foreignKey: 'orderItemId',
+  as: 'orderItem',
+});
+
+OrderItem.hasMany(WarehouseReceiptItem, {
+  foreignKey: 'orderItemId',
+  as: 'warehouseReceiptItems',
+});
+
 // Связи для lifecycle-истории товара
 Product.hasMany(ProductActionHistory, {
   foreignKey: 'productId',

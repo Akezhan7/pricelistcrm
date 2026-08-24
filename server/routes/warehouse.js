@@ -18,6 +18,7 @@ router.post(
   '/receive/:orderId',
   param('orderId').isInt(),
   body('items').notEmpty().isArray({ min: 1 }),
+  body('items.*.orderItemId').notEmpty().isInt({ min: 1 }),
   body('items.*.productId').notEmpty().isInt(),
   body('items.*.expectedQuantity').notEmpty().isInt({ min: 0 }),
   body('items.*.receivedQuantity').notEmpty().isInt({ min: 0 }),

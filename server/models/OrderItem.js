@@ -26,9 +26,17 @@ const OrderItem = sequelize.define('OrderItem', {
     type: DataTypes.INTEGER,
     allowNull: false,
     validate: {
-      min: 1,
+      min: 0,
     },
-    comment: 'Количество товара в заявке',
+    comment: 'Итоговое количество; после приёмки — фактически принятое',
+  },
+  orderedQuantity: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    validate: {
+      min: 0,
+    },
+    comment: 'Первоначально заказанное количество до складской приёмки',
   },
   priceAtPurchase: {
     type: DataTypes.DECIMAL(10, 2),
@@ -75,7 +83,7 @@ const OrderItem = sequelize.define('OrderItem', {
   hooks: {
     // Автоматический расчет totalPrice перед сохранением
     beforeValidate: (orderItem) => {
-      if (orderItem.quantity && orderItem.priceAtPurchase) {
+      if (orderItem.quantity !== undefined && orderItem.priceAtPurchase !== undefined) {
         orderItem.totalPrice = parseFloat(orderItem.quantity) * parseFloat(orderItem.priceAtPurchase);
       }
     },

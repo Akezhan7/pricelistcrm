@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import ReactSelect from 'react-select';
 import { ArrowRight, Check, FileText, PackageSearch, Plus, Save, ShoppingBasket, Trash2, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
@@ -10,7 +11,6 @@ import {
   IconButton,
   Input,
   PageHeader,
-  Select,
   Spinner,
   Textarea,
 } from '../components/ui';
@@ -93,6 +93,13 @@ const ProcurementItemRow: React.FC<ItemRowProps> = ({
     || notes.trim() !== (item.notes || '')
     || (selectedSupplierId === '' ? null : Number(selectedSupplierId)) !== item.selectedSupplierId
     || parsedPurchasePrice !== (item.purchasePrice === null ? null : Number(item.purchasePrice));
+  const supplierOptions = suppliers.map((supplier) => ({
+    value: supplier.id,
+    label: supplier.name,
+  }));
+  const selectedSupplierOption = supplierOptions.find(
+    (option) => String(option.value) === selectedSupplierId
+  ) || null;
 
   const selectSupplier = async (supplierId: number | null) => {
     const recommendation = item.supplierRecommendation;
@@ -181,19 +188,34 @@ const ProcurementItemRow: React.FC<ItemRowProps> = ({
       </div>
 
       <div className="mt-3 grid gap-3 border-l-2 border-brand-yellow pl-3 md:grid-cols-[minmax(15rem,1fr)_10rem_minmax(16rem,1fr)] md:items-end">
-        <Select
-          label="Поставщик"
-          value={selectedSupplierId}
-          disabled={busy}
-          onChange={(event) => selectSupplier(
-            event.target.value ? Number(event.target.value) : null
-          )}
-        >
-          <option value="">Не выбран</option>
-          {suppliers.map((supplier) => (
-            <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
-          ))}
-        </Select>
+        <div className="w-full">
+          <label className="mb-1.5 block text-caption font-medium text-brand-black">
+            Поставщик
+          </label>
+          <ReactSelect
+            options={supplierOptions}
+            value={selectedSupplierOption}
+            onChange={(option) => selectSupplier(option?.value ?? null)}
+            placeholder="Найти поставщика"
+            noOptionsMessage={() => 'Поставщики не найдены'}
+            isClearable
+            isDisabled={busy}
+            menuPosition="fixed"
+            menuPortalTarget={document.body}
+            maxMenuHeight={280}
+            styles={{
+              control: (base, state) => ({
+                ...base,
+                minHeight: '44px',
+                borderRadius: '8px',
+                borderColor: state.isFocused ? '#f4bd00' : '#d1d5db',
+                boxShadow: state.isFocused ? '0 0 0 2px rgba(244, 189, 0, 0.2)' : 'none',
+                ':hover': { borderColor: '#9ca3af' },
+              }),
+              menuPortal: (base) => ({ ...base, zIndex: 70 }),
+            }}
+          />
+        </div>
         <Input
           label="Цена закупа"
           type="number"
@@ -291,7 +313,7 @@ export const ProcurementListPage: React.FC = () => {
     const timeout = window.setTimeout(async () => {
       setSearching(true);
       try {
-        const products = await productsApi.getProducts({ search: normalizedSearch, limit: 12 });
+        const products = await productsApi.getProducts({ search: normalizedSearch, limit: 30 });
         if (!cancelled) setSearchResults(products);
       } catch (searchError) {
         if (!cancelled) {

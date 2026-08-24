@@ -183,7 +183,7 @@ const createOrderHTML = (order: Order): HTMLElement => {
               ${item.variation ? `<div style="font-size:10px;color:${BRAND.textMuted};font-style:italic;margin-top:3px;">${item.variation.name}: ${item.variation.value}</div>` : ''}
             </td>
             <td style="padding:8px;border-bottom:1px solid ${BRAND.border};text-align:right;vertical-align:middle;">${formatNumber(item.priceAtPurchase)} ₸</td>
-            <td style="padding:8px;border-bottom:1px solid ${BRAND.border};text-align:center;vertical-align:middle;font-weight:600;">${item.quantity}</td>
+            <td style="padding:8px;border-bottom:1px solid ${BRAND.border};text-align:center;vertical-align:middle;font-weight:600;">${item.quantity}${item.orderedQuantity !== null && item.orderedQuantity !== undefined && item.orderedQuantity !== item.quantity ? `<div style="margin-top:2px;font-size:9px;font-weight:400;color:${BRAND.textMuted};">заказано: ${item.orderedQuantity}</div>` : ''}</td>
             <td style="padding:8px;border-bottom:1px solid ${BRAND.border};text-align:right;vertical-align:middle;font-weight:600;">${formatNumber(sum)} ₸</td>
           </tr>
         `;

@@ -39,6 +39,7 @@
     "test:product-designer-kpi": "node scripts/testProductDesignerKpiService.js",
     "test:procurement-list": "node scripts/testProcurementListService.js",
     "test:order-settlement": "node scripts/testOrderSettlementService.js",
+    "test:warehouse-receipt": "node scripts/testWarehouseReceiptService.js",
     "test-connection": "node scripts/testConnection.js",
     "db:migrate": "node scripts/runMigrations.js up",
     "db:migrate:undo": "node scripts/runMigrations.js down",
