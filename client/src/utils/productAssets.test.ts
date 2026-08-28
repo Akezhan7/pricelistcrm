@@ -8,6 +8,7 @@ import {
   getProductAssetThumbnailPath,
   getGalleryImageAssets,
   recommendAssetTypeForFiles,
+  getChunkRetryDelayMs,
   shouldUseChunkedUpload,
   shouldRetryChunkUpload,
 } from './productAssets';
@@ -87,6 +88,11 @@ describe('productAssets helpers', () => {
     expect(shouldRetryChunkUpload(429, 1)).toBe(true);
     expect(shouldRetryChunkUpload(400, 0)).toBe(false);
     expect(shouldRetryChunkUpload(503, 2)).toBe(false);
+  });
+
+  it('adds a short delay before retrying a failed chunk', () => {
+    expect(getChunkRetryDelayMs(0)).toBe(1000);
+    expect(getChunkRetryDelayMs(1)).toBe(2000);
   });
 
   it('selects optimized image paths with an original fallback', () => {

@@ -2,6 +2,8 @@ const assert = require('assert');
 const {
   buildProductCategoryFilter,
   buildProductSearchFilter,
+  buildProductSearchOrder,
+  buildProductSupplierFilter,
   normalizeProductSearchTokens,
 } = require('../services/productListQueryService');
 const { Op } = require('sequelize');
@@ -30,7 +32,7 @@ function testBuildsCaseInsensitiveTokenSearch() {
   assert.strictEqual(filter[Op.and].length, 2);
 
   const firstTokenFields = filter[Op.and][0][Op.or];
-  assert.strictEqual(firstTokenFields.length, 5);
+  assert.strictEqual(firstTokenFields.length, 2);
   assert.deepStrictEqual(firstTokenFields[0].name, { [Op.iLike]: '%малярный%' });
   assert.deepStrictEqual(firstTokenFields[1].article, { [Op.iLike]: '%малярный%' });
 
@@ -39,5 +41,39 @@ function testBuildsCaseInsensitiveTokenSearch() {
 }
 
 testBuildsCaseInsensitiveTokenSearch();
+
+function testDoesNotSearchHiddenProductNames() {
+  const filter = buildProductSearchFilter('drill');
+  const searchedFields = filter[Op.and][0][Op.or].map((condition) => Object.keys(condition)[0]);
+
+  assert.deepStrictEqual(searchedFields, ['name', 'article']);
+}
+
+function testBuildsRelevantSearchOrder() {
+  const sql = {
+    escape: (value) => `'${value}'`,
+    literal: (value) => ({ sql: value }),
+  };
+  const order = buildProductSearchOrder('  Marker  ', sql);
+
+  assert.strictEqual(order.length, 2);
+  assert.match(order[0][0].sql, /LOWER\("Product"\."article"\) = 'marker'/);
+  assert.match(order[0][0].sql, /LOWER\("Product"\."name"\) = 'marker'/);
+  assert.match(order[0][0].sql, /POSITION\('marker' IN LOWER\("Product"\."name"\)\) = 1/);
+  assert.deepStrictEqual(order[1], ['name', 'ASC']);
+}
+
+function testBuildsProductsWithoutSupplierFilter() {
+  assert.deepStrictEqual(buildProductSupplierFilter(undefined), {});
+  assert.deepStrictEqual(
+    buildProductSupplierFilter('without'),
+    { '$suppliers.id$': { [Op.is]: null } }
+  );
+  assert.throws(() => buildProductSupplierFilter('wrong'), /invalid supplier status/i);
+}
+
+testDoesNotSearchHiddenProductNames();
+testBuildsRelevantSearchOrder();
+testBuildsProductsWithoutSupplierFilter();
 
 console.log('Product list query service test passed');

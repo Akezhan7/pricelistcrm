@@ -27,6 +27,7 @@ export const ProductsPage: React.FC = () => {
   const [hasLoaded, setHasLoaded] = useState(false);
   const [totalProducts, setTotalProducts] = useState(0);
   const [lifecycleStatusFilter, setLifecycleStatusFilter] = useState<ProductLifecycleStatus | ''>('');
+  const [supplierStatusFilter, setSupplierStatusFilter] = useState<'without' | ''>('');
   const [categoryName, setCategoryName] = useState('');
   const productsRequestRef = useRef<AbortController | null>(null);
 
@@ -41,6 +42,7 @@ export const ProductsPage: React.FC = () => {
         limit: API_LIST_LIMIT,
         categoryId,
         lifecycleStatus: lifecycleStatusFilter,
+        supplierStatus: supplierStatusFilter,
       });
 
       const res = await api.get(`/products?${params.toString()}`, {
@@ -61,7 +63,7 @@ export const ProductsPage: React.FC = () => {
         setHasLoaded(true);
       }
     }
-  }, [categoryId, lifecycleStatusFilter]);
+  }, [categoryId, lifecycleStatusFilter, supplierStatusFilter]);
 
   useEffect(() => {
     fetchProducts();
@@ -184,6 +186,8 @@ export const ProductsPage: React.FC = () => {
             canAssignDesigner={user?.role === 'admin'}
             lifecycleStatusFilter={lifecycleStatusFilter}
             onLifecycleStatusFilterChange={setLifecycleStatusFilter}
+            supplierStatusFilter={supplierStatusFilter}
+            onSupplierStatusFilterChange={setSupplierStatusFilter}
             pageResetKey={categoryId || 'all-products'}
           />
         </div>

@@ -41,6 +41,10 @@ export function shouldRetryChunkUpload(status: number | undefined, attempt: numb
   return status === undefined || status === 408 || status === 429 || status >= 500;
 }
 
+export function getChunkRetryDelayMs(attempt: number) {
+  return (attempt + 1) * 1000;
+}
+
 export function buildChunkUploadProgress(
   completedBytes: number,
   currentChunkLoaded: number,

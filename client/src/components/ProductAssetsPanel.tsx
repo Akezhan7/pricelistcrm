@@ -7,6 +7,7 @@ import {
   buildChunkUploadProgress,
   calculateProductAssetUploadProgress,
   getDisplayAssetName,
+  getChunkRetryDelayMs,
   getGalleryImageAssets,
   getProductAssetPreviewPath,
   getProductAssetThumbnailPath,
@@ -262,6 +263,9 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
                   if ((chunkError as { code?: string })?.code === 'ERR_CANCELED') throw chunkError;
                   const status = (chunkError as { response?: { status?: number } })?.response?.status;
                   if (!shouldRetryChunkUpload(status, attempt)) throw chunkError;
+                  await new Promise((resolve) => {
+                    window.setTimeout(resolve, getChunkRetryDelayMs(attempt));
+                  });
                 }
               }
 

@@ -3,6 +3,7 @@ import ReactSelect from 'react-select';
 import { ArrowRight, Check, FileText, PackageSearch, Plus, Save, ShoppingBasket, Trash2, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
+import { ProcurementProductThumbnail } from '../components/ProcurementProductThumbnail';
 import {
   Alert,
   Badge,
@@ -27,6 +28,7 @@ import procurementListsApi, {
   type ProcurementSupplier,
 } from '../services/procurementListsApi';
 import type { Product } from '../types';
+import { getRelevantProcurementSuppliers } from '../utils/procurementSuppliers';
 
 const ALLOWED_ROLES = new Set(['admin', 'purchase_manager', 'warehouse_operator', 'collector']);
 
@@ -68,6 +70,7 @@ const ProcurementItemRow: React.FC<ItemRowProps> = ({
   const [purchasePrice, setPurchasePrice] = useState(
     item.purchasePrice === null ? '' : String(item.purchasePrice)
   );
+  const [showAllSuppliers, setShowAllSuppliers] = useState(false);
 
   useEffect(() => {
     setQuantity(String(item.requestedQuantity));
@@ -93,7 +96,22 @@ const ProcurementItemRow: React.FC<ItemRowProps> = ({
     || notes.trim() !== (item.notes || '')
     || (selectedSupplierId === '' ? null : Number(selectedSupplierId)) !== item.selectedSupplierId
     || parsedPurchasePrice !== (item.purchasePrice === null ? null : Number(item.purchasePrice));
-  const supplierOptions = suppliers.map((supplier) => ({
+  const currentSelectedSupplier = suppliers.find(
+    (supplier) => String(supplier.id) === selectedSupplierId
+  ) || item.selectedSupplier;
+  const relevantSuppliers = getRelevantProcurementSuppliers({
+    linkedSuppliers: item.product.suppliers || [],
+    recommendedSupplier: item.supplierRecommendation.supplier,
+    selectedSupplier: currentSelectedSupplier,
+  });
+  const selectableSuppliers = showAllSuppliers
+    ? getRelevantProcurementSuppliers({
+      linkedSuppliers: suppliers,
+      recommendedSupplier: item.supplierRecommendation.supplier,
+      selectedSupplier: currentSelectedSupplier,
+    })
+    : relevantSuppliers;
+  const supplierOptions = selectableSuppliers.map((supplier) => ({
     value: supplier.id,
     label: supplier.name,
   }));
@@ -116,6 +134,7 @@ const ProcurementItemRow: React.FC<ItemRowProps> = ({
     setSelectedSupplierId(supplierId === null ? '' : String(supplierId));
     setPurchasePrice(nextPrice === null ? '' : String(nextPrice));
     await onSupplierChange(item.id, supplierId, nextPrice);
+    setShowAllSuppliers(false);
   };
 
   const recommendationLabel = item.supplierRecommendation.source === 'last_successful_purchase'
@@ -125,14 +144,17 @@ const ProcurementItemRow: React.FC<ItemRowProps> = ({
   return (
     <div className="border-b border-border-subtle px-4 py-4 last:border-b-0">
       <div className="grid gap-3 xl:grid-cols-[minmax(15rem,1.5fr)_9rem_10rem_minmax(14rem,1fr)_auto] xl:items-end">
-        <div className="min-w-0 self-center">
-          <p className="text-card-title text-brand-black break-words">
-            {item.product.internalName || item.product.name}
-          </p>
-          <p className="mt-1 text-caption text-text-muted">{item.product.article}</p>
-          <p className="mt-1 text-caption text-text-muted">
-            Добавил: {item.addedBy?.name || 'Сотрудник'}
-          </p>
+        <div className="flex min-w-0 items-center gap-3 self-center">
+          <ProcurementProductThumbnail product={item.product} />
+          <div className="min-w-0">
+            <p className="text-card-title text-brand-black break-words">
+              {item.product.internalName || item.product.name}
+            </p>
+            <p className="mt-1 text-caption text-text-muted">{item.product.article}</p>
+            <p className="mt-1 text-caption text-text-muted">
+              Добавил: {item.addedBy?.name || 'Сотрудник'}
+            </p>
+          </div>
         </div>
         <Input
           label="Закупить, шт."
@@ -196,8 +218,10 @@ const ProcurementItemRow: React.FC<ItemRowProps> = ({
             options={supplierOptions}
             value={selectedSupplierOption}
             onChange={(option) => selectSupplier(option?.value ?? null)}
-            placeholder="Найти поставщика"
-            noOptionsMessage={() => 'Поставщики не найдены'}
+            placeholder={showAllSuppliers ? 'Найти поставщика' : 'Выберите поставщика товара'}
+            noOptionsMessage={() => showAllSuppliers
+              ? 'Поставщики не найдены'
+              : 'У товара нет привязанных поставщиков'}
             isClearable
             isDisabled={busy}
             menuPosition="fixed"
@@ -215,6 +239,25 @@ const ProcurementItemRow: React.FC<ItemRowProps> = ({
               menuPortal: (base) => ({ ...base, zIndex: 70 }),
             }}
           />
+          <div className="mt-1.5 flex items-center justify-between gap-2">
+            {!showAllSuppliers && relevantSuppliers.length === 0 && (
+              <span className="text-caption text-text-muted">
+                У товара нет привязанных поставщиков
+              </span>
+            )}
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="ml-auto"
+              disabled={busy}
+              onClick={() => setShowAllSuppliers((current) => !current)}
+            >
+              {showAllSuppliers
+                ? 'Только поставщики товара'
+                : 'Выбрать другого поставщика'}
+            </Button>
+          </div>
         </div>
         <Input
           label="Цена закупа"
@@ -333,7 +376,7 @@ export const ProcurementListPage: React.FC = () => {
 
   const selectProduct = (product: Product) => {
     setSelectedProduct(product);
-    setSearch(product.internalName || product.name);
+    setSearch(product.name);
     setSearchResults([]);
   };
 
@@ -602,12 +645,15 @@ export const ProcurementListPage: React.FC = () => {
                         className="flex w-full items-center justify-between gap-3 border-b border-border-subtle px-4 py-3 text-left last:border-b-0 hover:bg-surface-muted"
                         onClick={() => selectProduct(product)}
                       >
-                        <span className="min-w-0">
-                          <span className="block text-body-medium text-brand-black break-words">
-                            {product.internalName || product.name}
+                        <div className="flex min-w-0 items-center gap-3">
+                          <ProcurementProductThumbnail product={product} />
+                          <span className="min-w-0">
+                            <span className="block text-body-medium text-brand-black break-words">
+                              {product.name}
+                            </span>
+                            <span className="block text-caption text-text-muted">{product.article}</span>
                           </span>
-                          <span className="block text-caption text-text-muted">{product.article}</span>
-                        </span>
+                        </div>
                         <Plus className="h-4 w-4 shrink-0 text-brand-yellow-dark" aria-hidden />
                       </button>
                     ))

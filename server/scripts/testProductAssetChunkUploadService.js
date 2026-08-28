@@ -46,6 +46,7 @@ async function testChunkMiddlewareAcceptsCompleteChunk() {
 }
 
 async function run() {
+  assert.strictEqual(DEFAULT_CHUNK_SIZE, 2 * 1024 * 1024);
   assert.ok(
     PRODUCT_ASSET_CHUNK_FILE_LIMIT > DEFAULT_CHUNK_SIZE,
     'Multer file limit must be larger than a complete upload chunk'

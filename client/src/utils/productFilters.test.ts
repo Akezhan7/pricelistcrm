@@ -9,7 +9,10 @@ describe('product filters', () => {
       limit: 1000,
       categoryId: 17,
       lifecycleStatus: 'content_created',
-    }).toString()).toBe('limit=1000&categoryId=17&lifecycleStatus=content_created');
+      supplierStatus: 'without',
+    }).toString()).toBe(
+      'limit=1000&categoryId=17&lifecycleStatus=content_created&supplierStatus=without'
+    );
   });
 
   it('accepts only positive integer category ids from the URL', () => {

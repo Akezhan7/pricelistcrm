@@ -61,6 +61,8 @@ type ProductListProps = {
   canAssignDesigner?: boolean;
   lifecycleStatusFilter?: ProductLifecycleStatus | '';
   onLifecycleStatusFilterChange?: (status: ProductLifecycleStatus | '') => void;
+  supplierStatusFilter?: 'without' | '';
+  onSupplierStatusFilterChange?: (status: 'without' | '') => void;
   pageResetKey?: string | number;
   compact?: boolean;
   className?: string;
@@ -81,6 +83,8 @@ export const ProductList: React.FC<ProductListProps> = ({
   canAssignDesigner = false,
   lifecycleStatusFilter = '',
   onLifecycleStatusFilterChange,
+  supplierStatusFilter = '',
+  onSupplierStatusFilterChange,
   pageResetKey,
   compact = false,
   className,
@@ -108,7 +112,7 @@ export const ProductList: React.FC<ProductListProps> = ({
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, localSearchQuery, lifecycleStatusFilter, pageResetKey]);
+  }, [searchQuery, localSearchQuery, lifecycleStatusFilter, supplierStatusFilter, pageResetKey]);
 
   const filteredProducts = useMemo(() => {
     let filtered = products;
@@ -255,8 +259,11 @@ export const ProductList: React.FC<ProductListProps> = ({
     onRefresh();
   };
 
-  const emptyTitle =
-    searchQuery || localSearchQuery ? 'Товары не найдены' : 'Товары не добавлены';
+  const emptyTitle = supplierStatusFilter === 'without'
+    ? 'Товары без поставщика не найдены'
+    : searchQuery || localSearchQuery
+      ? 'Товары не найдены'
+      : 'Товары не добавлены';
 
   return (
     <div className={cn('flex flex-col flex-1', className)} style={{ minHeight: 0 }}>
@@ -264,7 +271,7 @@ export const ProductList: React.FC<ProductListProps> = ({
         className={cn(
           'product-list-toolbar px-4 py-3 border-b border-border-subtle grid grid-cols-1 gap-3 bg-surface-page/95 backdrop-blur-sm sticky top-0 z-10 shrink-0',
           !compact &&
-            'md:grid-cols-[repeat(2,minmax(0,1fr))] xl:grid-cols-[auto_auto_minmax(12rem,14rem)_minmax(18rem,1fr)] xl:items-center'
+            'md:grid-cols-[repeat(2,minmax(0,1fr))] xl:grid-cols-[auto_auto_minmax(11rem,13rem)_minmax(11rem,13rem)] xl:items-center 2xl:grid-cols-[auto_auto_minmax(11rem,13rem)_minmax(11rem,13rem)_minmax(18rem,1fr)]'
         )}
       >
         {canEdit && (
@@ -307,7 +314,20 @@ export const ProductList: React.FC<ProductListProps> = ({
             ))}
           </Select>
         )}
-        <div className={cn('relative min-w-0 w-full', !compact && 'md:col-span-2 xl:col-span-1')}>
+        {onSupplierStatusFilterChange && (
+          <Select
+            value={supplierStatusFilter}
+            onChange={(e) =>
+              onSupplierStatusFilterChange(e.target.value as 'without' | '')
+            }
+            className="min-w-0 xl:w-52"
+            aria-label="Фильтр по наличию поставщика"
+          >
+            <option value="">Поставщик: любой</option>
+            <option value="without">Без поставщика</option>
+          </Select>
+        )}
+        <div className={cn('relative min-w-0 w-full', !compact && 'md:col-span-2 xl:col-span-2 2xl:col-span-1')}>
           <Input
             leftIcon={Search}
             type="text"
@@ -399,12 +419,12 @@ export const ProductList: React.FC<ProductListProps> = ({
             icon={Package}
             title={emptyTitle}
             description={
-              canEdit && !searchQuery && !localSearchQuery
+              canEdit && !searchQuery && !localSearchQuery && !supplierStatusFilter
                 ? 'Добавьте первый товар, чтобы начать работу'
                 : undefined
             }
             action={
-              canEdit && !searchQuery && !localSearchQuery ? (
+              canEdit && !searchQuery && !localSearchQuery && !supplierStatusFilter ? (
                 <Button
                   type="button"
                   variant="primary"

@@ -3,16 +3,16 @@ const { Op } = require('sequelize');
 const PRODUCT_SEARCH_FIELDS = Object.freeze([
   'name',
   'article',
-  'internalName',
-  'kaspiName',
-  'kaspiArticle',
 ]);
 
+function normalizeProductSearchQuery(search) {
+  if (typeof search !== 'string') return '';
+  return search.trim().toLocaleLowerCase('ru-RU').replace(/\s+/g, ' ');
+}
+
 function normalizeProductSearchTokens(search) {
-  if (typeof search !== 'string') return [];
-  return Array.from(new Set(
-    search.trim().toLocaleLowerCase('ru-RU').split(/\s+/).filter(Boolean)
-  ));
+  const normalizedSearch = normalizeProductSearchQuery(search);
+  return normalizedSearch ? Array.from(new Set(normalizedSearch.split(' '))) : [];
 }
 
 function buildProductSearchFilter(search) {
@@ -26,6 +26,36 @@ function buildProductSearchFilter(search) {
       })),
     })),
   };
+}
+
+function buildProductSearchOrder(search, sql) {
+  const normalizedSearch = normalizeProductSearchQuery(search);
+  if (!normalizedSearch) return [['createdAt', 'DESC']];
+
+  const escapedSearch = sql.escape(normalizedSearch);
+  const relevance = sql.literal(`CASE
+    WHEN LOWER("Product"."article") = ${escapedSearch} THEN 0
+    WHEN LOWER("Product"."name") = ${escapedSearch} THEN 1
+    WHEN POSITION(${escapedSearch} IN LOWER("Product"."name")) = 1 THEN 2
+    ELSE 3
+  END`);
+
+  return [
+    [relevance, 'ASC'],
+    ['name', 'ASC'],
+  ];
+}
+
+function buildProductSupplierFilter(supplierStatus) {
+  if (supplierStatus === undefined || supplierStatus === null || supplierStatus === '') {
+    return {};
+  }
+
+  if (supplierStatus !== 'without') {
+    throw new Error('invalid supplier status');
+  }
+
+  return { '$suppliers.id$': { [Op.is]: null } };
 }
 
 function buildProductCategoryFilter(categoryId) {
@@ -44,5 +74,8 @@ function buildProductCategoryFilter(categoryId) {
 module.exports = {
   buildProductCategoryFilter,
   buildProductSearchFilter,
+  buildProductSearchOrder,
+  buildProductSupplierFilter,
+  normalizeProductSearchQuery,
   normalizeProductSearchTokens,
 };

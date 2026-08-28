@@ -64,6 +64,8 @@ const { uploadsDir } = require('../middleware/upload');
 const {
   buildProductCategoryFilter,
   buildProductSearchFilter,
+  buildProductSearchOrder,
+  buildProductSupplierFilter,
 } = require('../services/productListQueryService');
 const {
   buildProductWorkflowQuery,
@@ -285,7 +287,15 @@ function generateDraftDatePrefix(date) {
 
 const getAllProducts = async (req, res) => {
   try {
-    const { search, page = 1, limit = 50, excludeSupplierId, lifecycleStatus, categoryId } = req.query;
+    const {
+      search,
+      page = 1,
+      limit = 50,
+      excludeSupplierId,
+      lifecycleStatus,
+      categoryId,
+      supplierStatus,
+    } = req.query;
     const offset = (page - 1) * limit;
 
     let categoryFilter;
@@ -298,9 +308,20 @@ const getAllProducts = async (req, res) => {
       });
     }
 
+    let supplierFilter;
+    try {
+      supplierFilter = buildProductSupplierFilter(supplierStatus);
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid supplier status',
+      });
+    }
+
     const whereClause = {
       isActive: true,
       ...categoryFilter,
+      ...supplierFilter,
     };
 
     if (lifecycleStatus) {
@@ -371,7 +392,7 @@ const getAllProducts = async (req, res) => {
       subQuery: false,
       limit: parseInt(limit),
       offset: parseInt(offset),
-      order: [['createdAt', 'DESC']], // Новые товары первыми
+      order: buildProductSearchOrder(search, sequelize),
     });
 
     res.json({

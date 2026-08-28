@@ -4,7 +4,7 @@ const path = require('path');
 const { pipeline } = require('stream/promises');
 const { validateProductAssetUpload } = require('./productAssetService');
 
-const DEFAULT_CHUNK_SIZE = 10 * 1024 * 1024;
+const DEFAULT_CHUNK_SIZE = 2 * 1024 * 1024;
 const SESSION_TTL_MS = 24 * 60 * 60 * 1000;
 const MANIFEST_FILE = 'manifest.json';
 

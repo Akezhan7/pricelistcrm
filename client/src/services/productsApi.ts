@@ -84,6 +84,7 @@ class ProductsApi {
     limit?: number;
     page?: number;
     excludeSupplierId?: number;
+    supplierStatus?: 'without';
   }): Promise<Product[]> {
     const queryParams = new URLSearchParams();
 
@@ -94,6 +95,7 @@ class ProductsApi {
     if (params?.excludeSupplierId !== undefined) {
       queryParams.append('excludeSupplierId', String(params.excludeSupplierId));
     }
+    if (params?.supplierStatus) queryParams.append('supplierStatus', params.supplierStatus);
 
     const url = queryParams.toString() ? `${this.baseUrl}?${queryParams}` : this.baseUrl;
     const response = await api.get<ApiResponse<{ products: Product[]; pagination: any }>>(url);
