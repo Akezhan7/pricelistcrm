@@ -53,6 +53,7 @@ import {
 type ProductListProps = {
   products: Product[];
   searchQuery: string;
+  onSearchQueryChange?: (query: string) => void;
   selectedProduct: Product | null;
   onSelectProduct: (product: Product | null) => void;
   onRefresh: () => void;
@@ -64,6 +65,11 @@ type ProductListProps = {
   supplierStatusFilter?: 'without' | '';
   onSupplierStatusFilterChange?: (status: 'without' | '') => void;
   pageResetKey?: string | number;
+  currentPage?: number;
+  totalItems?: number;
+  itemsPerPage?: number;
+  onPageChange?: (page: number) => void;
+  onSelectAllEligible?: (mode: ProductBulkActionMode) => Promise<number[]>;
   compact?: boolean;
   className?: string;
 };
@@ -75,6 +81,7 @@ function isLegacyCatalogProduct(product: Product) {
 export const ProductList: React.FC<ProductListProps> = ({
   products,
   searchQuery,
+  onSearchQueryChange,
   selectedProduct,
   onSelectProduct,
   onRefresh,
@@ -86,6 +93,11 @@ export const ProductList: React.FC<ProductListProps> = ({
   supplierStatusFilter = '',
   onSupplierStatusFilterChange,
   pageResetKey,
+  currentPage: controlledCurrentPage,
+  totalItems: controlledTotalItems,
+  itemsPerPage = 30,
+  onPageChange,
+  onSelectAllEligible,
   compact = false,
   className,
 }) => {
@@ -107,14 +119,18 @@ export const ProductList: React.FC<ProductListProps> = ({
   const [productForPriceHistory, setProductForPriceHistory] = useState<Product | null>(null);
   const [productForHistory, setProductForHistory] = useState<Product | null>(null);
   const [localSearchQuery, setLocalSearchQuery] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 30;
+  const [localCurrentPage, setLocalCurrentPage] = useState(1);
+  const [isSelectingAll, setIsSelectingAll] = useState(false);
+  const isServerPaginated = controlledCurrentPage !== undefined && !!onPageChange;
+  const currentPage = controlledCurrentPage ?? localCurrentPage;
+  const setCurrentPage = onPageChange ?? setLocalCurrentPage;
 
   useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, localSearchQuery, lifecycleStatusFilter, supplierStatusFilter, pageResetKey]);
+    if (!isServerPaginated) setCurrentPage(1);
+  }, [isServerPaginated, searchQuery, localSearchQuery, lifecycleStatusFilter, supplierStatusFilter, pageResetKey]);
 
   const filteredProducts = useMemo(() => {
+    if (isServerPaginated) return products;
     let filtered = products;
 
     if (searchQuery.trim()) {
@@ -136,15 +152,17 @@ export const ProductList: React.FC<ProductListProps> = ({
     }
 
     return filtered;
-  }, [products, searchQuery, localSearchQuery]);
+  }, [isServerPaginated, products, searchQuery, localSearchQuery]);
 
   const paginatedProducts = useMemo(() => {
+    if (isServerPaginated) return filteredProducts;
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     return filteredProducts.slice(startIndex, endIndex);
-  }, [filteredProducts, currentPage, itemsPerPage]);
+  }, [filteredProducts, currentPage, isServerPaginated, itemsPerPage]);
 
-  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  const totalItems = controlledTotalItems ?? filteredProducts.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage);
   const bulkAssignEnabled = canAssignDesigner && lifecycleStatusFilter === 'new';
   const bulkLifecycleEnabled = canAssignDesigner && lifecycleStatusFilter === 'in_sale';
   const bulkSelectionEnabled = bulkAssignEnabled || bulkLifecycleEnabled;
@@ -186,16 +204,8 @@ export const ProductList: React.FC<ProductListProps> = ({
     selectableProductIdsOnPage.every((productId) => selectedProductIds.has(productId));
 
   useEffect(() => {
-    if (!bulkSelectionEnabled) {
-      setSelectedProductIds(new Set());
-      return;
-    }
-
-    setSelectedProductIds((prev) => {
-      const next = new Set(Array.from(prev).filter((id) => selectableProductIdSet.has(id)));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [bulkSelectionEnabled, selectableProductIdSet]);
+    setSelectedProductIds(new Set());
+  }, [bulkSelectionEnabled, bulkActionMode, pageResetKey, searchQuery, supplierStatusFilter]);
 
   const handleDeleteProduct = async () => {
     if (!productToDelete) return;
@@ -245,8 +255,22 @@ export const ProductList: React.FC<ProductListProps> = ({
     });
   };
 
-  const selectAllEligibleProducts = () => {
-    setSelectedProductIds(new Set(selectableProductIds));
+  const selectAllEligibleProducts = async () => {
+    if (!bulkActionMode) return;
+    if (!onSelectAllEligible) {
+      setSelectedProductIds(new Set(selectableProductIds));
+      return;
+    }
+
+    try {
+      setIsSelectingAll(true);
+      const productIds = await onSelectAllEligible(bulkActionMode);
+      setSelectedProductIds(new Set(productIds));
+    } catch (error) {
+      console.error('Ошибка массового выбора товаров:', error);
+    } finally {
+      setIsSelectingAll(false);
+    }
   };
 
   const handleDesignerAssigned = () => {
@@ -332,18 +356,24 @@ export const ProductList: React.FC<ProductListProps> = ({
             leftIcon={Search}
             type="text"
             placeholder="Поиск по названию или артикулу..."
-            value={localSearchQuery}
-            onChange={(e) => setLocalSearchQuery(e.target.value)}
+            value={onSearchQueryChange ? searchQuery : localSearchQuery}
+            onChange={(e) => {
+              if (onSearchQueryChange) onSearchQueryChange(e.target.value);
+              else setLocalSearchQuery(e.target.value);
+            }}
             className="pr-10 bg-brand-white border-border-subtle shadow-sm focus:border-brand-yellow focus:ring-2 focus:ring-brand-yellow/20"
           />
-          {localSearchQuery && (
+          {(onSearchQueryChange ? searchQuery : localSearchQuery) && (
             <div className="absolute right-1 top-1/2 -translate-y-1/2">
               <IconButton
                 icon={X}
                 title="Очистить поиск"
                 size="md"
                 variant="ghost"
-                onClick={() => setLocalSearchQuery('')}
+                onClick={() => {
+                  if (onSearchQueryChange) onSearchQueryChange('');
+                  else setLocalSearchQuery('');
+                }}
               />
             </div>
           )}
@@ -371,14 +401,15 @@ export const ProductList: React.FC<ProductListProps> = ({
             <span className="text-caption text-text-muted tabular-nums">
               Выбрано: {selectedProductIds.size}
             </span>
-            {bulkAssignEnabled && selectedProductIds.size < selectableProductIds.length && (
+            {bulkAssignEnabled && selectedProductIds.size < totalItems && (
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
+                disabled={isSelectingAll}
                 onClick={selectAllEligibleProducts}
               >
-                Выбрать все новые ({selectableProductIds.length})
+                {isSelectingAll ? 'Выбираем...' : `Выбрать все новые (${totalItems})`}
               </Button>
             )}
           </div>
@@ -588,7 +619,7 @@ export const ProductList: React.FC<ProductListProps> = ({
       <Pagination
         currentPage={currentPage}
         totalPages={totalPages}
-        totalItems={filteredProducts.length}
+        totalItems={totalItems}
         itemsPerPage={itemsPerPage}
         onPageChange={setCurrentPage}
         variant="numbered"

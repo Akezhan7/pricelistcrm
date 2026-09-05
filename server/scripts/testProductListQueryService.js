@@ -4,6 +4,7 @@ const {
   buildProductSearchFilter,
   buildProductSearchOrder,
   buildProductSupplierFilter,
+  findPaginatedProducts,
   normalizeProductSearchTokens,
 } = require('../services/productListQueryService');
 const { Op } = require('sequelize');
@@ -76,4 +77,41 @@ testDoesNotSearchHiddenProductNames();
 testBuildsRelevantSearchOrder();
 testBuildsProductsWithoutSupplierFilter();
 
-console.log('Product list query service test passed');
+async function testPaginatesProductIdsBeforeHydratingAssociations() {
+  const calls = [];
+  const productModel = {
+    async findAndCountAll(options) {
+      calls.push({ method: 'findAndCountAll', options });
+      return {
+        count: 1202,
+        rows: [{ id: 1001 }, { id: 1002 }],
+      };
+    },
+    async findAll(options) {
+      calls.push({ method: 'findAll', options });
+      return [{ id: 1002 }, { id: 1001 }];
+    },
+  };
+
+  const result = await findPaginatedProducts({
+    productModel,
+    where: { isActive: true },
+    include: [{ as: 'suppliers' }],
+    limit: 2,
+    offset: 1000,
+    order: [['createdAt', 'DESC']],
+  });
+
+  assert.strictEqual(calls[0].options.include, undefined);
+  assert.strictEqual(calls[0].options.offset, 1000);
+  assert.deepStrictEqual(calls[1].options.include, [{ as: 'suppliers' }]);
+  assert.deepStrictEqual(result.rows.map((product) => product.id), [1001, 1002]);
+  assert.strictEqual(result.count, 1202);
+}
+
+testPaginatesProductIdsBeforeHydratingAssociations()
+  .then(() => console.log('Product list query service test passed'))
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });

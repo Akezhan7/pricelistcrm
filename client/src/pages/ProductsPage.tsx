@@ -13,8 +13,10 @@ import {
   buildProductsListSearchParams,
   parseCategoryIdParam,
 } from '../utils/productFilters';
+import type { ProductBulkActionMode } from '../utils/productBulkSelection';
 
-const API_LIST_LIMIT = 1000;
+const API_LIST_LIMIT = 30;
+const SEARCH_DEBOUNCE_MS = 300;
 
 export const ProductsPage: React.FC = () => {
   const { user } = useAuth();
@@ -29,6 +31,8 @@ export const ProductsPage: React.FC = () => {
   const [lifecycleStatusFilter, setLifecycleStatusFilter] = useState<ProductLifecycleStatus | ''>('');
   const [supplierStatusFilter, setSupplierStatusFilter] = useState<'without' | ''>('');
   const [categoryName, setCategoryName] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
   const productsRequestRef = useRef<AbortController | null>(null);
 
   const fetchProducts = useCallback(async () => {
@@ -40,6 +44,8 @@ export const ProductsPage: React.FC = () => {
       setLoading(true);
       const params = buildProductsListSearchParams({
         limit: API_LIST_LIMIT,
+        page: currentPage,
+        search: debouncedSearchQuery,
         categoryId,
         lifecycleStatus: lifecycleStatusFilter,
         supplierStatus: supplierStatusFilter,
@@ -63,7 +69,15 @@ export const ProductsPage: React.FC = () => {
         setHasLoaded(true);
       }
     }
-  }, [categoryId, lifecycleStatusFilter, supplierStatusFilter]);
+  }, [categoryId, currentPage, debouncedSearchQuery, lifecycleStatusFilter, supplierStatusFilter]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setCurrentPage(1);
+      setDebouncedSearchQuery(searchQuery);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
 
   useEffect(() => {
     fetchProducts();
@@ -96,7 +110,32 @@ export const ProductsPage: React.FC = () => {
     const nextParams = new URLSearchParams(searchParams);
     nextParams.delete('categoryId');
     setSearchParams(nextParams);
+    setCurrentPage(1);
   };
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+  };
+
+  const handleLifecycleFilterChange = (status: ProductLifecycleStatus | '') => {
+    setLifecycleStatusFilter(status);
+    setCurrentPage(1);
+  };
+
+  const handleSupplierFilterChange = (status: 'without' | '') => {
+    setSupplierStatusFilter(status);
+    setCurrentPage(1);
+  };
+
+  const fetchAllSelectableProductIds = useCallback(async (mode: ProductBulkActionMode) => {
+    const params = new URLSearchParams({ mode });
+    if (debouncedSearchQuery.trim()) params.set('search', debouncedSearchQuery.trim());
+    if (categoryId) params.set('categoryId', String(categoryId));
+    if (supplierStatusFilter) params.set('supplierStatus', supplierStatusFilter);
+
+    const response = await api.get(`/products/selection-ids?${params.toString()}`);
+    return response.data.data.productIds as number[];
+  }, [categoryId, debouncedSearchQuery, supplierStatusFilter]);
 
   const countLabel =
     totalProducts === 1 ? 'позиция' : totalProducts < 5 ? 'позиции' : 'позиций';
@@ -113,7 +152,7 @@ export const ProductsPage: React.FC = () => {
   }
 
   return (
-    <Layout searchQuery={searchQuery} onSearchChange={setSearchQuery} fullHeight>
+    <Layout searchQuery={searchQuery} onSearchChange={handleSearchChange} fullHeight>
       <div className="w-full h-full flex flex-col min-h-0">
         {/* Mobile sticky page header */}
         <div className="md:hidden sticky top-0 z-10 -mx-4 px-4 py-3 mb-3 bg-surface-page/95 backdrop-blur-sm border-b border-border-subtle shrink-0">
@@ -178,6 +217,7 @@ export const ProductsPage: React.FC = () => {
           <ProductList
             products={products}
             searchQuery={searchQuery}
+            onSearchQueryChange={handleSearchChange}
             selectedProduct={selectedProduct}
             onSelectProduct={setSelectedProduct}
             onRefresh={fetchProducts}
@@ -185,10 +225,15 @@ export const ProductsPage: React.FC = () => {
             canCreateDraft={user?.role === 'admin'}
             canAssignDesigner={user?.role === 'admin'}
             lifecycleStatusFilter={lifecycleStatusFilter}
-            onLifecycleStatusFilterChange={setLifecycleStatusFilter}
+            onLifecycleStatusFilterChange={handleLifecycleFilterChange}
             supplierStatusFilter={supplierStatusFilter}
-            onSupplierStatusFilterChange={setSupplierStatusFilter}
+            onSupplierStatusFilterChange={handleSupplierFilterChange}
             pageResetKey={categoryId || 'all-products'}
+            currentPage={currentPage}
+            totalItems={totalProducts}
+            itemsPerPage={API_LIST_LIMIT}
+            onPageChange={setCurrentPage}
+            onSelectAllEligible={fetchAllSelectableProductIds}
           />
         </div>
       </div>

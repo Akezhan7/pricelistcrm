@@ -9,6 +9,7 @@ const {
 } = require('../middleware/upload');
 const {
   getAllProducts,
+  getProductSelectionIds,
   getProductWorkflowQueue,
   getProductById,
   getProductAssets,
@@ -140,6 +141,7 @@ const productUpdateValidation = [
 
 // Публичные маршруты (для всех авторизованных пользователей)
 router.get('/', auth, getAllProducts);
+router.get('/selection-ids', auth, requireRole('admin'), getProductSelectionIds);
 router.get('/low-stock', auth, getLowStockProducts);
 router.get('/stock-analytics', auth, getStockAnalytics);
 router.get('/purchase-suggestions', auth, getPurchaseSuggestions);

@@ -66,6 +66,7 @@ const {
   buildProductSearchFilter,
   buildProductSearchOrder,
   buildProductSupplierFilter,
+  findPaginatedProducts,
 } = require('../services/productListQueryService');
 const {
   buildProductWorkflowQuery,
@@ -117,6 +118,47 @@ const productUserInclude = [
     required: false,
   },
 ];
+
+function buildProductSupplierInclude() {
+  return {
+    model: Supplier,
+    as: 'suppliers',
+    through: {
+      model: ProductSupplier,
+      attributes: ['supplierPrice', 'quantity', 'isAvailable', 'notes'],
+    },
+    where: { isActive: true },
+    required: false,
+  };
+}
+
+function buildProductListInclude() {
+  return [
+    buildProductSupplierInclude(),
+    {
+      model: Category,
+      as: 'category',
+      attributes: ['id', 'name'],
+      required: false,
+    },
+    {
+      model: ProductLifecyclePurchase,
+      as: 'lifecyclePurchase',
+      required: false,
+    },
+    {
+      model: ProductWarehouseDetails,
+      as: 'warehouseDetails',
+      required: false,
+    },
+    {
+      model: ProductLaunchFlags,
+      as: 'launchFlags',
+      required: false,
+    },
+    ...productUserInclude,
+  ];
+}
 
 const productAssetInclude = [
   {
@@ -352,45 +394,17 @@ const getAllProducts = async (req, res) => {
 
     Object.assign(whereClause, buildProductSearchFilter(search));
 
-    const products = await Product.findAndCountAll({
+    const parsedLimit = parseInt(limit, 10);
+    const parsedPage = parseInt(page, 10);
+    const productIncludes = buildProductListInclude();
+    const products = await findPaginatedProducts({
+      productModel: Product,
       where: whereClause,
-      include: [
-        {
-          model: Supplier,
-          as: 'suppliers',
-          through: {
-            model: ProductSupplier,
-            attributes: ['supplierPrice', 'quantity', 'isAvailable', 'notes'],
-          },
-          where: { isActive: true },
-          required: false,
-        },
-        {
-          model: Category,
-          as: 'category',
-          attributes: ['id', 'name'],
-          required: false,
-        },
-        {
-          model: ProductLifecyclePurchase,
-          as: 'lifecyclePurchase',
-          required: false,
-        },
-        {
-          model: ProductWarehouseDetails,
-          as: 'warehouseDetails',
-          required: false,
-        },
-        {
-          model: ProductLaunchFlags,
-          as: 'launchFlags',
-          required: false,
-        },
-        ...productUserInclude,
-      ],
-      distinct: true,
-      subQuery: false,
-      limit: parseInt(limit),
+      include: productIncludes,
+      idInclude: supplierStatus === 'without'
+        ? [buildProductSupplierInclude()]
+        : undefined,
+      limit: parsedLimit,
       offset: parseInt(offset),
       order: buildProductSearchOrder(search, sequelize),
     });
@@ -401,9 +415,9 @@ const getAllProducts = async (req, res) => {
         products: products.rows.map((product) => serializeProductForUser(product, req.user)),
         pagination: {
           total: products.count,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          totalPages: Math.ceil(products.count / limit),
+          page: parsedPage,
+          limit: parsedLimit,
+          totalPages: Math.ceil(products.count / parsedLimit),
         },
       },
     });
@@ -412,6 +426,51 @@ const getAllProducts = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Ошибка сервера при получении товаров',
+    });
+  }
+};
+
+const getProductSelectionIds = async (req, res) => {
+  try {
+    const { mode, search, categoryId, supplierStatus } = req.query;
+    if (!['assign_designer', 'start_lifecycle'].includes(mode)) {
+      return res.status(400).json({ success: false, message: 'Invalid selection mode' });
+    }
+
+    let categoryFilter;
+    let supplierFilter;
+    try {
+      categoryFilter = buildProductCategoryFilter(categoryId);
+      supplierFilter = buildProductSupplierFilter(supplierStatus);
+    } catch (error) {
+      return res.status(400).json({ success: false, message: 'Invalid product filter' });
+    }
+
+    const where = {
+      isActive: true,
+      ...categoryFilter,
+      ...supplierFilter,
+      ...buildProductSearchFilter(search),
+      lifecycleStatus: mode === 'assign_designer' ? 'new' : 'in_sale',
+    };
+    if (mode === 'start_lifecycle') where.lifecycleStartedAt = { [Op.is]: null };
+
+    const products = await Product.findAll({
+      where,
+      attributes: ['id'],
+      include: supplierStatus === 'without' ? [buildProductSupplierInclude()] : undefined,
+      subQuery: false,
+    });
+
+    res.json({
+      success: true,
+      data: { productIds: products.map((product) => product.id) },
+    });
+  } catch (error) {
+    console.error('Ошибка получения товаров для массового выбора:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Ошибка сервера при получении товаров для массового выбора',
     });
   }
 };
@@ -3956,6 +4015,7 @@ const getPurchaseSuggestions = async (req, res) => {
 
 module.exports = {
   getAllProducts,
+  getProductSelectionIds,
   getProductWorkflowQueue,
   getProductById,
   getProductAssets,

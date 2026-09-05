@@ -71,11 +71,51 @@ function buildProductCategoryFilter(categoryId) {
   return { categoryId: parsedCategoryId };
 }
 
+async function findPaginatedProducts({
+  productModel,
+  where,
+  include,
+  idInclude,
+  limit,
+  offset,
+  order,
+}) {
+  const pageQuery = {
+    where,
+    attributes: ['id'],
+    distinct: true,
+    limit,
+    offset,
+    order,
+  };
+
+  if (idInclude?.length) {
+    pageQuery.include = idInclude;
+    pageQuery.subQuery = false;
+  }
+
+  const page = await productModel.findAndCountAll(pageQuery);
+  const ids = page.rows.map((product) => product.id);
+  if (ids.length === 0) return { count: page.count, rows: [] };
+
+  const hydratedProducts = await productModel.findAll({
+    where: { id: { [Op.in]: ids } },
+    include,
+  });
+  const productById = new Map(hydratedProducts.map((product) => [product.id, product]));
+
+  return {
+    count: page.count,
+    rows: ids.map((id) => productById.get(id)).filter(Boolean),
+  };
+}
+
 module.exports = {
   buildProductCategoryFilter,
   buildProductSearchFilter,
   buildProductSearchOrder,
   buildProductSupplierFilter,
+  findPaginatedProducts,
   normalizeProductSearchQuery,
   normalizeProductSearchTokens,
 };
