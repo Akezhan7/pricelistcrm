@@ -6,6 +6,7 @@ import { Supplier, Sector, Row } from '../types';
 import { sectorsApi } from '../services/sectorsApi';
 import { rowsApi } from '../services/rowsApi';
 import getImageUrl from '../utils/image';
+import { getSupplierBalancePresentation } from '../utils/supplierBalance';
 
 type BaysideMapProps = {
   suppliers: Supplier[];
@@ -576,6 +577,7 @@ export const BaysideMap: React.FC<BaysideMapProps> = ({ suppliers }) => {
                     .filter(supplier => supplier.rowId === viewState.selectedRow!.id)
                     .map(supplier => {
                       const isHighlighted = highlightedItems.suppliers.includes(supplier.id);
+                      const balancePresentation = getSupplierBalancePresentation(supplier.debt);
                       
                       return (
                         <div
@@ -608,9 +610,12 @@ export const BaysideMap: React.FC<BaysideMapProps> = ({ suppliers }) => {
                             />
                           )}
                           
-                          {supplier.debt > 0 && (
-                            <div className="mt-2 text-caption text-danger-dark">
-                              Долг: {supplier.debt} ₸
+                          {balancePresentation.amount > 0 && (
+                            <div className={cn(
+                              'mt-2 text-caption',
+                              balancePresentation.tone === 'danger' ? 'text-danger-dark' : 'text-success-dark'
+                            )}>
+                              {balancePresentation.label}: {balancePresentation.amount} ₸
                             </div>
                           )}
                         </div>

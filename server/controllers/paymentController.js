@@ -2,7 +2,7 @@ const { Op } = require('sequelize');
 const sequelize = require('../config/database');
 const { Payment, Order, Supplier, User } = require('../models');
 const { DEBT_STATUSES } = require('../services/orderStatusPolicyService');
-const { calculateOrderDebtContribution } = require('../services/orderSettlementService');
+const { calculateSupplierBalance } = require('../services/orderSettlementService');
 
 /**
  * Автоматический расчет статуса оплаты на основе сумм
@@ -30,30 +30,24 @@ const calculatePaymentStatus = (order) => {
 const recalculateSupplierDebt = async (supplierId, options = {}) => {
   if (!supplierId) return 0;
 
-  const orders = await Order.findAll({
-    where: {
-      supplierId,
-      isActive: true,
-      status: { [Op.in]: DEBT_STATUSES },
-    },
-    attributes: [
-      'type',
-      'status',
-      'settlementType',
-      'totalAmount',
-      'paidAmount',
-      'isActive',
-    ],
-    transaction: options.transaction,
-  });
+  const [orders, payments] = await Promise.all([
+    Order.findAll({
+      where: {
+        supplierId,
+        isActive: true,
+        status: { [Op.in]: DEBT_STATUSES },
+      },
+      attributes: ['type', 'status', 'totalAmount', 'isActive'],
+      transaction: options.transaction,
+    }),
+    Payment.findAll({
+      where: { supplierId },
+      attributes: ['amount'],
+      transaction: options.transaction,
+    }),
+  ]);
 
-  const totalDebt = Math.max(
-    0,
-    orders.reduce(
-      (sum, order) => sum + calculateOrderDebtContribution(order),
-      0
-    )
-  );
+  const totalDebt = calculateSupplierBalance({ orders, payments });
 
   // Обновляем поле debt в таблице поставщиков
   await Supplier.update(
@@ -194,9 +188,7 @@ const getPaymentsBySupplier = async (req, res) => {
 
     // Расчет статистики
     const totalPaid = payments.reduce((sum, payment) => sum + parseFloat(payment.amount), 0);
-    const totalDebt = unpaidOrders.reduce((sum, order) => {
-      return sum + (parseFloat(order.totalAmount) - parseFloat(order.paidAmount));
-    }, 0);
+    const balance = Number(supplier.debt) || 0;
 
     res.json({
       success: true,
@@ -206,7 +198,9 @@ const getPaymentsBySupplier = async (req, res) => {
         unpaidOrders,
         stats: {
           totalPaid: totalPaid.toFixed(2),
-          totalDebt: totalDebt.toFixed(2),
+          balance: balance.toFixed(2),
+          totalDebt: Math.max(balance, 0).toFixed(2),
+          supplierAdvance: Math.max(-balance, 0).toFixed(2),
           paymentsCount: payments.length,
           unpaidOrdersCount: unpaidOrders.length
         }

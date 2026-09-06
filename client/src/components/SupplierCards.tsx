@@ -30,6 +30,7 @@ import api from '../utils/api';
 import getImageUrl from '../utils/image';
 
 import { cn } from '../utils/cn';
+import { getSupplierBalancePresentation } from '../utils/supplierBalance';
 
 type SupplierCardsProps = {
   suppliers: Supplier[];
@@ -195,6 +196,7 @@ export const SupplierCards: React.FC<SupplierCardsProps> = ({
             style={{ maxWidth: '1800px', margin: '0 auto' }}
           >
             {paginatedSuppliers.map((supplier) => {
+              const balancePresentation = getSupplierBalancePresentation(supplier.debt);
               const productPrice = selectedProduct
                 ? supplier.products?.find((p) => p.id === selectedProduct.id)?.ProductSupplier
                 : null;
@@ -318,13 +320,9 @@ export const SupplierCards: React.FC<SupplierCardsProps> = ({
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="text-caption font-medium text-text-muted">Финансы</span>
-                          {supplier.debt && supplier.debt > 0 ? (
-                            <Badge variant="danger">
-                              Долг: {formatPrice(supplier.debt)} ₸
-                            </Badge>
-                          ) : (
-                            <Badge variant="success">Нет долга</Badge>
-                          )}
+                          <Badge variant={balancePresentation.tone === 'neutral' ? 'outline' : balancePresentation.tone}>
+                            {balancePresentation.label}: {formatPrice(balancePresentation.amount)} ₸
+                          </Badge>
                         </div>
                         <IconButton
                           icon={DollarSign}

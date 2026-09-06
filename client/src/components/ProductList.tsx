@@ -23,6 +23,7 @@ import {
 import { Button, EmptyState, IconButton, Input, Modal, Pagination, Select } from './ui';
 
 import { ProductListItem } from './ProductListItem';
+import { ProductRowActions, type ProductRowAction } from './ProductRowActions';
 
 import { CreateProductModal } from './CreateProductModal';
 
@@ -71,6 +72,7 @@ type ProductListProps = {
   onPageChange?: (page: number) => void;
   onSelectAllEligible?: (mode: ProductBulkActionMode) => Promise<number[]>;
   compact?: boolean;
+  denseCatalog?: boolean;
   className?: string;
 };
 
@@ -99,6 +101,7 @@ export const ProductList: React.FC<ProductListProps> = ({
   onPageChange,
   onSelectAllEligible,
   compact = false,
+  denseCatalog = false,
   className,
 }) => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -289,6 +292,86 @@ export const ProductList: React.FC<ProductListProps> = ({
       ? 'Товары не найдены'
       : 'Товары не добавлены';
 
+  const renderDenseActions = (product: Product) => {
+    const allowedActions = product.permissions?.allowedActions || [];
+    const primaryActions: ProductRowAction[] = [];
+    const overflowActions: ProductRowAction[] = [];
+
+    if (allowedActions.includes('manage_product_suppliers')) {
+      primaryActions.push({
+        key: 'suppliers',
+        label: 'Управление поставщиками',
+        icon: Users,
+        onClick: () => openSuppliers(product),
+      });
+    }
+    if (allowedActions.includes('edit_product_card')) {
+      primaryActions.push({
+        key: 'edit',
+        label: 'Редактировать товар',
+        icon: Edit,
+        onClick: () => setProductForCard(product),
+      });
+    }
+    if (allowedActions.includes('view_product_history')) {
+      overflowActions.push({
+        key: 'history',
+        label: 'История товара',
+        icon: History,
+        onClick: () => setProductForHistory(product),
+      });
+    }
+    if (canEdit) {
+      overflowActions.push({
+        key: 'price-history',
+        label: 'История цен',
+        icon: TrendingUp,
+        onClick: () => setProductForPriceHistory(product),
+      });
+    }
+    if (allowedActions.includes('manage_product_variations')) {
+      overflowActions.push({
+        key: 'variations',
+        label: 'Управление вариациями',
+        icon: Settings,
+        onClick: () => setProductForVariations(product),
+      });
+    }
+    if (allowedActions.includes('manage_marketplace')) {
+      overflowActions.push({
+        key: 'marketplaces',
+        label: 'Маркетплейсы товара',
+        icon: Store,
+        onClick: () => setProductForMarketplace(product),
+      });
+    }
+    if (canAssignDesigner && isLegacyCatalogProduct(product)) {
+      overflowActions.push({
+        key: 'lifecycle',
+        label: 'Запустить lifecycle',
+        icon: Rocket,
+        onClick: () => setProductForLifecycleStart(product),
+      });
+    }
+    if (allowedActions.includes('delete_product')) {
+      overflowActions.push({
+        key: 'delete',
+        label: 'Удалить товар',
+        icon: Trash2,
+        danger: true,
+        onClick: () => setProductToDelete(product),
+      });
+    }
+
+    if (primaryActions.length === 0 && overflowActions.length === 0) return undefined;
+    return (
+      <ProductRowActions
+        primaryActions={primaryActions}
+        overflowActions={overflowActions}
+      />
+    );
+  };
+
   return (
     <div className={cn('flex flex-col flex-1', className)} style={{ minHeight: 0 }}>
       <div
@@ -473,10 +556,15 @@ export const ProductList: React.FC<ProductListProps> = ({
               <ProductListItem
                 key={product.id}
                 product={product}
-                selected={selectedProduct?.id === product.id}
-                onClick={() =>
-                  onSelectProduct(selectedProduct?.id === product.id ? null : product)
-                }
+                density={denseCatalog ? 'compact' : 'default'}
+                selected={!denseCatalog && selectedProduct?.id === product.id}
+                onClick={() => {
+                  if (denseCatalog && product.permissions?.allowedActions.includes('edit_product_card')) {
+                    setProductForCard(product);
+                    return;
+                  }
+                  onSelectProduct(selectedProduct?.id === product.id ? null : product);
+                }}
                 children={
                   bulkSelectionEnabled && selectableProductIdSet.has(product.id) ? (
                     <label
@@ -499,6 +587,7 @@ export const ProductList: React.FC<ProductListProps> = ({
                   ) : undefined
                 }
                 footer={
+                  denseCatalog ? renderDenseActions(product) : (
                   canEdit || product.permissions?.allowedActions.includes('view_product_history') ? (
                     <div className="flex justify-end">
                       <div className="inline-flex items-center gap-1 rounded-lg border border-border-subtle bg-surface-inset/60 p-1">
@@ -608,7 +697,7 @@ export const ProductList: React.FC<ProductListProps> = ({
                         )}
                       </div>
                     </div>
-                  ) : undefined
+                  ) : undefined)
                 }
               />
             ))}

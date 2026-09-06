@@ -180,7 +180,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
       }
 
       if (selectedSuppliers.length > 0) {
-        const supplierPromises = selectedSuppliers.map(async (selected) => {
+        const supplierPromises = selectedSuppliers.map(async (selected, index) => {
           const price = parseFloat(selected.supplierPrice);
           if (lockSupplier && (Number.isNaN(price) || price < 0)) {
             throw new Error('Укажите цену у поставщика');
@@ -191,6 +191,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({
               supplierPrice: Number.isNaN(price) ? 0 : price,
               quantity: parseInt(selected.quantity) || 0,
               isAvailable: selected.isAvailable,
+              isPreferred: index === 0,
               notes: selected.notes || '',
             });
           } catch (err: any) {

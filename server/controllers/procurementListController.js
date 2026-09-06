@@ -72,7 +72,7 @@ function currentListInclude() {
             model: Supplier,
             as: 'suppliers',
             attributes: ['id', 'name', 'isActive'],
-            through: { attributes: ['supplierPrice'] },
+            through: { attributes: ['supplierPrice', 'isPreferred'] },
             where: { isActive: true },
             required: false,
           }],
@@ -170,6 +170,48 @@ async function getOrCreateCurrentList(actorId, transaction) {
   return list;
 }
 
+async function getSupplierRecommendationForProduct(product, transaction) {
+  const lastPurchase = await OrderItem.findOne({
+    where: { productId: product.id },
+    attributes: ['id', 'priceAtPurchase'],
+    include: [{
+      model: Order,
+      as: 'order',
+      attributes: ['id', 'createdAt'],
+      required: true,
+      where: {
+        type: 'purchase',
+        isActive: true,
+        supplierId: { [Op.ne]: null },
+        status: { [Op.in]: ['Принята на складе', 'Закрыта'] },
+      },
+      include: [{
+        model: Supplier,
+        as: 'supplier',
+        attributes: ['id', 'name', 'isActive'],
+        required: true,
+        where: { isActive: true },
+      }],
+    }],
+    order: [
+      [{ model: Order, as: 'order' }, 'createdAt', 'DESC'],
+      ['id', 'DESC'],
+    ],
+    transaction,
+  });
+
+  return buildSupplierRecommendation({
+    linkedSuppliers: product.suppliers || [],
+    lastPurchase: lastPurchase
+      ? {
+          supplier: lastPurchase.order.supplier,
+          priceAtPurchase: lastPurchase.priceAtPurchase,
+          purchasedAt: lastPurchase.order.createdAt,
+        }
+      : null,
+  });
+}
+
 async function getCurrentList(req, res) {
   try {
     return res.json({ success: true, data: await loadCurrentListData() });
@@ -186,6 +228,14 @@ async function addCurrentListItem(req, res) {
       const product = await Product.findOne({
         where: { id: req.body.productId, isActive: true },
         attributes: PRODUCT_ATTRIBUTES,
+        include: [{
+          model: Supplier,
+          as: 'suppliers',
+          attributes: ['id', 'name', 'isActive'],
+          through: { attributes: ['supplierPrice', 'isPreferred'] },
+          where: { isActive: true },
+          required: false,
+        }],
         transaction,
       });
       if (!product) {
@@ -208,11 +258,13 @@ async function addCurrentListItem(req, res) {
       }
 
       const list = await getOrCreateCurrentList(req.user.id, transaction);
+      const supplierRecommendation = await getSupplierRecommendationForProduct(product, transaction);
       const itemData = buildProcurementListItemData({
         listId: list.id,
         productId: product.id,
         actorId: req.user.id,
         input: req.body,
+        supplierRecommendation,
       });
       const existingItem = await ProcurementListItem.findOne({
         where: {
@@ -229,7 +281,14 @@ async function addCurrentListItem(req, res) {
           error.statusCode = 409;
           throw error;
         }
-        await existingItem.update(buildProcurementListItemUpdate(req.body), { transaction });
+        const updateInput = existingItem.selectedSupplierId
+          ? req.body
+          : {
+              ...req.body,
+              selectedSupplierId: supplierRecommendation.supplier?.id || null,
+              purchasePrice: supplierRecommendation.purchasePrice,
+            };
+        await existingItem.update(buildProcurementListItemUpdate(updateInput), { transaction });
       } else {
         await ProcurementListItem.create(itemData, { transaction });
       }

@@ -83,6 +83,7 @@ function testRoleWorkflowQueries() {
     user: { id: 4, role: 'purchase_manager' },
   });
   assert.strictEqual(purchaseItem.workflow.nextActionKey, 'purchase_product');
+  assert.strictEqual(purchaseItem.workflow.nextActionLabel, 'Закупить');
   assert.strictEqual(purchaseItem.workflow.nextActionEnabled, true);
 
   const purchasedItem = resolveProductWorkflowItem({

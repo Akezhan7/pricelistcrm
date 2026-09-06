@@ -13,6 +13,7 @@ import { Badge } from './ui/Badge';
 import { Spinner } from './ui/Spinner';
 import { toast } from '../context/ToastContext';
 import { cn } from '../utils/cn';
+import { getSupplierBalancePresentation } from '../utils/supplierBalance';
 
 interface SupplierFinanceModalProps {
   isOpen: boolean;
@@ -155,10 +156,19 @@ export const SupplierFinanceModal: React.FC<SupplierFinanceModalProps> = ({
               {/* Статистика */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-surface-inset border border-border-subtle rounded-xl p-4">
-                  <div className="text-metric font-tabular text-danger">
-                    {formatPaymentAmount(supplierData.stats.totalDebt)}
+                  <div className={cn(
+                    'text-metric font-tabular',
+                    getSupplierBalancePresentation(supplierData.stats.balance).tone === 'danger'
+                      ? 'text-danger'
+                      : getSupplierBalancePresentation(supplierData.stats.balance).tone === 'success'
+                        ? 'text-success'
+                        : 'text-brand-black'
+                  )}>
+                    {formatPaymentAmount(getSupplierBalancePresentation(supplierData.stats.balance).amount)}
                   </div>
-                  <div className="text-caption text-text-muted mt-1">Общая задолженность</div>
+                  <div className="text-caption text-text-muted mt-1">
+                    {getSupplierBalancePresentation(supplierData.stats.balance).label}
+                  </div>
                 </div>
                 <div className="bg-surface-inset border border-border-subtle rounded-xl p-4">
                   <div className="text-metric font-tabular text-success">

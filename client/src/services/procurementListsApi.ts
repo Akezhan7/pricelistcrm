@@ -14,7 +14,7 @@ export type ProcurementSupplier = {
 };
 
 export type ProcurementSupplierRecommendation = {
-  source: 'last_successful_purchase' | 'single_linked_supplier' | 'none';
+  source: 'last_successful_purchase' | 'preferred_supplier' | 'single_linked_supplier' | 'none';
   supplier: ProcurementSupplier | null;
   purchasePrice: number | null;
   purchasedAt: string | null;
@@ -34,7 +34,7 @@ export type ProcurementListItem = {
   product: Pick<Product, 'id' | 'name' | 'internalName' | 'article' | 'image'> & {
     suppliers?: Array<ProcurementSupplier & {
       isActive: boolean;
-      ProductSupplier?: { supplierPrice: number | string };
+      ProductSupplier?: { supplierPrice: number | string; isPreferred: boolean };
     }>;
   };
   addedBy: ProcurementListUser;

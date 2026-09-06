@@ -14,28 +14,6 @@ export interface ProductLifecycleOperations {
   warehouseDetails: ProductWarehouseDetails | null;
 }
 
-export interface MarkProductPurchasedDto {
-  supplierId: number;
-  quantity: number;
-  purchasePrice: number;
-  expectedDeliveryDate?: string;
-  deliveryLocation?: string;
-  notes?: string;
-}
-
-export interface MarkProductsPurchasedBulkDto {
-  supplierId: number;
-  expectedDeliveryDate?: string;
-  deliveryLocation?: string;
-  notes?: string;
-  items: Array<{
-    productId: number;
-    quantity: number;
-    purchasePrice?: number;
-    notes?: string;
-  }>;
-}
-
 export interface CompleteProductWarehouseDto {
   sector: string;
   shelf: string;
@@ -147,36 +125,6 @@ class ProductsApi {
     );
     if (!response.data.success || !response.data.data) {
       throw new Error(response.data.message || 'Ошибка получения данных закупа и склада');
-    }
-    return response.data.data;
-  }
-
-  async markProductPurchased(
-    productId: number,
-    data: MarkProductPurchasedDto
-  ): Promise<ProductLifecyclePurchase> {
-    const response = await api.post<ApiResponse<{ purchase: ProductLifecyclePurchase }>>(
-      `${this.baseUrl}/${productId}/lifecycle/mark-purchased`,
-      data
-    );
-    if (!response.data.success || !response.data.data?.purchase) {
-      throw new Error(response.data.message || 'Ошибка оформления закупа');
-    }
-    return response.data.data.purchase;
-  }
-
-  async markProductsPurchasedBulk(
-    data: MarkProductsPurchasedBulkDto
-  ): Promise<{ purchases: ProductLifecyclePurchase[]; order: { id: number; orderNumber: string } }> {
-    const response = await api.post<ApiResponse<{
-      purchases: ProductLifecyclePurchase[];
-      order: { id: number; orderNumber: string };
-    }>>(
-      `${this.baseUrl}/lifecycle/bulk-mark-purchased`,
-      data
-    );
-    if (!response.data.success || !response.data.data?.order) {
-      throw new Error(response.data.message || 'Ошибка оформления пакетного закупа');
     }
     return response.data.data;
   }

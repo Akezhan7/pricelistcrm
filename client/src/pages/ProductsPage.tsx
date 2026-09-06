@@ -234,6 +234,7 @@ export const ProductsPage: React.FC = () => {
             itemsPerPage={API_LIST_LIMIT}
             onPageChange={setCurrentPage}
             onSelectAllEligible={fetchAllSelectableProductIds}
+            denseCatalog
           />
         </div>
       </div>

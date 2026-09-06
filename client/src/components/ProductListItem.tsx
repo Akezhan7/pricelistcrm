@@ -46,6 +46,8 @@ export interface ProductListItemProps {
 
   footer?: React.ReactNode;
 
+  density?: 'default' | 'compact';
+
 }
 
 
@@ -84,6 +86,8 @@ export const ProductListItem: React.FC<ProductListItemProps> = ({
 
   footer,
 
+  density = 'default',
+
 }) => {
 
   const handleImgError = (e: React.SyntheticEvent<HTMLImageElement>) => {
@@ -99,6 +103,7 @@ export const ProductListItem: React.FC<ProductListItemProps> = ({
 
 
   const imgClass = imageSizeClasses[imageSize];
+  const isCompact = density === 'compact';
 
   const isLegacyCatalogProduct =
     product.lifecycleStatus === 'in_sale' && !product.lifecycleStartedAt;
@@ -208,7 +213,8 @@ export const ProductListItem: React.FC<ProductListItemProps> = ({
 
       className={cn(
 
-        'group relative flex flex-col rounded-xl border bg-brand-white',
+        'group relative flex rounded-xl border bg-brand-white',
+        isCompact ? 'flex-row items-center hover:z-10 focus-within:z-20' : 'flex-col',
 
         'transition-[colors,shadow,transform] duration-200 ease-product',
 
@@ -256,7 +262,10 @@ export const ProductListItem: React.FC<ProductListItemProps> = ({
 
     >
 
-      <div className="product-list-item-main flex items-center gap-3 p-3 lg:p-4 min-h-[72px] lg:min-h-16">
+      <div className={cn(
+        'product-list-item-main flex min-w-0 flex-1 items-center gap-3',
+        isCompact ? 'min-h-[68px] px-3 py-2.5' : 'p-3 lg:p-4 min-h-[72px] lg:min-h-16'
+      )}>
 
         <div className="shrink-0">
 
@@ -327,9 +336,16 @@ export const ProductListItem: React.FC<ProductListItemProps> = ({
                 {lifecycleLabel}
               </Badge>
             )}
+            {isCompact && product.suppliers && product.suppliers.length > 0 && (
+              <span className="hidden items-center gap-1 text-caption text-accent md:inline-flex">
+                <Store className="h-3 w-3 shrink-0" aria-hidden />
+                {product.suppliers.length}{' '}
+                {product.suppliers.length === 1 ? 'поставщик' : 'поставщиков'}
+              </span>
+            )}
           </div>
 
-          {product.suppliers && product.suppliers.length > 0 && (
+          {!isCompact && product.suppliers && product.suppliers.length > 0 && (
 
             <p className="flex items-center gap-1 text-caption text-accent mt-1">
 
@@ -378,7 +394,12 @@ export const ProductListItem: React.FC<ProductListItemProps> = ({
 
         <div
 
-          className="product-list-item-footer px-3 pb-3 lg:px-4 lg:pb-4 pt-0 border-t border-border-subtle lg:border-t-0"
+          className={cn(
+            'product-list-item-footer shrink-0',
+            isCompact
+              ? 'py-2 pr-2'
+              : 'px-3 pb-3 lg:px-4 lg:pb-4 pt-0 border-t border-border-subtle lg:border-t-0'
+          )}
 
           onClick={(e) => e.stopPropagation()}
 

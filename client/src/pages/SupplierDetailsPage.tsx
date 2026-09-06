@@ -30,6 +30,7 @@ import getImageUrl from '../utils/image';
 import { Supplier } from '../types';
 import { formatPriceKZT } from '../utils/format';
 import { cn } from '../utils/cn';
+import { getSupplierBalancePresentation } from '../utils/supplierBalance';
 
 export const SupplierDetailsPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -91,6 +92,7 @@ export const SupplierDetailsPage: React.FC = () => {
   }
 
   const waPhone = (supplier.whatsapp || supplier.phone || '').replace(/\D/g, '');
+  const balancePresentation = getSupplierBalancePresentation(supplier.debt);
   const locationLabel =
     supplier.row || supplier.container
       ? `${supplier.row ? `Ряд ${supplier.row}` : ''}${
@@ -185,15 +187,19 @@ export const SupplierDetailsPage: React.FC = () => {
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-2">
               <DollarSign className="h-4 w-4 text-text-muted shrink-0" aria-hidden />
-              <p className="text-caption font-medium text-text-muted">Задолженность</p>
+              <p className="text-caption font-medium text-text-muted">{balancePresentation.label}</p>
             </div>
             <p
               className={cn(
                 'text-price font-bold tabular-nums tracking-tight',
-                Number(supplier.debt) > 0 ? 'text-danger' : 'text-brand-black'
+                balancePresentation.tone === 'danger'
+                  ? 'text-danger'
+                  : balancePresentation.tone === 'success'
+                    ? 'text-success'
+                    : 'text-brand-black'
               )}
             >
-              {formatPriceKZT(supplier.debt)}
+              {formatPriceKZT(balancePresentation.amount)}
             </p>
           </div>
         </div>

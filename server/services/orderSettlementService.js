@@ -45,6 +45,27 @@ function calculateOrderDebtContribution(order = {}) {
   return Math.max(0, totalAmount - paidAmount);
 }
 
+function calculateSupplierBalance({ orders = [], payments = [] } = {}) {
+  const orderBalance = orders.reduce((sum, order) => {
+    if (order.isActive === false || !DEBT_STATUSES.includes(order.status)) return sum;
+    const totalAmount = Number(order.totalAmount);
+    if (!Number.isFinite(totalAmount) || totalAmount < 0) {
+      throw inputError('Order total amount is invalid');
+    }
+    return sum + (order.type === 'return' ? -totalAmount : totalAmount);
+  }, 0);
+
+  const paymentBalance = payments.reduce((sum, payment) => {
+    const amount = Number(payment.amount);
+    if (!Number.isFinite(amount) || amount < 0) {
+      throw inputError('Payment amount is invalid');
+    }
+    return sum + amount;
+  }, 0);
+
+  return Number((orderBalance - paymentBalance).toFixed(2));
+}
+
 function buildSettlementChange({
   order,
   actor,
@@ -81,5 +102,6 @@ module.exports = {
   SETTLEMENT_MANAGEMENT_ROLES,
   buildSettlementChange,
   calculateOrderDebtContribution,
+  calculateSupplierBalance,
   normalizeSettlementType,
 };

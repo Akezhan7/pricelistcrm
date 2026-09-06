@@ -116,7 +116,13 @@ function buildProcurementListItemUpdate(input = {}) {
   return update;
 }
 
-function buildProcurementListItemData({ listId, productId, actorId, input = {} }) {
+function buildProcurementListItemData({
+  listId,
+  productId,
+  actorId,
+  input = {},
+  supplierRecommendation = null,
+}) {
   const data = {
     procurementListId: requiredPositiveInteger(listId, 'listId'),
     productId: requiredPositiveInteger(productId, 'productId'),
@@ -135,6 +141,15 @@ function buildProcurementListItemData({ listId, productId, actorId, input = {} }
     if (data.purchasePrice !== null && !data.selectedSupplierId) {
       throw createInputError('selectedSupplierId is required when purchasePrice is set');
     }
+  } else if (supplierRecommendation?.supplier?.id) {
+    data.selectedSupplierId = requiredPositiveInteger(
+      supplierRecommendation.supplier.id,
+      'selectedSupplierId'
+    );
+    data.purchasePrice = optionalNonNegativeNumber(
+      supplierRecommendation.purchasePrice,
+      'purchasePrice'
+    ) ?? null;
   }
 
   return data;
@@ -165,6 +180,21 @@ function buildSupplierRecommendation({ linkedSuppliers = [], lastPurchase = null
   const activeLinkedSuppliers = linkedSuppliers.filter(
     (supplier) => supplier?.isActive !== false
   );
+  const preferredSupplier = activeLinkedSuppliers.find(
+    (supplier) => supplier.ProductSupplier?.isPreferred === true
+  );
+  if (preferredSupplier) {
+    return {
+      source: 'preferred_supplier',
+      supplier: normalizeRecommendedSupplier(preferredSupplier),
+      purchasePrice: optionalNonNegativeNumber(
+        preferredSupplier.ProductSupplier?.supplierPrice,
+        'supplierPrice'
+      ) ?? null,
+      purchasedAt: null,
+    };
+  }
+
   if (activeLinkedSuppliers.length === 1) {
     const supplier = activeLinkedSuppliers[0];
     return {

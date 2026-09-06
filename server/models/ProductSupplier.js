@@ -37,6 +37,11 @@ const ProductSupplier = sequelize.define('ProductSupplier', {
     defaultValue: true,
     comment: 'Доступен ли товар у поставщика',
   },
+  isPreferred: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  },
   notes: {
     type: DataTypes.TEXT,
     allowNull: true,

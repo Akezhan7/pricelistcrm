@@ -139,7 +139,9 @@ const ProcurementItemRow: React.FC<ItemRowProps> = ({
 
   const recommendationLabel = item.supplierRecommendation.source === 'last_successful_purchase'
     ? 'Последний успешный закуп'
-    : 'Единственный поставщик товара';
+    : item.supplierRecommendation.source === 'preferred_supplier'
+      ? 'Основной поставщик товара'
+      : 'Единственный поставщик товара';
 
   return (
     <div className="border-b border-border-subtle px-4 py-4 last:border-b-0">

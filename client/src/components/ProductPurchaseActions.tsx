@@ -3,10 +3,10 @@ import { ListPlus, PackageCheck, ShoppingCart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '../context/ToastContext';
 import productsApi, { ProductLifecycleOperations } from '../services/productsApi';
-import procurementListsApi from '../services/procurementListsApi';
-import type { Product, ProductWorkflowItem } from '../types';
+import procurementListsApi, { ProcurementListItem } from '../services/procurementListsApi';
+import type { ProductWorkflowItem } from '../types';
 import { formatPriceKZT } from '../utils/format';
-import { Alert, Badge, Button, Input, Select, Spinner, Textarea } from './ui';
+import { Alert, Badge, Button, Input, Spinner, Textarea } from './ui';
 import { RequirementsChecklist, type RequirementItem } from './RequirementsChecklist';
 
 type ProductPurchaseActionsProps = {
@@ -25,39 +25,39 @@ export const ProductPurchaseActions: React.FC<ProductPurchaseActionsProps> = ({
   onChanged,
 }) => {
   const navigate = useNavigate();
-  const [details, setDetails] = useState<Product | null>(null);
   const [operations, setOperations] = useState<ProductLifecycleOperations | null>(null);
+  const [procurementItem, setProcurementItem] = useState<ProcurementListItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [addingToList, setAddingToList] = useState(false);
   const [error, setError] = useState('');
-  const [supplierId, setSupplierId] = useState('');
   const [quantity, setQuantity] = useState('1');
-  const [purchasePrice, setPurchasePrice] = useState('');
-  const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('');
   const [receivedQuantity, setReceivedQuantity] = useState('');
   const [notes, setNotes] = useState('');
 
   const canEdit = Boolean(product.permissions?.allowedActions.includes('manage_purchase'));
   const purchase = operations?.purchase || null;
-  const suppliers = details?.suppliers || [];
 
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [productDetails, lifecycleOperations] = await Promise.all([
-        productsApi.getProductById(product.id),
+      const [lifecycleOperations, procurementData] = await Promise.all([
         productsApi.getLifecycleOperations(product.id),
+        procurementListsApi.getCurrent(),
       ]);
-      setDetails(productDetails);
       setOperations(lifecycleOperations);
 
       if (lifecycleOperations.purchase) {
         setReceivedQuantity(String(lifecycleOperations.purchase.quantity));
-      } else if (productDetails.suppliers?.length) {
-        const firstSupplier = productDetails.suppliers[0];
-        setSupplierId(String(firstSupplier.id));
-        setPurchasePrice(String(firstSupplier.ProductSupplier.supplierPrice));
+      } else {
+        const existingItem = procurementData.list?.items.find(
+          (item) => Number(item.productId) === Number(product.id)
+        ) || null;
+        setProcurementItem(existingItem);
+        if (existingItem) {
+          setQuantity(String(existingItem.requestedQuantity));
+          setNotes(existingItem.notes || '');
+        }
       }
       setError('');
     } catch (loadError) {
@@ -71,46 +71,19 @@ export const ProductPurchaseActions: React.FC<ProductPurchaseActionsProps> = ({
     loadData();
   }, [loadData]);
 
-  const selectedSupplier = suppliers.find((supplier) => String(supplier.id) === supplierId);
-
-  const handleSupplierChange = (value: string) => {
-    setSupplierId(value);
-    const supplier = suppliers.find((item) => String(item.id) === value);
-    if (supplier) setPurchasePrice(String(supplier.ProductSupplier.supplierPrice));
-  };
-
-  const handlePurchase = async () => {
-    setSaving(true);
-    setError('');
-    try {
-      await productsApi.markProductPurchased(product.id, {
-        supplierId: Number(supplierId),
-        quantity: Number(quantity),
-        purchasePrice: Number(purchasePrice),
-        expectedDeliveryDate: expectedDeliveryDate || undefined,
-        notes: notes.trim() || undefined,
-      });
-      toast.success('Первичный закуп оформлен');
-      onChanged();
-    } catch (saveError) {
-      setError(getErrorMessage(saveError, 'Не удалось оформить закуп'));
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleAddToProcurementList = async () => {
     setAddingToList(true);
     setError('');
     try {
-      await procurementListsApi.addItem(product.id, {
+      const data = await procurementListsApi.addItem(product.id, {
         requestedQuantity: Number(quantity),
-        selectedSupplierId: Number(supplierId),
-        purchasePrice: Number(purchasePrice),
         notes: notes.trim() || null,
       });
-      toast.success('Товар добавлен в закупочный лист');
-      navigate('/procurement-list');
+      const savedItem = data.list?.items.find(
+        (item) => Number(item.productId) === Number(product.id)
+      ) || null;
+      setProcurementItem(savedItem);
+      toast.success(procurementItem ? 'Количество в закупочном листе обновлено' : 'Товар добавлен в закупочный лист');
     } catch (saveError) {
       setError(getErrorMessage(saveError, 'Не удалось добавить товар в закупочный лист'));
     } finally {
@@ -144,9 +117,7 @@ export const ProductPurchaseActions: React.FC<ProductPurchaseActionsProps> = ({
     );
   }
 
-  const purchaseReady = Boolean(
-    supplierId && Number(quantity) > 0 && Number(purchasePrice) >= 0
-  );
+  const purchaseReady = Number.isInteger(Number(quantity)) && Number(quantity) > 0;
   const arrivalReady = Number(receivedQuantity) > 0;
   const purchaseRequirements: RequirementItem[] = purchase
     ? [
@@ -157,16 +128,8 @@ export const ProductPurchaseActions: React.FC<ProductPurchaseActionsProps> = ({
       ]
     : [
         {
-          label: 'Поставщик выбран',
-          met: Boolean(supplierId),
-        },
-        {
           label: 'Количество больше 0',
-          met: Number(quantity) > 0,
-        },
-        {
-          label: 'Закупочная цена указана',
-          met: Number(purchasePrice) >= 0 && purchasePrice.trim().length > 0,
+          met: purchaseReady,
         },
       ];
 
@@ -178,54 +141,24 @@ export const ProductPurchaseActions: React.FC<ProductPurchaseActionsProps> = ({
           <h3 className="text-section-title text-brand-black">{product.name}</h3>
           <p className="mt-1 text-body text-text-muted">{product.article}</p>
         </div>
-        <Badge variant="outline">Первичный закуп</Badge>
+        <Badge variant="outline">{procurementItem ? 'В закупочном листе' : 'Первичный закуп'}</Badge>
       </div>
 
       {error && <Alert variant="error">{error}</Alert>}
 
       {!purchase ? (
         <>
-          {suppliers.length === 0 && (
-            <Alert variant="warning">Сначала привяжите к товару хотя бы одного поставщика.</Alert>
+          {procurementItem && (
+            <Alert variant="info">В закупочном листе: {procurementItem.requestedQuantity} шт.</Alert>
           )}
           <div className="space-y-3 rounded-xl border border-border-subtle bg-surface-muted p-3">
-            <Select
-              label="Поставщик"
-              value={supplierId}
-              onChange={(event) => handleSupplierChange(event.target.value)}
-              disabled={!canEdit || suppliers.length === 0}
-            >
-              <option value="">Выберите поставщика</option>
-              {suppliers.map((supplier) => (
-                <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
-              ))}
-            </Select>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <Input
-                label="Количество"
-                type="number"
-                min="1"
-                step="1"
-                value={quantity}
-                onChange={(event) => setQuantity(event.target.value)}
-                disabled={!canEdit}
-              />
-              <Input
-                label="Закупочная цена за единицу"
-                type="number"
-                min="0"
-                step="0.01"
-                value={purchasePrice}
-                onChange={(event) => setPurchasePrice(event.target.value)}
-                disabled={!canEdit}
-                helperText={selectedSupplier ? `Цена поставщика: ${formatPriceKZT(selectedSupplier.ProductSupplier.supplierPrice)}` : undefined}
-              />
-            </div>
             <Input
-              label="Ожидаемая дата поставки"
-              type="date"
-              value={expectedDeliveryDate}
-              onChange={(event) => setExpectedDeliveryDate(event.target.value)}
+              label="Количество"
+              type="number"
+              min="1"
+              step="1"
+              value={quantity}
+              onChange={(event) => setQuantity(event.target.value)}
               disabled={!canEdit}
             />
             <Textarea
@@ -240,24 +173,25 @@ export const ProductPurchaseActions: React.FC<ProductPurchaseActionsProps> = ({
           <RequirementsChecklist items={purchaseRequirements} />
           {canEdit && (
             <div className="flex flex-wrap justify-end gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                leftIcon={ListPlus}
-                loading={addingToList}
-                disabled={saving || addingToList || !purchaseReady}
-                onClick={handleAddToProcurementList}
-              >
-                Добавить в закупочный лист
-              </Button>
+              {procurementItem && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  leftIcon={ListPlus}
+                  disabled={addingToList}
+                  onClick={() => navigate('/procurement-list')}
+                >
+                  Открыть закупочный лист
+                </Button>
+              )}
               <Button
                 type="button"
                 leftIcon={ShoppingCart}
-                loading={saving}
-                disabled={saving || addingToList || !purchaseReady}
-                onClick={handlePurchase}
+                loading={addingToList}
+                disabled={addingToList || !purchaseReady}
+                onClick={handleAddToProcurementList}
               >
-                Оформить закуп
+                {procurementItem ? 'Обновить количество' : 'Закупить'}
               </Button>
             </div>
           )}

@@ -4,6 +4,7 @@ const {
   ORDER_SETTLEMENT_TYPES,
   buildSettlementChange,
   calculateOrderDebtContribution,
+  calculateSupplierBalance,
   normalizeSettlementType,
 } = require('../services/orderSettlementService');
 
@@ -63,6 +64,23 @@ function testDebtContribution() {
   }), -200);
 }
 
+function testSignedSupplierBalanceIncludesUnallocatedAdvance() {
+  assert.strictEqual(calculateSupplierBalance({
+    orders: [
+      { type: 'purchase', status: 'Закрыта', totalAmount: 4950, isActive: true },
+    ],
+    payments: [{ amount: 100000 }],
+  }), -95050);
+
+  assert.strictEqual(calculateSupplierBalance({
+    orders: [
+      { type: 'purchase', status: 'Закрыта', totalAmount: 120000, isActive: true },
+      { type: 'return', status: 'Закрыта', totalAmount: 5000, isActive: true },
+    ],
+    payments: [{ amount: 15000 }],
+  }), 100000);
+}
+
 function testSettlementValidation() {
   assert.strictEqual(
     normalizeSettlementType('purchase', 'consignment'),
@@ -103,5 +121,6 @@ function testSettlementValidation() {
 }
 
 testDebtContribution();
+testSignedSupplierBalanceIncludesUnallocatedAdvance();
 testSettlementValidation();
 console.log('Order settlement service test passed');

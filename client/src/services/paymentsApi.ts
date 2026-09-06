@@ -54,7 +54,9 @@ export interface PaymentFilters {
 
 export interface PaymentStats {
   totalPaid: string;
+  balance: string;
   totalDebt: string;
+  supplierAdvance: string;
   paymentsCount: number;
   unpaidOrdersCount: number;
 }

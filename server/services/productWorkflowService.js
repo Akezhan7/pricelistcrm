@@ -58,7 +58,7 @@ const WORKFLOW_ACTION_BY_STATUS = Object.freeze({
   }),
   [PRODUCT_LIFECYCLE_STATUSES.PURCHASE]: Object.freeze({
     nextActionKey: 'purchase_product',
-    nextActionLabel: 'Отметить закуп',
+    nextActionLabel: 'Закупить',
     nextActionEnabled: true,
     ownerLabel: 'Закуп',
   }),

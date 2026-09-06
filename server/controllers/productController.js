@@ -125,7 +125,7 @@ function buildProductSupplierInclude() {
     as: 'suppliers',
     through: {
       model: ProductSupplier,
-      attributes: ['supplierPrice', 'quantity', 'isAvailable', 'notes'],
+      attributes: ['supplierPrice', 'quantity', 'isAvailable', 'isPreferred', 'notes'],
     },
     where: { isActive: true },
     required: false,
@@ -2548,6 +2548,7 @@ const createProductDraft = async (req, res) => {
           : product.costPrice,
         quantity: 0,
         isAvailable: true,
+        isPreferred: true,
         notes: comment || '',
       }, { transaction });
     }
@@ -2684,12 +2685,13 @@ const createProduct = async (req, res) => {
 
     // Добавление поставщиков, если они указаны
     if (suppliers && Array.isArray(suppliers)) {
-      const supplierData = suppliers.map(s => ({
+      const supplierData = suppliers.map((s, index) => ({
         productId: product.id,
         supplierId: s.id,
         supplierPrice: s.price,
         quantity: s.quantity || 0,
         isAvailable: s.isAvailable !== false,
+        isPreferred: s.isPreferred === true || (index === 0 && !suppliers.some(item => item.isPreferred === true)),
         notes: s.notes || '',
       }));
 
@@ -2893,12 +2895,13 @@ const updateProduct = async (req, res) => {
       await ProductSupplier.destroy({ where: { productId: id }, transaction });
 
       // Создание новых связей
-      const supplierData = suppliers.map(s => ({
+      const supplierData = suppliers.map((s, index) => ({
         productId: id,
         supplierId: s.id,
         supplierPrice: s.price,
         quantity: s.quantity || 0,
         isAvailable: s.isAvailable !== false,
+        isPreferred: s.isPreferred === true || (index === 0 && !suppliers.some(item => item.isPreferred === true)),
         notes: s.notes || '',
       }));
 
@@ -3027,7 +3030,14 @@ const addSupplierToProduct = async (req, res) => {
 
   try {
     const { productId } = req.params;
-    const { supplierId, supplierPrice, quantity = 0, isAvailable = true, notes = '' } = req.body;
+    const {
+      supplierId,
+      supplierPrice,
+      quantity = 0,
+      isAvailable = true,
+      isPreferred = false,
+      notes = '',
+    } = req.body;
 
     // Проверяем существование товара
     const product = await Product.findOne({
@@ -3074,12 +3084,20 @@ const addSupplierToProduct = async (req, res) => {
     }
 
     // Создаем связь
+    if (isPreferred) {
+      await ProductSupplier.update(
+        { isPreferred: false },
+        { where: { productId }, transaction }
+      );
+    }
+
     await ProductSupplier.create({
       productId,
       supplierId,
       supplierPrice,
       quantity,
       isAvailable,
+      isPreferred,
       notes,
     }, { transaction });
 

@@ -127,6 +127,31 @@ function testSupplierRecommendation() {
       linkedSuppliers: [
         {
           id: 2,
+          name: 'First supplier',
+          isActive: true,
+          ProductSupplier: { supplierPrice: '99.90', isPreferred: false },
+        },
+        {
+          id: 3,
+          name: 'Preferred supplier',
+          isActive: true,
+          ProductSupplier: { supplierPrice: '120.00', isPreferred: true },
+        },
+      ],
+    }),
+    {
+      source: 'preferred_supplier',
+      supplier: { id: 3, name: 'Preferred supplier' },
+      purchasePrice: 120,
+      purchasedAt: null,
+    }
+  );
+
+  assert.deepStrictEqual(
+    buildSupplierRecommendation({
+      linkedSuppliers: [
+        {
+          id: 2,
           name: 'Linked supplier',
           isActive: true,
           ProductSupplier: { supplierPrice: '100.00' },
@@ -177,6 +202,31 @@ function testSupplierRecommendation() {
       supplier: null,
       purchasePrice: null,
       purchasedAt: null,
+    }
+  );
+}
+
+function testRecommendationBecomesItemDefault() {
+  assert.deepStrictEqual(
+    buildProcurementListItemData({
+      listId: 7,
+      productId: 15,
+      actorId: 4,
+      input: { requestedQuantity: 3 },
+      supplierRecommendation: {
+        supplier: { id: 9, name: 'Default supplier' },
+        purchasePrice: 350.5,
+      },
+    }),
+    {
+      procurementListId: 7,
+      productId: 15,
+      requestedQuantity: 3,
+      observedStock: null,
+      notes: null,
+      selectedSupplierId: 9,
+      purchasePrice: 350.5,
+      addedByUserId: 4,
     }
   );
 }
@@ -288,6 +338,7 @@ testAllowedRoles();
 testCreateItemData();
 testUpdateItemData();
 testSupplierRecommendation();
+testRecommendationBecomesItemDefault();
 testProcurementOrderGroups();
 testIncompleteSupplierGroupDoesNotBlockOtherGroups();
 console.log('Procurement list service test passed');
