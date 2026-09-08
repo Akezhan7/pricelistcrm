@@ -6,12 +6,28 @@ import type {
   ProductLaunchFlags,
   ProductHistoryPage,
   ProductWarehouseDetails,
-  WarehouseReceipt,
 } from '../types';
 
 export interface ProductLifecycleOperations {
   purchase: ProductLifecyclePurchase | null;
   warehouseDetails: ProductWarehouseDetails | null;
+  arrivalRecovery: {
+    status: 'available' | 'ambiguous';
+    receiptId?: number;
+    receivedQuantity?: number;
+    receivedAt?: string;
+    message?: string;
+  } | null;
+}
+
+export interface ProductSearchPage {
+  products: Product[];
+  pagination: {
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  };
 }
 
 export interface CompleteProductWarehouseDto {
@@ -56,14 +72,14 @@ export interface LinkProductSupplierDto {
 class ProductsApi {
   private baseUrl = '/products';
 
-  async getProducts(params?: {
+  async getProductsPage(params?: {
     search?: string;
     isActive?: boolean;
     limit?: number;
     page?: number;
     excludeSupplierId?: number;
     supplierStatus?: 'without';
-  }): Promise<Product[]> {
+  }): Promise<ProductSearchPage> {
     const queryParams = new URLSearchParams();
 
     if (params?.search) queryParams.append('search', params.search);
@@ -82,7 +98,19 @@ class ProductsApi {
       throw new Error(response.data.message || 'Ошибка получения товаров');
     }
 
-    return response.data.data.products;
+    return response.data.data;
+  }
+
+  async getProducts(params?: {
+    search?: string;
+    isActive?: boolean;
+    limit?: number;
+    page?: number;
+    excludeSupplierId?: number;
+    supplierStatus?: 'without';
+  }): Promise<Product[]> {
+    const result = await this.getProductsPage(params);
+    return result.products;
   }
 
   async getProductById(id: number): Promise<Product> {
@@ -129,18 +157,13 @@ class ProductsApi {
     return response.data.data;
   }
 
-  async markProductArrived(
-    productId: number,
-    data: { receivedQuantity: number; notes?: string }
-  ): Promise<WarehouseReceipt> {
-    const response = await api.post<ApiResponse<{ receipt: WarehouseReceipt }>>(
-      `${this.baseUrl}/${productId}/lifecycle/mark-arrived`,
-      data
+  async reconcileProductArrival(productId: number): Promise<void> {
+    const response = await api.post<ApiResponse<unknown>>(
+      `${this.baseUrl}/${productId}/lifecycle/reconcile-arrival`
     );
-    if (!response.data.success || !response.data.data?.receipt) {
-      throw new Error(response.data.message || 'Ошибка подтверждения поступления');
+    if (!response.data.success) {
+      throw new Error(response.data.message || 'Ошибка восстановления этапа склада');
     }
-    return response.data.data.receipt;
   }
 
   async completeProductWarehouse(

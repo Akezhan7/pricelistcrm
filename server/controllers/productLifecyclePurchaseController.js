@@ -1,4 +1,5 @@
 const { validationResult } = require('express-validator');
+const { Op } = require('sequelize');
 const {
   Order,
   OrderItem,
@@ -9,17 +10,14 @@ const {
   ProductLifecyclePurchase,
   ProductSupplier,
   ProductWarehouseDetails,
-  StockHistory,
   Supplier,
   WarehouseReceipt,
   WarehouseReceiptItem,
   sequelize,
 } = require('../models');
 const { generateOrderNumber } = require('../services/orderNumberService');
-const { recalculateSupplierDebt } = require('./paymentController');
-const { canReceiveAtWarehouse } = require('../services/orderStatusPolicyService');
 const {
-  buildLifecycleArrivalPlan,
+  buildLifecycleArrivalReconciliationPlan,
   buildLifecyclePurchasePlan,
   buildWarehouseCompletionPlan,
 } = require('../services/productLifecyclePurchaseService');
@@ -41,6 +39,19 @@ function sendError(res, error, context) {
   return res.status(status).json({ success: false, message: error.message });
 }
 
+function buildArrivalReceiptItemWhere(productId, purchase) {
+  const receiptLinks = [{ orderItemId: purchase.orderItemId }];
+  if (purchase.warehouseReceiptId) {
+    receiptLinks.push({ receiptId: purchase.warehouseReceiptId });
+  }
+
+  return {
+    productId,
+    receivedQuantity: { [Op.gt]: 0 },
+    [Op.or]: receiptLinks,
+  };
+}
+
 async function getLifecycleOperations(req, res) {
   try {
     const product = await Product.findOne({ where: { id: req.params.id, isActive: true } });
@@ -57,7 +68,31 @@ async function getLifecycleOperations(req, res) {
       ProductWarehouseDetails.findOne({ where: { productId: product.id } }),
     ]);
 
-    return res.json({ success: true, data: { purchase, warehouseDetails } });
+    let arrivalRecovery = null;
+    if (purchase && !purchase.arrivedAt && product.lifecycleStatus === 'purchase') {
+      const receiptItems = await WarehouseReceiptItem.findAll({
+        where: buildArrivalReceiptItemWhere(product.id, purchase),
+        include: [{ model: WarehouseReceipt, as: 'receipt', required: true }],
+        order: [['id', 'DESC']],
+      });
+
+      if (receiptItems.length === 1) {
+        const receiptItem = receiptItems[0];
+        arrivalRecovery = {
+          status: 'available',
+          receiptId: receiptItem.receiptId,
+          receivedQuantity: receiptItem.receivedQuantity,
+          receivedAt: receiptItem.receipt.receivedAt,
+        };
+      } else if (receiptItems.length > 1) {
+        arrivalRecovery = {
+          status: 'ambiguous',
+          message: 'Найдено несколько документов приёмки для одной позиции. Требуется проверка администратором.',
+        };
+      }
+    }
+
+    return res.json({ success: true, data: { purchase, warehouseDetails, arrivalRecovery } });
   } catch (error) {
     return sendError(res, error, 'Error loading lifecycle purchase operations:');
   }
@@ -257,11 +292,32 @@ async function markProductsPurchasedBulk(req, res) {
 }
 
 async function markProductArrived(req, res) {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ success: false, message: 'Проверьте данные приемки', errors: errors.array() });
-  }
+  try {
+    const product = await Product.findOne({ where: { id: req.params.id, isActive: true } });
+    if (!product) throw requestError(404, 'Товар не найден');
 
+    const purchase = await ProductLifecyclePurchase.findOne({
+      where: { productId: product.id },
+      include: [{ model: Order, as: 'order', attributes: ['id', 'orderNumber', 'status'] }],
+    });
+    if (!purchase) throw requestError(400, 'Сначала оформите первичный закуп товара');
+    if (purchase.arrivedAt) throw requestError(409, 'Поступление этого товара уже подтверждено');
+    return res.status(409).json({
+      success: false,
+      code: 'ORDER_RECEIPT_REQUIRED',
+      message: 'Поступление проводится через приёмку всей связанной заявки',
+      data: {
+        orderId: purchase.orderId,
+        orderItemId: purchase.orderItemId,
+        receiptPath: `/warehouse/receipt?orderId=${purchase.orderId}&orderItemId=${purchase.orderItemId}`,
+      },
+    });
+  } catch (error) {
+    return sendError(res, error, 'Error marking product arrived:');
+  }
+}
+
+async function reconcileProductArrival(req, res) {
   const transaction = await sequelize.transaction();
   let transactionFinished = false;
   try {
@@ -277,75 +333,49 @@ async function markProductArrived(req, res) {
       transaction,
       lock: true,
     });
-    if (!purchase) throw requestError(400, 'Сначала оформите первичный закуп товара');
-    if (purchase.arrivedAt) throw requestError(409, 'Поступление этого товара уже подтверждено');
+    if (!purchase) throw requestError(409, 'У товара нет связанного первичного закупа');
+    if (purchase.arrivedAt) {
+      await transaction.commit();
+      transactionFinished = true;
+      return res.json({ success: true, message: 'Связь с приёмкой уже восстановлена', data: { purchase, product } });
+    }
 
-    const order = await Order.findOne({
-      where: { id: purchase.orderId, isActive: true },
+    const receiptItems = await WarehouseReceiptItem.findAll({
+      where: buildArrivalReceiptItemWhere(product.id, purchase),
+      include: [{ model: WarehouseReceipt, as: 'receipt', required: true }],
       transaction,
       lock: true,
     });
-    if (!order) throw requestError(409, 'Связанная заявка закупа не найдена');
-    if (!canReceiveAtWarehouse(order.status, req.user.role)) {
-      throw requestError(409, `Заявку в статусе «${order.status}» нельзя принять на склад`);
+    if (receiptItems.length === 0) {
+      throw requestError(409, 'Для этой позиции нет подтверждённого поступления с количеством больше нуля');
+    }
+    if (receiptItems.length > 1) {
+      throw requestError(409, 'Найдено несколько документов приёмки. Автоматическое восстановление небезопасно');
     }
 
-    const now = new Date();
-    const plan = buildLifecycleArrivalPlan({
+    const receiptItem = receiptItems[0];
+    const plan = buildLifecycleArrivalReconciliationPlan({
       product,
       lifecyclePurchase: purchase,
+      receipt: receiptItem.receipt,
+      receiptItem,
       actor: req.user,
-      payload: req.body,
-      now,
+      now: new Date(),
     });
-
-    const receipt = await WarehouseReceipt.create(plan.receipt, { transaction });
-    await WarehouseReceiptItem.create({ ...plan.receiptItem, receiptId: receipt.id }, { transaction });
-    await StockHistory.create({
-      productId: product.id,
-      oldStock: Number(product.currentStock || 0),
-      newStock: plan.productUpdate.currentStock,
-      changeAmount: plan.receiptItem.receivedQuantity,
-      changeType: 'receipt',
-      userId: req.user.id,
-      orderId: order.id,
-      reason: `Приемка первичной партии по заявке ${order.orderNumber}`,
-      notes: plan.receiptItem.notes,
-    }, { transaction });
     await product.update(plan.productUpdate, { transaction, hooks: false });
-    await purchase.update({
-      ...plan.purchaseUpdate,
-      warehouseReceiptId: receipt.id,
-    }, { transaction });
-
-    const oldStatus = order.status;
-    await order.update({ status: 'Принята на складе' }, { transaction });
-    await OrderStatusHistory.create({
-      orderId: order.id,
-      oldStatus,
-      newStatus: 'Принята на складе',
-      changedBy: req.user.id,
-      comment: plan.receipt.receiptType === 'partial'
-        ? 'Первичная партия принята с расхождением'
-        : 'Первичная партия принята полностью',
-      changedAt: now,
-    }, { transaction });
-    await ProductActionHistory.create({
-      ...plan.history,
-      metadata: { ...plan.history.metadata, warehouseReceiptId: receipt.id },
-    }, { transaction });
-    await recalculateSupplierDebt(order.supplierId, { transaction });
+    await purchase.update(plan.purchaseUpdate, { transaction });
+    await ProductActionHistory.create(plan.history, { transaction });
 
     await transaction.commit();
     transactionFinished = true;
     return res.json({
       success: true,
-      message: 'Поступление подтверждено, товар передан на складской этап',
-      data: { purchase, receipt, product },
+      message: 'Этап склада восстановлен по существующему документу приёмки',
+      data: { purchase, product },
     });
   } catch (error) {
     if (!transactionFinished) await transaction.rollback();
-    return sendError(res, error, 'Error marking product arrived:');
+    return sendError(res, error, 'Error reconciling product arrival:');
   }
 }
 
@@ -403,6 +433,7 @@ module.exports = {
   completeProductWarehouse,
   getLifecycleOperations,
   markProductArrived,
+  reconcileProductArrival,
   markProductPurchased,
   markProductsPurchasedBulk,
 };

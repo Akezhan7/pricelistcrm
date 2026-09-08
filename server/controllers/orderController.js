@@ -1,11 +1,34 @@
 const { Op } = require('sequelize');
 const sequelize = require('../config/database');
-const { Order, OrderItem, OrderStatusHistory, OrderSettlementHistory, Product, Supplier, User, Payment, ProductVariation, OrderConfirmation, CollectorTask, ProductLifecyclePurchase } = require('../models');
+const {
+  Order,
+  OrderItem,
+  OrderStatusHistory,
+  OrderSettlementHistory,
+  OrderCorrection,
+  Product,
+  Supplier,
+  User,
+  Payment,
+  ProductVariation,
+  OrderConfirmation,
+  CollectorTask,
+  ProductLifecyclePurchase,
+  ProductActionHistory,
+  ProcurementList,
+  ProcurementListItem,
+  WarehouseReceipt,
+  StockHistory,
+} = require('../models');
 const { recalculateSupplierDebt } = require('./paymentController');
 const { createPriceHistoryRecord } = require('./priceHistoryController');
 const { formatOrderMessage, generateWhatsAppLink } = require('../utils/whatsappFormatter');
 const { generateOrderNumber } = require('../services/orderNumberService');
 const { buildOrderItemSyncPlan } = require('../services/orderItemSyncService');
+const {
+  buildOrderEditPolicy,
+  buildReceivedOrderCorrectionPlan,
+} = require('../services/orderCorrectionService');
 const {
   buildSettlementChange,
   normalizeSettlementType,
@@ -23,6 +46,7 @@ const {
   canReceiveAtWarehouse,
   assertOrderWorkflowOpen,
 } = require('../services/orderStatusPolicyService');
+const { removeUploadedFile } = require('../middleware/upload');
 
 /**
  * Автоматический расчет статуса оплаты на основе сумм
@@ -261,6 +285,17 @@ exports.getOrderById = async (req, res) => {
             as: 'changer',
             attributes: ['id', 'name']
           }]
+        },
+        {
+          model: OrderCorrection,
+          as: 'corrections',
+          separate: true,
+          order: [['createdAt', 'ASC']],
+          include: [{
+            model: User,
+            as: 'changer',
+            attributes: ['id', 'name']
+          }]
         }
       ]
     });
@@ -272,9 +307,17 @@ exports.getOrderById = async (req, res) => {
       });
     }
 
+    const documentCounts = await getOrderDocumentCounts(order);
+    const orderData = order.toJSON();
+    orderData.editPolicy = buildOrderEditPolicy({
+      status: order.status,
+      ...documentCounts,
+      role: req.user.role,
+    });
+
     res.json({
       success: true,
-      data: order
+      data: orderData
     });
 
   } catch (error) {
@@ -490,10 +533,11 @@ exports.createOrder = async (req, res) => {
  * Обновить заявку
  * PUT /api/orders/:id
  * Доступ: admin, purchase_manager
- * Ограничение: можно редактировать только если статус = "Создана" или "Отправлена поставщику" или "Частично подтверждена"
+ * До приёмки — обычное редактирование; после приёмки — корректировка администратором.
  */
 exports.updateOrder = async (req, res) => {
   const transaction = await sequelize.transaction();
+  let transactionFinished = false;
 
   try {
     const { id } = req.params;
@@ -504,55 +548,66 @@ exports.updateOrder = async (req, res) => {
       notes,
       items,
       settlementType,
+      correctionReason,
     } = req.body;
 
-    // Найти заявку
     const order = await Order.findOne({
-      where: { id, isActive: true }
+      where: { id, isActive: true },
+      transaction,
+      lock: true,
     });
 
     if (!order) {
-      await transaction.rollback();
-      return res.status(404).json({
-        success: false,
-        message: 'Заявка не найдена'
-      });
+      const error = new Error('Заявка не найдена');
+      error.statusCode = 404;
+      throw error;
     }
 
-    // Проверка, что заявку можно редактировать (до того, как товар отправился в доставку/склад)
-    const editableStatuses = ['Создана', 'Отправлена поставщику', 'Частично подтверждена', 'Подтверждена'];
-    if (!editableStatuses.includes(order.status)) {
-      await transaction.rollback();
-      return res.status(409).json({
-        success: false,
-        message: `Невозможно редактировать заявку. Текущий статус: ${order.status}. Редактировать можно только заявки в статусах: ${editableStatuses.join(', ')}`
-      });
+    const documentCounts = await getOrderDocumentCounts(order, transaction);
+    const editPolicy = buildOrderEditPolicy({
+      status: order.status,
+      ...documentCounts,
+      role: req.user.role,
+    });
+    if (!editPolicy.canEdit) {
+      const error = new Error(editPolicy.reason || 'Заявку нельзя изменить');
+      error.statusCode = 409;
+      throw error;
+    }
+    if (
+      editPolicy.mode === 'correction'
+      && (typeof correctionReason !== 'string' || correctionReason.trim().length < 5)
+    ) {
+      const error = new Error('Причина корректировки должна содержать минимум 5 символов');
+      error.statusCode = 400;
+      throw error;
     }
 
+    const existingItems = await OrderItem.findAll({
+      where: { orderId: order.id },
+      order: [['id', 'ASC']],
+      transaction,
+      lock: true,
+    });
+    const beforeData = snapshotOrder(order, existingItems);
     const previousSupplierId = order.supplierId;
     let settlementHistoryData = null;
+
     if (Object.prototype.hasOwnProperty.call(req.body, 'supplierId')) {
       let normalizedSupplierId;
       try {
         normalizedSupplierId = normalizeOptionalSupplierId(supplierId);
         assertSupplierAllowedForOrderType(order.type, normalizedSupplierId);
       } catch (error) {
-        await transaction.rollback();
-        return res.status(400).json({
-          success: false,
-          message: order.type === 'return'
-            ? 'Для возврата необходимо выбрать поставщика'
-            : 'Некорректный поставщик',
-        });
+        error.statusCode = 400;
+        throw error;
       }
 
       const currentSupplierId = previousSupplierId == null ? null : Number(previousSupplierId);
-      if (order.status !== 'Создана' && normalizedSupplierId !== currentSupplierId) {
-        await transaction.rollback();
-        return res.status(409).json({
-          success: false,
-          message: 'Поставщика можно изменить только у заявки в статусе «Создана»',
-        });
+      if ((editPolicy.mode === 'correction' || order.status !== 'Создана') && normalizedSupplierId !== currentSupplierId) {
+        const error = new Error('Поставщика можно изменить только у заявки в статусе «Создана» до приёмки');
+        error.statusCode = 409;
+        throw error;
       }
 
       if (normalizedSupplierId) {
@@ -561,15 +616,15 @@ exports.updateOrder = async (req, res) => {
           transaction,
         });
         if (!supplier) {
-          await transaction.rollback();
-          return res.status(400).json({ success: false, message: 'Поставщик не найден' });
+          const error = new Error('Поставщик не найден');
+          error.statusCode = 400;
+          throw error;
         }
       }
 
       order.supplierId = normalizedSupplierId;
     }
 
-    // Обновление основной информации
     if (expectedDeliveryDate !== undefined) order.expectedDeliveryDate = expectedDeliveryDate;
     if (deliveryLocation !== undefined) order.deliveryLocation = deliveryLocation;
     if (notes !== undefined) order.notes = notes;
@@ -578,8 +633,8 @@ exports.updateOrder = async (req, res) => {
       try {
         normalizedSettlementType = normalizeSettlementType(order.type, settlementType);
       } catch (error) {
-        await transaction.rollback();
-        return res.status(400).json({ success: false, message: error.message });
+        error.statusCode = 400;
+        throw error;
       }
       if (normalizedSettlementType !== order.settlementType) {
         settlementHistoryData = {
@@ -594,102 +649,187 @@ exports.updateOrder = async (req, res) => {
       }
     }
 
-    // Обновление товаров если они переданы
-    if (items && items.length > 0) {
-      // Проверка существования товаров и вариаций, расчет новой суммы
-      for (const item of items) {
-        const product = await Product.findByPk(item.productId);
-        if (!product) {
-          await transaction.rollback();
-          return res.status(400).json({
-            success: false,
-            message: `Товар с ID ${item.productId} не найден`
-          });
-        }
+    if (items !== undefined) {
+      if (!Array.isArray(items) || items.length === 0) {
+        const error = new Error('В заявке должен остаться хотя бы один товар. Пустую заявку удалите или отмените.');
+        error.statusCode = 400;
+        throw error;
+      }
 
-        // Если указана вариация, проверить её существование
+      const productIds = [...new Set([
+        ...existingItems.map((item) => Number(item.productId)),
+        ...items.map((item) => Number(item.productId)),
+      ])];
+      const products = await Product.findAll({
+        where: { id: { [Op.in]: productIds } },
+        transaction,
+        lock: true,
+      });
+      if (products.length !== productIds.length) {
+        const error = new Error('Один из товаров не найден');
+        error.statusCode = 400;
+        throw error;
+      }
+      const productsById = new Map(products.map((product) => [Number(product.id), product]));
+
+      for (const item of items) {
+        if (!item.id && !productsById.get(Number(item.productId)).isActive) {
+          const error = new Error(`Нельзя добавить деактивированный товар с ID ${item.productId}`);
+          error.statusCode = 400;
+          throw error;
+        }
         if (item.productVariationId) {
           const variation = await ProductVariation.findOne({
             where: {
               id: item.productVariationId,
               productId: item.productId,
               isActive: true
-            }
+            },
+            transaction,
           });
-          
           if (!variation) {
-            await transaction.rollback();
-            return res.status(400).json({
-              success: false,
-              message: `Вариация товара с ID ${item.productVariationId} не найдена`
-            });
+            const error = new Error(`Вариация товара с ID ${item.productVariationId} не найдена`);
+            error.statusCode = 400;
+            throw error;
           }
         }
-
       }
 
-      const [existingItems, lifecyclePurchases] = await Promise.all([
-        OrderItem.findAll({
+      const lifecyclePurchases = await ProductLifecyclePurchase.findAll({
           where: { orderId: order.id },
           transaction,
           lock: true,
-        }),
-        ProductLifecyclePurchase.findAll({
-          where: { orderId: order.id },
-          transaction,
-          lock: true,
-        }),
-      ]);
-
-      const syncPlan = buildOrderItemSyncPlan({
-        orderId: order.id,
-        existingItems,
-        lifecyclePurchases,
-        incomingItems: items,
       });
-
       const existingItemsById = new Map(existingItems.map((item) => [Number(item.id), item]));
-      for (const update of syncPlan.updates) {
-        const orderItem = existingItemsById.get(Number(update.id));
-        await orderItem.update(update.data, { transaction });
-      }
 
-      if (syncPlan.deleteIds.length > 0) {
-        await OrderItem.destroy({
-          where: { id: { [Op.in]: syncPlan.deleteIds }, orderId: order.id },
-          transaction,
+      if (editPolicy.mode === 'correction') {
+        const topLevelChanged = ['expectedDeliveryDate', 'deliveryLocation', 'notes', 'settlementType']
+          .some((field) => Object.prototype.hasOwnProperty.call(req.body, field)
+            && String(beforeData[field] ?? '') !== String(order[field] ?? ''));
+        const correctionPlan = buildReceivedOrderCorrectionPlan({
+          reason: correctionReason,
+          paidAmount: order.paidAmount,
+          existingItems,
+          incomingItems: items,
+          products,
+          allowNoItemChanges: topLevelChanged,
         });
-      }
 
-      if (syncPlan.creates.length > 0) {
-        await OrderItem.bulkCreate(syncPlan.creates, { transaction });
-      }
-
-      for (const update of syncPlan.lifecyclePurchaseUpdates) {
-        await ProductLifecyclePurchase.update(update.data, {
-          where: { id: update.id, orderId: order.id },
-          transaction,
+        for (const update of correctionPlan.updates) {
+          await existingItemsById.get(Number(update.id)).update(update.data, { transaction });
+        }
+        for (const create of correctionPlan.creates) {
+          await OrderItem.create({ orderId: order.id, ...create.data }, { transaction });
+        }
+        for (const stockChange of correctionPlan.stockChanges) {
+          const product = products.find((item) => Number(item.id) === stockChange.productId);
+          await product.update({ currentStock: stockChange.newStock }, { transaction, hooks: false });
+          await StockHistory.create({
+            productId: stockChange.productId,
+            oldStock: stockChange.oldStock,
+            newStock: stockChange.newStock,
+            changeAmount: stockChange.delta,
+            changeType: 'correction',
+            userId: req.user.id,
+            orderId: order.id,
+            reason: `Корректировка заявки ${order.orderNumber}`,
+            notes: correctionPlan.reason,
+          }, { transaction });
+        }
+        for (const purchase of lifecyclePurchases) {
+          const update = correctionPlan.updates.find((item) => Number(item.id) === Number(purchase.orderItemId));
+          if (!update) continue;
+          await purchase.update({
+            ...(update.data.quantity > 0 ? { quantity: update.data.quantity } : {}),
+            receivedQuantity: update.data.quantity,
+            purchasePrice: update.data.priceAtPurchase,
+            notes: update.data.notes,
+          }, { transaction });
+        }
+        order.totalAmount = correctionPlan.totalAmount;
+        order.paymentStatus = correctionPlan.paymentStatus;
+      } else {
+        const syncPlan = buildOrderItemSyncPlan({
+          orderId: order.id,
+          existingItems,
+          lifecyclePurchases,
+          incomingItems: items,
+          allowLifecycleRelease: true,
         });
-      }
 
-      order.totalAmount = syncPlan.totalAmount;
+        for (const update of syncPlan.updates) {
+          await existingItemsById.get(Number(update.id)).update(update.data, { transaction });
+        }
+
+        if (syncPlan.deleteIds.length > 0) {
+          await releaseOrderItemLinks({
+            order,
+            orderItemIds: syncPlan.deleteIds,
+            actorId: req.user.id,
+            transaction,
+          });
+
+          await OrderItem.destroy({
+            where: { id: { [Op.in]: syncPlan.deleteIds }, orderId: order.id },
+            transaction,
+          });
+        }
+
+        if (syncPlan.creates.length > 0) {
+          await OrderItem.bulkCreate(syncPlan.creates, { transaction });
+        }
+
+        for (const update of syncPlan.lifecyclePurchaseUpdates) {
+          await ProductLifecyclePurchase.update(update.data, {
+            where: { id: update.id, orderId: order.id },
+            transaction,
+          });
+        }
+
+        order.totalAmount = syncPlan.totalAmount;
+        order.paymentStatus = calculatePaymentStatus(order);
+      }
     }
 
     await order.save({ transaction });
     if (settlementHistoryData) {
       await OrderSettlementHistory.create(settlementHistoryData, { transaction });
     }
-    await transaction.commit();
 
-    // Пересчитать задолженность поставщика
+    const finalItems = await OrderItem.findAll({
+      where: { orderId: order.id },
+      order: [['id', 'ASC']],
+      transaction,
+    });
+    const afterData = snapshotOrder(order, finalItems);
+    if (JSON.stringify(beforeData) !== JSON.stringify(afterData)) {
+      await OrderCorrection.create({
+        orderId: order.id,
+        correctionType: editPolicy.mode === 'correction'
+          ? 'post_receipt_correction'
+          : 'pre_receipt_edit',
+        reason: editPolicy.mode === 'correction'
+          ? correctionReason.trim()
+          : (typeof correctionReason === 'string' && correctionReason.trim()
+            ? correctionReason.trim()
+            : 'Редактирование заявки до приёмки'),
+        beforeData,
+        afterData,
+        changedBy: req.user.id,
+        createdAt: new Date(),
+      }, { transaction });
+    }
+
     if (previousSupplierId && Number(previousSupplierId) !== Number(order.supplierId)) {
-      await recalculateSupplierDebt(previousSupplierId);
+      await recalculateSupplierDebt(previousSupplierId, { transaction });
     }
     if (order.supplierId) {
-      await recalculateSupplierDebt(order.supplierId);
+      await recalculateSupplierDebt(order.supplierId, { transaction });
     }
 
-    // Получение обновленной заявки
+    await transaction.commit();
+    transactionFinished = true;
+
     const updatedOrder = await Order.findByPk(order.id, {
       include: [
         {
@@ -719,23 +859,112 @@ exports.updateOrder = async (req, res) => {
     res.json({
       success: true,
       data: updatedOrder,
-      message: 'Заявка успешно обновлена'
+      message: editPolicy.mode === 'correction'
+        ? 'Корректировка заявки сохранена'
+        : 'Заявка успешно обновлена'
     });
 
   } catch (error) {
-    await transaction.rollback();
-    if (/Cannot delete lifecycle-linked order item|Cannot change product for lifecycle-linked order item/i.test(error.message)) {
-      return res.status(409).json({
-        success: false,
-        message: 'Нельзя удалить или заменить строку, связанную с lifecycle-закупом. Можно изменить количество, цену и заметки, а остальные товары добавлять или удалять отдельно.',
-      });
-    }
-    console.error('Ошибка обновления заявки:', error);
-    res.status(500).json({
+    if (!transactionFinished) await transaction.rollback();
+    const status = error.statusCode || 500;
+    if (status >= 500) console.error('Ошибка обновления заявки:', error);
+    res.status(status).json({
       success: false,
-      message: 'Ошибка обновления заявки',
-      error: error.message
+      message: status >= 500 ? 'Ошибка обновления заявки' : error.message,
+      code: error.code,
     });
+  }
+};
+
+const snapshotOrder = (order, items) => ({
+  supplierId: order.supplierId == null ? null : Number(order.supplierId),
+  expectedDeliveryDate: order.expectedDeliveryDate || null,
+  deliveryLocation: order.deliveryLocation || null,
+  notes: order.notes || null,
+  settlementType: order.settlementType,
+  totalAmount: Number(order.totalAmount || 0).toFixed(2),
+  paymentStatus: order.paymentStatus,
+  items: items.map((item) => ({
+    id: Number(item.id),
+    productId: Number(item.productId),
+    productVariationId: item.productVariationId ? Number(item.productVariationId) : null,
+    quantity: Number(item.quantity),
+    orderedQuantity: item.orderedQuantity == null ? null : Number(item.orderedQuantity),
+    priceAtPurchase: Number(item.priceAtPurchase),
+    totalPrice: Number(item.totalPrice).toFixed(2),
+    notes: item.notes || null,
+  })),
+});
+
+const getOrderDocumentCounts = async (order, transaction) => {
+  const [receiptCount, paymentCount] = await Promise.all([
+    WarehouseReceipt.count({ where: { orderId: order.id }, transaction }),
+    Payment.count({
+      where: { relatedOrderIds: { [Op.contains]: [Number(order.id)] } },
+      transaction,
+    }),
+  ]);
+  return {
+    receiptCount,
+    paymentCount: Number(order.paidAmount || 0) > 0 ? Math.max(1, paymentCount) : paymentCount,
+  };
+};
+
+const releaseOrderItemLinks = async ({ order, orderItemIds, actorId, transaction }) => {
+  if (orderItemIds.length === 0) return;
+
+  const [linkedProcurementItems, lifecyclePurchases] = await Promise.all([
+    ProcurementListItem.findAll({
+      where: { orderItemId: { [Op.in]: orderItemIds } },
+      transaction,
+      lock: true,
+    }),
+    ProductLifecyclePurchase.findAll({
+      where: { orderId: order.id, orderItemId: { [Op.in]: orderItemIds } },
+      transaction,
+      lock: true,
+    }),
+  ]);
+
+  let targetList = await ProcurementList.findOne({
+    where: { status: 'open' },
+    transaction,
+    lock: true,
+  });
+  if (!targetList && linkedProcurementItems.length > 0) {
+    targetList = await ProcurementList.findByPk(linkedProcurementItems[0].procurementListId, {
+      transaction,
+      lock: true,
+    });
+    if (targetList) await targetList.update({ status: 'open', processedAt: null }, { transaction });
+  }
+
+  for (const item of linkedProcurementItems) {
+    if (!targetList || Number(item.procurementListId) === Number(targetList.id)) {
+      await item.update({ orderItemId: null }, { transaction });
+      continue;
+    }
+    const duplicate = await ProcurementListItem.findOne({
+      where: { procurementListId: targetList.id, productId: item.productId },
+      transaction,
+      lock: true,
+    });
+    if (duplicate) await item.destroy({ transaction });
+    else await item.update({ procurementListId: targetList.id, orderItemId: null }, { transaction });
+  }
+
+  for (const purchase of lifecyclePurchases) {
+    await purchase.destroy({ transaction });
+    await ProductActionHistory.create({
+      productId: purchase.productId,
+      actorId,
+      actionType: 'purchase_order_line_released',
+      fromStatus: 'purchase',
+      toStatus: 'purchase',
+      message: 'Lifecycle purchase released after order line removal',
+      metadata: { orderId: order.id, orderItemId: purchase.orderItemId },
+      createdAt: new Date(),
+    }, { transaction });
   }
 };
 
@@ -910,39 +1139,59 @@ exports.changeOrderStatus = async (req, res) => {
  * Ограничение: можно удалить только если статус = "Создана" и paymentStatus = "Не оплачено"
  */
 exports.deleteOrder = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
   try {
     const { id } = req.params;
 
-    // Найти заявку
     const order = await Order.findOne({
-      where: { id, isActive: true }
+      where: { id, isActive: true },
+      transaction,
+      lock: true,
     });
 
     if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: 'Заявка не найдена'
-      });
+      const error = new Error('Заявка не найдена');
+      error.statusCode = 404;
+      throw error;
     }
 
-    // Проверка возможности удаления
-    if (order.status !== 'Создана' || order.paymentStatus !== 'Не оплачено') {
-      return res.status(409).json({
-        success: false,
-        message: 'Невозможно удалить заявку. Можно удалить только заявки в статусе "Создана" и "Не оплачено"',
-        currentStatus: order.status,
-        paymentStatus: order.paymentStatus
-      });
+    const documentCounts = await getOrderDocumentCounts(order, transaction);
+    const editPolicy = buildOrderEditPolicy({
+      status: order.status,
+      ...documentCounts,
+      role: req.user.role,
+    });
+    if (!editPolicy.canDelete) {
+      const error = new Error(documentCounts.receiptCount > 0
+        ? 'Заявку с приёмкой нельзя удалить. Используйте корректировку или возврат.'
+        : documentCounts.paymentCount > 0
+          ? 'Заявку с платежами нельзя удалить. Сначала урегулируйте оплату.'
+          : 'Удалить можно только неоплаченную заявку в статусе «Создана»');
+      error.statusCode = 409;
+      throw error;
     }
 
     const supplierId = order.supplierId;
+    const orderItems = await OrderItem.findAll({
+      where: { orderId: order.id },
+      attributes: ['id'],
+      transaction,
+      lock: true,
+    });
+    await releaseOrderItemLinks({
+      order,
+      orderItemIds: orderItems.map((item) => Number(item.id)),
+      actorId: req.user.id,
+      transaction,
+    });
 
-    // Мягкое удаление
     order.isActive = false;
-    await order.save();
+    await order.save({ transaction });
 
-    // Пересчитать задолженность поставщика
-    await recalculateSupplierDebt(supplierId);
+    await recalculateSupplierDebt(supplierId, { transaction });
+    await transaction.commit();
+    transactionFinished = true;
 
     res.json({
       success: true,
@@ -950,11 +1199,12 @@ exports.deleteOrder = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Ошибка удаления заявки:', error);
-    res.status(500).json({
+    if (!transactionFinished) await transaction.rollback();
+    const status = error.statusCode || 500;
+    if (status >= 500) console.error('Ошибка удаления заявки:', error);
+    res.status(status).json({
       success: false,
-      message: 'Ошибка удаления заявки',
-      error: error.message
+      message: status >= 500 ? 'Ошибка удаления заявки' : error.message,
     });
   }
 };
@@ -1025,6 +1275,7 @@ exports.changeSettlementType = async (req, res) => {
  */
 exports.updatePayment = async (req, res) => {
   const transaction = await sequelize.transaction();
+  let transactionFinished = false;
 
   try {
     const { id } = req.params;
@@ -1032,11 +1283,15 @@ exports.updatePayment = async (req, res) => {
 
     // Найти заявку
     const order = await Order.findOne({
-      where: { id, isActive: true }
+      where: { id, isActive: true },
+      transaction,
+      lock: true,
     });
 
     if (!order) {
       await transaction.rollback();
+      transactionFinished = true;
+      removeUploadedFile(req.file);
       return res.status(404).json({
         success: false,
         message: 'Заявка не найдена'
@@ -1047,6 +1302,8 @@ exports.updatePayment = async (req, res) => {
       assertOrderHasSupplier(order);
     } catch (error) {
       await transaction.rollback();
+      transactionFinished = true;
+      removeUploadedFile(req.file);
       return res.status(error.statusCode || 409).json({
         success: false,
         message: 'Сначала назначьте поставщика заявке',
@@ -1056,6 +1313,8 @@ exports.updatePayment = async (req, res) => {
 
     if (order.status === 'Отменена') {
       await transaction.rollback();
+      transactionFinished = true;
+      removeUploadedFile(req.file);
       return res.status(409).json({
         success: false,
         message: 'Нельзя зарегистрировать оплату по отменённой заявке',
@@ -1070,6 +1329,8 @@ exports.updatePayment = async (req, res) => {
 
     if (paymentAmount <= 0) {
       await transaction.rollback();
+      transactionFinished = true;
+      removeUploadedFile(req.file);
       return res.status(400).json({
         success: false,
         message: 'Сумма оплаты должна быть больше нуля',
@@ -1081,6 +1342,8 @@ exports.updatePayment = async (req, res) => {
     const newPaidAmount = currentPaid + paymentAmount;
     if (newPaidAmount > totalAmount) {
       await transaction.rollback();
+      transactionFinished = true;
+      removeUploadedFile(req.file);
       return res.status(400).json({
         success: false,
         message: 'Сумма оплаты превышает остаток к доплате',
@@ -1101,7 +1364,8 @@ exports.updatePayment = async (req, res) => {
       paymentMethod: 'Наличные', // По умолчанию, можно добавить поле в запрос
       comment: comment || `Оплата по заявке ${order.orderNumber}`,
       createdBy: req.user.id,
-      relatedOrderIds: [order.id]
+      relatedOrderIds: [order.id],
+      receiptUrl: req.file ? `/uploads/${req.file.filename}` : null,
     }, { transaction });
 
     // Обновление оплаты
@@ -1124,10 +1388,8 @@ exports.updatePayment = async (req, res) => {
     }, { transaction });
 
     await recalculateSupplierDebt(order.supplierId, { transaction });
-    await transaction.commit();
-
-    // Получение обновленной заявки
     const updatedOrder = await Order.findByPk(order.id, {
+      transaction,
       include: [
         {
           model: Supplier,
@@ -1136,6 +1398,8 @@ exports.updatePayment = async (req, res) => {
         }
       ]
     });
+    await transaction.commit();
+    transactionFinished = true;
 
     res.json({
       success: true,
@@ -1147,14 +1411,18 @@ exports.updatePayment = async (req, res) => {
           remainingAmount: (totalAmount - newPaidAmount).toFixed(2),
           statusChanged: oldPaymentStatus !== order.paymentStatus,
           oldStatus: oldPaymentStatus,
-          newStatus: order.paymentStatus
+          newStatus: order.paymentStatus,
+          receiptUrl: payment.receiptUrl,
         }
       },
       message: `Оплата в размере ${paymentAmount.toFixed(2)} тенге успешно зарегистрирована`
     });
 
   } catch (error) {
-    await transaction.rollback();
+    if (!transactionFinished) {
+      removeUploadedFile(req.file);
+      await transaction.rollback();
+    }
     console.error('Ошибка обновления оплаты:', error);
     res.status(500).json({
       success: false,

@@ -33,9 +33,10 @@ function testBuildsCaseInsensitiveTokenSearch() {
   assert.strictEqual(filter[Op.and].length, 2);
 
   const firstTokenFields = filter[Op.and][0][Op.or];
-  assert.strictEqual(firstTokenFields.length, 2);
+  assert.strictEqual(firstTokenFields.length, 5);
   assert.deepStrictEqual(firstTokenFields[0].name, { [Op.iLike]: '%малярный%' });
   assert.deepStrictEqual(firstTokenFields[1].article, { [Op.iLike]: '%малярный%' });
+  assert.deepStrictEqual(firstTokenFields[2].internalName, { [Op.iLike]: '%малярный%' });
 
   const secondTokenFields = filter[Op.and][1][Op.or];
   assert.deepStrictEqual(secondTokenFields[0].name, { [Op.iLike]: '%скотч%' });
@@ -43,11 +44,17 @@ function testBuildsCaseInsensitiveTokenSearch() {
 
 testBuildsCaseInsensitiveTokenSearch();
 
-function testDoesNotSearchHiddenProductNames() {
+function testSearchesAllProductNamesAndArticles() {
   const filter = buildProductSearchFilter('drill');
   const searchedFields = filter[Op.and][0][Op.or].map((condition) => Object.keys(condition)[0]);
 
-  assert.deepStrictEqual(searchedFields, ['name', 'article']);
+  assert.deepStrictEqual(searchedFields, [
+    'name',
+    'article',
+    'internalName',
+    'kaspiName',
+    'kaspiArticle',
+  ]);
 }
 
 function testBuildsRelevantSearchOrder() {
@@ -73,7 +80,7 @@ function testBuildsProductsWithoutSupplierFilter() {
   assert.throws(() => buildProductSupplierFilter('wrong'), /invalid supplier status/i);
 }
 
-testDoesNotSearchHiddenProductNames();
+testSearchesAllProductNamesAndArticles();
 testBuildsRelevantSearchOrder();
 testBuildsProductsWithoutSupplierFilter();
 

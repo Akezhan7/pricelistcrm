@@ -61,6 +61,7 @@ const {
   markProductArrived,
   markProductPurchased,
   markProductsPurchasedBulk,
+  reconcileProductArrival,
 } = require('../controllers/productLifecyclePurchaseController');
 const {
   completeProductSaleLaunch,
@@ -295,11 +296,13 @@ router.post('/:id/lifecycle/mark-purchased',
 router.post('/:id/lifecycle/mark-arrived',
   auth,
   requireRole('admin', 'purchase_manager'),
-  [
-    body('receivedQuantity').isInt({ min: 1 }),
-    body('notes').optional({ values: 'falsy' }).isLength({ max: 2000 }),
-  ],
   markProductArrived
+);
+
+router.post('/:id/lifecycle/reconcile-arrival',
+  auth,
+  requireRole('admin', 'purchase_manager'),
+  reconcileProductArrival
 );
 
 router.post('/:id/lifecycle/complete-warehouse',

@@ -5,10 +5,12 @@ const { auth } = require('../middleware/auth');
 const checkRole = require('../middleware/checkRole');
 const orderController = require('../controllers/orderController');
 const { ORDER_STATUSES } = require('../services/orderStatusPolicyService');
+const { removeUploadedFile, uploadReceiptFile } = require('../middleware/upload');
 
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    removeUploadedFile(req.file);
     return res.status(400).json({
       success: false,
       message: 'Ошибка валидации',
@@ -73,6 +75,7 @@ router.get('/:id/status-options',
 router.patch('/:id/payment',
   auth,
   checkRole(['admin', 'purchase_manager', 'accountant']),
+  uploadReceiptFile,
   param('id').isInt(),
   body('amount').notEmpty().isFloat({ min: 0.01 }).withMessage('Сумма должна быть больше нуля'),
   body('comment').optional({ nullable: true }).isString().trim().isLength({ max: 500 }),
@@ -106,6 +109,7 @@ router.put('/:id',
   body('expectedDeliveryDate').optional({ nullable: true }).isISO8601(),
   body('deliveryLocation').optional().isString().trim().isLength({ max: 200 }),
   body('notes').optional({ nullable: true }).isString().trim(),
+  body('correctionReason').optional({ nullable: true }).isString().trim().isLength({ max: 1000 }),
   body('items').optional().isArray({ min: 1 }),
   body('items.*.id').optional({ nullable: true }).isInt(),
   body('items.*.productId').if(body('items').exists()).notEmpty().isInt(),

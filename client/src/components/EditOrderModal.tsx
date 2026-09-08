@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Package } from 'lucide-react';
 import ordersApi from '../services/ordersApi';
-import productsApi from '../services/productsApi';
 import suppliersApi from '../services/suppliersApi';
 import api from '../utils/api';
 import type { Order, Product, Supplier, UpdateOrderDto, ProductVariation, OrderItem, OrderSettlementType } from '../types';
@@ -14,6 +13,8 @@ import { Select } from './ui/Select';
 import { Textarea } from './ui/Textarea';
 import { OrderLineItemsEditor, type OrderLineItemEdit } from './forms/OrderLineItemsEditor';
 import { formatPriceKZT } from '../utils/format';
+import { useProductCatalogSearch } from '../hooks/useProductCatalogSearch';
+import { getSupplierListPrice } from '../utils/orderItems';
 
 interface EditOrderModalProps {
   isOpen: boolean;
@@ -31,17 +32,24 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
   const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('');
   const [deliveryLocation, setDeliveryLocation] = useState('');
   const [notes, setNotes] = useState('');
+  const [correctionReason, setCorrectionReason] = useState('');
   const [items, setItems] = useState<OrderItemForm[]>([]);
-
-  const [products, setProducts] = useState<Product[]>([]);
-  const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
 
   const [productSearch, setProductSearch] = useState('');
   const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const {
+    products: filteredProducts,
+    loading: productsLoading,
+    loadingMore: productsLoadingMore,
+    error: productsError,
+    hasMore: hasMoreProducts,
+    loadMore: loadMoreProducts,
+  } = useProductCatalogSearch({ enabled: isOpen, search: productSearch });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState(true);
+  const isCorrection = order.editPolicy?.mode === 'correction';
 
   useEffect(() => {
     if (isOpen && order) {
@@ -55,14 +63,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
       setLoadingData(true);
       setError(null);
 
-      // Загрузить список товаров
-      const [productsData, suppliersData] = await Promise.all([
-        productsApi.getProducts({ isActive: true, limit: 1000 }),
-        suppliersApi.getSuppliers({ isActive: true, limit: 1000 }),
-      ]);
-      const productsArray = Array.isArray(productsData) ? productsData : [];
-      setProducts(productsArray);
-      setFilteredProducts(productsArray);
+      const suppliersData = await suppliersApi.getSuppliers({ isActive: true, limit: 1000 });
       setSuppliers(Array.isArray(suppliersData) ? suppliersData : []);
 
       // Инициализировать форму данными заявки
@@ -123,24 +124,10 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
     } catch (err: any) {
       console.error('Ошибка загрузки данных:', err);
       setError(err.message || 'Ошибка загрузки данных');
-      setProducts([]);
-      setFilteredProducts([]);
     } finally {
       setLoadingData(false);
     }
   };
-
-  useEffect(() => {
-    if (productSearch.trim()) {
-      const filtered = products.filter(p =>
-        p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-        p.article.toLowerCase().includes(productSearch.toLowerCase())
-      );
-      setFilteredProducts(filtered);
-    } else {
-      setFilteredProducts(products);
-    }
-  }, [productSearch, products]);
 
   const handleAddProduct = async (product: Product) => {
     let variations: ProductVariation[] = [];
@@ -151,13 +138,19 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
       console.error('Ошибка загрузки вариаций:', error);
     }
 
+    const selectedSupplier = supplierId
+      ? product.suppliers?.find((supplier) => supplier.id === supplierId)
+      : undefined;
+    const productWithSupplierPrice = selectedSupplier
+      ? { ...product, ProductSupplier: selectedSupplier.ProductSupplier }
+      : product;
     const newItem: OrderItemForm = {
       productId: product.id,
       product: { ...product, variations },
       productVariationId: null,
       selectedVariation: null,
       quantity: 1,
-      priceAtPurchase: Number(product.costPrice) || 0,
+      priceAtPurchase: getSupplierListPrice(productWithSupplierPrice),
       notes: '',
       uniqueKey: `new-${product.id}-${Date.now()}`,
       isDeleted: false
@@ -236,7 +229,13 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
     const activeItems = items.filter(item => !item.isDeleted);
     
     if (activeItems.length === 0) {
-      return 'Добавьте хотя бы один товар в заявку';
+      return isCorrection
+        ? 'Для полного возврата используйте возвратную накладную'
+        : 'Добавьте хотя бы один товар в заявку';
+    }
+
+    if (isCorrection && correctionReason.trim().length < 5) {
+      return 'Укажите причину корректировки (минимум 5 символов)';
     }
     
     for (const item of activeItems) {
@@ -268,6 +267,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
         expectedDeliveryDate: expectedDeliveryDate || undefined,
         deliveryLocation: deliveryLocation || undefined,
         notes: notes || undefined,
+        correctionReason: isCorrection ? correctionReason.trim() : undefined,
         items: activeItems.map(item => ({
           id: item.id,
           productId: item.productId,
@@ -295,6 +295,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
     setExpectedDeliveryDate('');
     setDeliveryLocation('');
     setNotes('');
+    setCorrectionReason('');
     setItems([]);
     setProductSearch('');
     setError(null);
@@ -308,13 +309,13 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title={`Редактирование заявки — ${order.orderNumber}`}
+      title={`${isCorrection ? 'Корректировка' : 'Редактирование'} заявки — ${order.orderNumber}`}
       size="xl"
       footer={
         !loadingData ? (
           <FormFooter
             onCancel={handleClose}
-            submitLabel={loading ? 'Сохранение...' : 'Сохранить изменения'}
+            submitLabel={loading ? 'Сохранение...' : isCorrection ? 'Сохранить корректировку' : 'Сохранить изменения'}
             submitLoading={loading}
             submitDisabled={loading || loadingData || activeItemsCount === 0}
             onSubmit={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
@@ -339,12 +340,10 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && <Alert variant="error">{error}</Alert>}
 
-          {!['Создана', 'Отправлена поставщику', 'Частично подтверждена', 'Подтверждена'].includes(
-            order.status
-          ) && (
+          {isCorrection && (
             <Alert variant="warning" title="Внимание">
-              Эта заявка имеет статус «{order.status}». Редактирование может быть ограничено
-              системными правилами.
+              Заявка уже принята. Количество изменит остаток только на разницу, платежи и
+              исходная приёмка сохранятся. Фактический возврат оформляйте возвратной накладной.
             </Alert>
           )}
 
@@ -353,7 +352,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
               label="Поставщик"
               value={supplierId || ''}
               onChange={(event) => setSupplierId(event.target.value ? Number(event.target.value) : null)}
-              disabled={order.status !== 'Создана'}
+              disabled={order.status !== 'Создана' || isCorrection}
             >
               <option value="">Без поставщика</option>
               {suppliers.map((supplier) => (
@@ -414,9 +413,18 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
                     />
                   </div>
 
-                  {showProductDropdown && filteredProducts.length > 0 && (
+                  {showProductDropdown && (
                     <div className="absolute z-10 w-full mt-1 bg-surface-overlay border border-border-subtle rounded-xl shadow-md max-h-60 overflow-y-auto">
-                      {filteredProducts.slice(0, 10).map(product => (
+                      {productsLoading ? (
+                        <div className="flex items-center justify-center gap-2 px-4 py-5 text-text-muted">
+                          <Spinner size="sm" />
+                          <span>Поиск товаров...</span>
+                        </div>
+                      ) : productsError ? (
+                        <div className="px-4 py-4 text-sm text-danger">{productsError}</div>
+                      ) : filteredProducts.length === 0 ? (
+                        <div className="px-4 py-4 text-sm text-text-muted">Товары не найдены</div>
+                      ) : filteredProducts.map(product => (
                         <button
                           key={product.id}
                           type="button"
@@ -429,6 +437,16 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
                           </div>
                         </button>
                       ))}
+                      {!productsLoading && !productsError && hasMoreProducts && (
+                        <button
+                          type="button"
+                          disabled={productsLoadingMore}
+                          onClick={loadMoreProducts}
+                          className="w-full px-4 py-3 text-center text-sm font-medium text-brand-black hover:bg-surface-inset/60 disabled:opacity-60"
+                        >
+                          {productsLoadingMore ? 'Загрузка...' : 'Показать ещё'}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -470,6 +488,18 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
             className="resize-none"
           />
 
+          {isCorrection && (
+            <Textarea
+              label="Причина корректировки"
+              value={correctionReason}
+              onChange={(e) => setCorrectionReason(e.target.value)}
+              rows={3}
+              placeholder="Например, поставщик уточнил фактическую цену после поставки"
+              required
+              className="resize-none"
+            />
+          )}
+
           {activeItemsCount > 0 && (
             <div className="bg-surface-inset border border-border-subtle rounded-xl p-4">
               <div className="flex justify-between items-center gap-4">
@@ -478,6 +508,11 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
                   {order.totalAmount && (
                     <div className="text-caption text-text-muted mt-1">
                       Было: {formatPriceKZT(order.totalAmount)}
+                    </div>
+                  )}
+                  {isCorrection && (
+                    <div className="text-caption text-text-muted mt-1">
+                      Будет сохранена история значений до и после изменения
                     </div>
                   )}
                 </div>

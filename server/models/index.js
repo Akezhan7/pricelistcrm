@@ -11,6 +11,7 @@ const Order = require('./Order');
 const OrderItem = require('./OrderItem');
 const OrderStatusHistory = require('./OrderStatusHistory');
 const OrderSettlementHistory = require('./OrderSettlementHistory');
+const OrderCorrection = require('./OrderCorrection');
 const Payment = require('./Payment');
 const PriceHistory = require('./PriceHistory');
 
@@ -52,6 +53,7 @@ module.exports = {
   OrderItem,
   OrderStatusHistory,
   OrderSettlementHistory,
+  OrderCorrection,
   Payment,
   PriceHistory,
   // Новые модели

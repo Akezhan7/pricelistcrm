@@ -10,6 +10,7 @@ const {
   OrderStatusHistory,
   ProductLifecyclePurchase,
   ProductActionHistory,
+  StockHistory,
 } = require('../models');
 const { Op } = require('sequelize');
 const { validationResult } = require('express-validator');
@@ -17,7 +18,10 @@ const { getStockStatus } = require('./productController');
 const { assertOrderHasSupplier } = require('../services/orderSupplierPolicyService');
 const { canReceiveAtWarehouse } = require('../services/orderStatusPolicyService');
 const { recalculateSupplierDebt } = require('./paymentController');
-const { buildWarehouseReceiptPlan } = require('../services/warehouseReceiptService');
+const {
+  buildLifecycleReceiptUpdates,
+  buildWarehouseReceiptPlan,
+} = require('../services/warehouseReceiptService');
 const { PRODUCT_LIFECYCLE_STATUSES } = require('../constants/productLifecycle');
 
 /**
@@ -117,6 +121,18 @@ const receiveOrder = async (req, res) => {
       throw error;
     }
 
+    const existingReceipt = await WarehouseReceipt.findOne({
+      where: { orderId: order.id },
+      transaction,
+      lock: true,
+    });
+    if (existingReceipt) {
+      const error = new Error('Приёмка по этой заявке уже проведена');
+      error.statusCode = 409;
+      error.code = 'ORDER_ALREADY_RECEIVED';
+      throw error;
+    }
+
     assertOrderHasSupplier(order);
     if (!canReceiveAtWarehouse(order.status, req.user.role)) {
       const error = new Error(`Заявку в статусе «${order.status}» нельзя принять на склад`);
@@ -149,8 +165,18 @@ const receiveOrder = async (req, res) => {
       transaction,
       lock: true,
     });
-    const lifecyclePurchaseByOrderItemId = new Map(
-      lifecyclePurchases.map((purchase) => [Number(purchase.orderItemId), purchase])
+    const lifecycleUpdates = buildLifecycleReceiptUpdates({
+      lifecyclePurchases,
+      receiptItems: plan.receiptItems,
+      receiptId: receipt.id,
+      receivedAt: now,
+      receivedBy: req.user.id,
+    });
+    const lifecycleUpdateByOrderItemId = new Map(
+      lifecycleUpdates.map((update) => [update.orderItemId, update])
+    );
+    const lifecyclePurchaseById = new Map(
+      lifecyclePurchases.map((purchase) => [Number(purchase.id), purchase])
     );
     const orderItemsById = new Map(orderItems.map((item) => [Number(item.id), item]));
 
@@ -158,7 +184,10 @@ const receiveOrder = async (req, res) => {
       const orderItem = orderItemsById.get(update.id);
       const receiptItem = plan.receiptItems.find((item) => item.orderItemId === update.id);
       const product = orderItem.product;
-      const lifecyclePurchase = lifecyclePurchaseByOrderItemId.get(update.id);
+      const oldStock = Number(product.currentStock || 0);
+      const lifecycleUpdate = product.lifecycleStatus === PRODUCT_LIFECYCLE_STATUSES.PURCHASE
+        ? lifecycleUpdateByOrderItemId.get(update.id)
+        : null;
 
       await orderItem.update({
         orderedQuantity: update.orderedQuantity,
@@ -166,8 +195,8 @@ const receiveOrder = async (req, res) => {
         totalPrice: update.totalPrice,
       }, { transaction });
       await product.update({
-        currentStock: Number(product.currentStock || 0) + update.quantity,
-        ...(lifecyclePurchase && product.lifecycleStatus === PRODUCT_LIFECYCLE_STATUSES.PURCHASE
+        currentStock: oldStock + update.quantity,
+        ...(lifecycleUpdate && product.lifecycleStatus === PRODUCT_LIFECYCLE_STATUSES.PURCHASE
           ? {
               lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.WAREHOUSE,
               lifecycleCompletedAt: null,
@@ -176,19 +205,31 @@ const receiveOrder = async (req, res) => {
           : {}),
       }, {
         transaction,
-        userId: req.user.id,
-        orderId: order.id,
-        changeType: 'receipt',
-        reason: `Приёмка товара по заявке ${order.orderNumber}`,
-        notes: receiptItem.notes
-          || `Принято ${update.quantity} шт, заказано ${update.orderedQuantity} шт`,
+        hooks: false,
       });
 
-      if (lifecyclePurchase) {
+      if (update.quantity > 0) {
+        await StockHistory.create({
+          productId: product.id,
+          oldStock,
+          newStock: oldStock + update.quantity,
+          changeAmount: update.quantity,
+          changeType: 'receipt',
+          userId: req.user.id,
+          orderId: order.id,
+          reason: `Приёмка товара по заявке ${order.orderNumber}`,
+          notes: receiptItem.notes
+            || `Принято ${update.quantity} шт, заказано ${update.orderedQuantity} шт`,
+        }, { transaction });
+      }
+
+      if (lifecycleUpdate) {
+        const lifecyclePurchase = lifecyclePurchaseById.get(lifecycleUpdate.purchaseId);
         await lifecyclePurchase.update({
-          receivedQuantity: update.quantity,
-          arrivedAt: now,
-          arrivedBy: req.user.id,
+          receivedQuantity: lifecycleUpdate.receivedQuantity,
+          warehouseReceiptId: lifecycleUpdate.warehouseReceiptId,
+          arrivedAt: lifecycleUpdate.arrivedAt,
+          arrivedBy: lifecycleUpdate.arrivedBy,
         }, { transaction });
         await ProductActionHistory.create({
           productId: product.id,
@@ -201,7 +242,7 @@ const receiveOrder = async (req, res) => {
             orderId: order.id,
             warehouseReceiptId: receipt.id,
             expectedQuantity: update.orderedQuantity,
-            receivedQuantity: update.quantity,
+            receivedQuantity: lifecycleUpdate.receivedQuantity,
           },
           createdAt: now,
         }, { transaction });

@@ -210,12 +210,12 @@ const Orders: React.FC = () => {
     setShowPaymentModal(true);
   };
 
-  const handlePaymentSubmit = async (amount: number, comment?: string) => {
+  const handlePaymentSubmit = async (amount: number, comment?: string, receipt?: File) => {
     if (!selectedOrder) return;
 
     try {
       setPaymentLoading(true);
-      const response = await ordersApi.updateOrderPayment(selectedOrder.id, amount, comment);
+      const response = await ordersApi.updateOrderPayment(selectedOrder.id, amount, comment, receipt);
 
       setOrders((prev) =>
         prev.map((order) => (order.id === selectedOrder.id ? response.order : order))
@@ -229,7 +229,13 @@ const Orders: React.FC = () => {
       toast.success(`Оплата успешно зарегистрирована!${statusNote}`);
     } catch (error: any) {
       console.error('Ошибка регистрации оплаты:', error);
-      toast.error(error.message || 'Ошибка при регистрации оплаты');
+      toast.error(error.response?.data?.message || error.message || 'Ошибка при регистрации оплаты');
+      if (!error.response) {
+        await loadOrders();
+        setShowPaymentModal(false);
+        setSelectedOrder(null);
+      }
+      throw error;
     } finally {
       setPaymentLoading(false);
     }

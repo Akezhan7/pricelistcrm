@@ -162,12 +162,33 @@ const handleUploadError = (err, req, res, next) => {
   next(err);
 };
 
+const uploadReceiptFile = (req, res, next) => {
+  uploadReceipt.single('receipt')(req, res, (err) => {
+    if (err) return handleUploadError(err, req, res, next);
+    next();
+  });
+};
+
+const removeUploadedFile = (file) => {
+  if (!file?.path) return;
+
+  try {
+    fs.unlinkSync(file.path);
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      console.error('Failed to remove uploaded file:', error);
+    }
+  }
+};
+
 module.exports = {
   PRODUCT_ASSET_CHUNK_FILE_LIMIT,
   uploadsDir,
   upload,
   uploadReceipt,
+  uploadReceiptFile,
   uploadProductAsset,
   uploadProductAssetChunk,
   handleUploadError,
+  removeUploadedFile,
 };

@@ -3,6 +3,7 @@ const sequelize = require('../config/database');
 const { Payment, Order, Supplier, User } = require('../models');
 const { DEBT_STATUSES } = require('../services/orderStatusPolicyService');
 const { calculateSupplierBalance } = require('../services/orderSettlementService');
+const { removeUploadedFile } = require('../middleware/upload');
 
 /**
  * Автоматический расчет статуса оплаты на основе сумм
@@ -223,6 +224,7 @@ const getPaymentsBySupplier = async (req, res) => {
  */
 const createPayment = async (req, res) => {
   const transaction = await sequelize.transaction();
+  let transactionFinished = false;
 
   try {
     let { supplierId, amount, paymentDate, paymentMethod, comment, orderIds } = req.body;
@@ -242,6 +244,8 @@ const createPayment = async (req, res) => {
     // Валидация входных данных
     if (!supplierId || !amount) {
       await transaction.rollback();
+      transactionFinished = true;
+      removeUploadedFile(req.file);
       return res.status(400).json({
         success: false,
         message: 'Необходимо указать поставщика и сумму платежа',
@@ -256,6 +260,8 @@ const createPayment = async (req, res) => {
     const supplier = await Supplier.findByPk(supplierId);
     if (!supplier) {
       await transaction.rollback();
+      transactionFinished = true;
+      removeUploadedFile(req.file);
       return res.status(404).json({
         success: false,
         message: 'Поставщик не найден'
@@ -265,6 +271,8 @@ const createPayment = async (req, res) => {
     const paymentAmount = parseFloat(amount);
     if (paymentAmount <= 0) {
       await transaction.rollback();
+      transactionFinished = true;
+      removeUploadedFile(req.file);
       return res.status(400).json({
         success: false,
         message: 'Сумма платежа должна быть больше нуля'
@@ -284,6 +292,8 @@ const createPayment = async (req, res) => {
 
       if (orders.length !== orderIds.length) {
         await transaction.rollback();
+        transactionFinished = true;
+        removeUploadedFile(req.file);
         return res.status(400).json({
           success: false,
           message: 'Один или несколько заказов не найдены или не принадлежат указанному поставщику'
@@ -374,11 +384,8 @@ const createPayment = async (req, res) => {
 
     // Пересчет задолженности поставщика
     await recalculateSupplierDebt(supplierId, { transaction });
-
-    await transaction.commit();
-
-    // Получение созданного платежа с полной информацией
     const createdPayment = await Payment.findByPk(payment.id, {
+      transaction,
       include: [
         {
           model: Supplier,
@@ -392,6 +399,8 @@ const createPayment = async (req, res) => {
         }
       ]
     });
+    await transaction.commit();
+    transactionFinished = true;
 
     res.status(201).json({
       success: true,
@@ -400,7 +409,10 @@ const createPayment = async (req, res) => {
     });
 
   } catch (error) {
-    await transaction.rollback();
+    if (!transactionFinished) {
+      removeUploadedFile(req.file);
+      await transaction.rollback();
+    }
     console.error('Ошибка создания платежа:', error);
     res.status(500).json({
       success: false,

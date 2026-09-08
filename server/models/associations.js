@@ -11,6 +11,7 @@ const Order = require('./Order');
 const OrderItem = require('./OrderItem');
 const OrderStatusHistory = require('./OrderStatusHistory');
 const OrderSettlementHistory = require('./OrderSettlementHistory');
+const OrderCorrection = require('./OrderCorrection');
 const Payment = require('./Payment');
 const PriceHistory = require('./PriceHistory');
 const Category = require('./Category');
@@ -238,6 +239,30 @@ OrderSettlementHistory.belongsTo(User, {
 User.hasMany(OrderSettlementHistory, {
   foreignKey: 'changedBy',
   as: 'orderSettlementChanges',
+});
+
+Order.hasMany(OrderCorrection, {
+  foreignKey: 'orderId',
+  as: 'corrections',
+  onDelete: 'RESTRICT',
+  onUpdate: 'CASCADE',
+});
+
+OrderCorrection.belongsTo(Order, {
+  foreignKey: 'orderId',
+  as: 'order',
+});
+
+OrderCorrection.belongsTo(User, {
+  foreignKey: 'changedBy',
+  as: 'changer',
+  onDelete: 'RESTRICT',
+  onUpdate: 'CASCADE',
+});
+
+User.hasMany(OrderCorrection, {
+  foreignKey: 'changedBy',
+  as: 'orderCorrections',
 });
 
 User.hasMany(OrderStatusHistory, {
@@ -887,6 +912,7 @@ module.exports = {
   Order,
   OrderItem,
   OrderStatusHistory,
+  OrderCorrection,
   Payment,
   PriceHistory,
   Category,

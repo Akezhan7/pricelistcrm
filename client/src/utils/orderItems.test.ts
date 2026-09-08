@@ -1,4 +1,5 @@
 import {
+  filterProductsBySearch,
   getMainOrderLineQuantities,
   getSupplierSuggestions,
   updateMainOrderLineQuantity,
@@ -67,4 +68,20 @@ test('updates the main order-line quantity without changing variations', () => {
 test('normalizes invalid catalog quantities to one', () => {
   expect(updateMainOrderLineQuantity(lines, 1, 0)[0].quantity).toBe(1);
   expect(updateMainOrderLineQuantity(lines, 1, Number.NaN)[0].quantity).toBe(1);
+});
+
+test('keeps server search results found by internal and Kaspi names', () => {
+  const internalMatch = {
+    ...product(3, []),
+    name: 'Сетевой инструмент',
+    internalName: 'Плиткорез усиленный',
+  };
+  const kaspiMatch = {
+    ...product(4, []),
+    name: 'Инструмент ручной',
+    kaspiName: 'Маркер строительный',
+  };
+
+  expect(filterProductsBySearch([internalMatch], 'плиткорез')).toEqual([internalMatch]);
+  expect(filterProductsBySearch([kaspiMatch], 'маркер')).toEqual([kaspiMatch]);
 });

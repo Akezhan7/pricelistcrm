@@ -1,5 +1,8 @@
 const assert = require('assert');
-const { buildWarehouseReceiptPlan } = require('../services/warehouseReceiptService');
+const {
+  buildLifecycleReceiptUpdates,
+  buildWarehouseReceiptPlan,
+} = require('../services/warehouseReceiptService');
 
 function testUsesActualQuantitiesForFinalOrder() {
   const plan = buildWarehouseReceiptPlan({
@@ -67,8 +70,51 @@ function testRejectsUnaccountedOverpayment() {
   }), /already paid/i);
 }
 
+function testAdvancesOnlyLifecycleItemsActuallyReceived() {
+  const receivedAt = new Date('2026-09-08T10:00:00Z');
+  const updates = buildLifecycleReceiptUpdates({
+    lifecyclePurchases: [
+      { id: 51, orderItemId: 11, productId: 101 },
+      { id: 52, orderItemId: 12, productId: 102 },
+      { id: 53, orderItemId: 13, productId: 103 },
+      { id: 54, orderItemId: 14, productId: 104, arrivedAt: receivedAt },
+    ],
+    receiptItems: [
+      { orderItemId: 11, productId: 101, receivedQuantity: 3 },
+      { orderItemId: 12, productId: 102, receivedQuantity: 0 },
+      { orderItemId: 13, productId: 103, receivedQuantity: 2 },
+      { orderItemId: 14, productId: 104, receivedQuantity: 5 },
+    ],
+    receiptId: 90,
+    receivedAt,
+    receivedBy: 7,
+  });
+
+  assert.deepStrictEqual(updates, [
+    {
+      purchaseId: 51,
+      orderItemId: 11,
+      productId: 101,
+      receivedQuantity: 3,
+      warehouseReceiptId: 90,
+      arrivedAt: receivedAt,
+      arrivedBy: 7,
+    },
+    {
+      purchaseId: 53,
+      orderItemId: 13,
+      productId: 103,
+      receivedQuantity: 2,
+      warehouseReceiptId: 90,
+      arrivedAt: receivedAt,
+      arrivedBy: 7,
+    },
+  ]);
+}
+
 testUsesActualQuantitiesForFinalOrder();
 testRejectsIncompleteOrDuplicatedReceipt();
 testRejectsUnaccountedOverpayment();
+testAdvancesOnlyLifecycleItemsActuallyReceived();
 
 console.log('Warehouse receipt service test passed');

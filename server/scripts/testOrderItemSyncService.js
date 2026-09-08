@@ -105,8 +105,28 @@ function testRejectsLifecycleLinkedItemDeletion() {
   );
 }
 
+function testReleasesLifecycleLinkedItemBeforeReceiptWhenExplicitlyAllowed() {
+  const plan = buildOrderItemSyncPlan({
+    orderId: 42,
+    existingItems: [
+      { id: 66, productId: 10, productVariationId: null },
+      { id: 67, productId: 11, productVariationId: null },
+    ],
+    lifecyclePurchases: [{ id: 5, orderItemId: 66, productId: 10 }],
+    incomingItems: [{ id: 67, productId: 11, quantity: 2, priceAtPurchase: 500 }],
+    allowLifecycleRelease: true,
+  });
+
+  assert.deepStrictEqual(plan.deleteIds, [66]);
+  assert.deepStrictEqual(plan.releasedLifecyclePurchases, [
+    { id: 5, orderItemId: 66, productId: 10 },
+  ]);
+  assert.strictEqual(plan.totalAmount, '1000.00');
+}
+
 testUpdatesLifecycleLinkedItemInPlaceAndAddsNewItems();
 testMatchesLifecycleItemByProductWhenClientDoesNotSendOrderItemId();
 testRejectsLifecycleLinkedItemDeletion();
+testReleasesLifecycleLinkedItemBeforeReceiptWhenExplicitlyAllowed();
 
 console.log('Order item sync service test passed');

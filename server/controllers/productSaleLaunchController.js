@@ -136,18 +136,31 @@ async function updateProductLaunchFlags(req, res) {
       transaction,
       lock: true,
     });
-    if (!launchFlags?.completedAt) {
+    if (!launchFlags?.completedAt && !product.lifecycleCompletedAt) {
       throw requestError(409, 'Сначала завершите запуск продаж');
     }
 
     const plan = buildSaleLaunchUpdatePlan({
       product,
-      launchFlags,
+      launchFlags: launchFlags || {
+        internalAdvertisingStarted: false,
+        externalAdvertisingStarted: false,
+        reviewBonusEnabled: false,
+        sellerBonusEnabled: false,
+        notes: null,
+        completedAt: null,
+        completedBy: null,
+      },
       actor: req.user,
       payload: req.body,
       now: new Date(),
     });
-    await launchFlags.update(plan.launchFlagsUpdate, { transaction });
+    const savedLaunchFlags = launchFlags
+      ? await launchFlags.update(plan.launchFlagsUpdate, { transaction })
+      : await ProductLaunchFlags.create({
+        productId: product.id,
+        ...plan.launchFlagsUpdate,
+      }, { transaction });
     await product.update(plan.productUpdate, { transaction });
     if (plan.history) await ProductActionHistory.create(plan.history, { transaction });
 
@@ -156,7 +169,7 @@ async function updateProductLaunchFlags(req, res) {
     return res.json({
       success: true,
       message: plan.history ? 'Параметры продаж обновлены' : 'Изменений нет',
-      data: { launchFlags },
+      data: { launchFlags: savedLaunchFlags },
     });
   } catch (error) {
     if (!transactionFinished) await transaction.rollback();

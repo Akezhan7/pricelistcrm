@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import ordersApi from '../services/ordersApi';
 import suppliersApi from '../services/suppliersApi';
-import productsApi from '../services/productsApi';
 import api from '../utils/api';
 import type { Supplier, CreateOrderDto, ProductVariation, ProductWithPrice, OrderSettlementType } from '../types';
 import {
@@ -23,6 +22,7 @@ import { Select } from './ui/Select';
 import { Textarea } from './ui/Textarea';
 import { OrderLineItemsEditor } from './forms/OrderLineItemsEditor';
 import { formatPriceKZT } from '../utils/format';
+import { useProductCatalogSearch } from '../hooks/useProductCatalogSearch';
 
 export type { CreateOrderInitialItem } from '../utils/orderItems';
 
@@ -56,11 +56,18 @@ const CreateOrderModal: React.FC = () => {
   const [notes, setNotes] = useState(EMPTY_FORM.notes);
   const [items, setItems] = useState<OrderLineForm[]>(EMPTY_FORM.items);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [catalogProducts, setCatalogProducts] = useState<ProductWithPrice[]>([]);
   const [productSearch, setProductSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState(true);
+  const {
+    products: searchedProducts,
+    loading: productsLoading,
+    loadingMore: productsLoadingMore,
+    hasMore: hasMoreProducts,
+    loadMore: loadMoreProducts,
+  } = useProductCatalogSearch({ enabled: isModalOpen, search: productSearch });
+  const catalogProducts = searchedProducts as ProductWithPrice[];
 
   const isFormReadyRef = useRef(false);
   const hydrateSessionRef = useRef(false);
@@ -103,7 +110,6 @@ const CreateOrderModal: React.FC = () => {
     setDeliveryLocation(EMPTY_FORM.deliveryLocation);
     setNotes(EMPTY_FORM.notes);
     setItems(EMPTY_FORM.items);
-    setCatalogProducts([]);
     setProductSearch('');
     setError(null);
     isFormReadyRef.current = false;
@@ -167,20 +173,15 @@ const CreateOrderModal: React.FC = () => {
     try {
       setLoadingData(true);
       setError(null);
-      const [suppliersData, productsData] = await Promise.all([
-        suppliersApi.getSuppliers({
-          isActive: true,
-          limit: SUPPLIERS_LIST_LIMIT,
-        }),
-        productsApi.getProducts({ isActive: true, limit: 1000 }),
-      ]);
+      const suppliersData = await suppliersApi.getSuppliers({
+        isActive: true,
+        limit: SUPPLIERS_LIST_LIMIT,
+      });
       setSuppliers(Array.isArray(suppliersData) ? suppliersData : []);
-      setCatalogProducts(Array.isArray(productsData) ? productsData as ProductWithPrice[] : []);
     } catch (err: unknown) {
       console.error('Ошибка загрузки данных:', err);
       setError(err instanceof Error ? err.message : 'Ошибка загрузки данных');
       setSuppliers([]);
-      setCatalogProducts([]);
     } finally {
       setLoadingData(false);
     }
@@ -450,6 +451,7 @@ const CreateOrderModal: React.FC = () => {
 
                 <SupplierProductCatalog
                   products={visibleCatalogProducts}
+                  loading={productsLoading}
                   search={productSearch}
                   onSearchChange={setProductSearch}
                   mode="pick"
@@ -459,6 +461,9 @@ const CreateOrderModal: React.FC = () => {
                   pickedProductIds={pickedProductIds}
                   quantities={catalogQuantities}
                   onQuantityChange={handleCatalogQuantityChange}
+                  hasMore={hasMoreProducts}
+                  loadingMore={productsLoadingMore}
+                  onLoadMore={loadMoreProducts}
                 />
 
                 <div className="mt-4">

@@ -50,9 +50,15 @@ const buildReceiptItems = (order: Order): ReceiptItem[] =>
     notes: '',
   })) || [];
 
+const getErrorMessage = (error: unknown, fallback: string) =>
+  (error as { response?: { data?: { message?: string } } })?.response?.data?.message
+  || (error as Error)?.message
+  || fallback;
+
 export const WarehouseReceipt: React.FC = () => {
   const [searchParams] = useSearchParams();
   const requestedOrderId = Number(searchParams.get('orderId')) || null;
+  const requestedOrderItemId = Number(searchParams.get('orderItemId')) || null;
   const requestedOrderHandledRef = useRef(false);
   const toast = useToast();
   const { confirm } = useConfirmDialog();
@@ -190,7 +196,7 @@ export const WarehouseReceipt: React.FC = () => {
       loadPendingOrders();
     } catch (error) {
       console.error('Ошибка приёмки:', error);
-      toast.error('Не удалось провести приёмку');
+      toast.error(getErrorMessage(error, 'Не удалось провести приёмку'));
     } finally {
       setSubmitting(false);
     }
@@ -353,7 +359,14 @@ export const WarehouseReceipt: React.FC = () => {
             <div className="md:hidden space-y-3">
               <p className="text-overline text-text-muted">Сверка товаров</p>
               {receiptItems.map((item) => (
-                <Card key={item.orderItemId} variant="inset" className="shadow-none">
+                <Card
+                  key={item.orderItemId}
+                  variant="inset"
+                  className={cn(
+                    'shadow-none',
+                    item.orderItemId === requestedOrderItemId && 'ring-2 ring-brand-yellow'
+                  )}
+                >
                   <CardBody className="p-4 space-y-3">
                     <div className="flex items-start justify-between gap-3">
                       <p className="text-body-medium text-brand-black">{item.productName}</p>
@@ -404,7 +417,12 @@ export const WarehouseReceipt: React.FC = () => {
                 </TableHead>
                 <TableBody>
                   {receiptItems.map((item) => (
-                    <TableRow key={item.orderItemId}>
+                    <TableRow
+                      key={item.orderItemId}
+                      className={cn(
+                        item.orderItemId === requestedOrderItemId && 'bg-brand-yellow/10'
+                      )}
+                    >
                       <TableCell>
                         <div className="text-body-medium text-brand-black">{item.productName}</div>
                       </TableCell>

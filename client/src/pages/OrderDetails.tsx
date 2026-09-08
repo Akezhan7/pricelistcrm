@@ -60,6 +60,7 @@ import {
 } from '../theme/statusColors';
 import { formatPriceKZT } from '../utils/format';
 import { cn } from '../utils/cn';
+import getImageUrl from '../utils/image';
 import type { Order, OrderSettlementType, OrderStatus, OrderStatusOptions } from '../types';
 
 type HeaderAction = {
@@ -219,12 +220,12 @@ const OrderDetails: React.FC = () => {
     }
   };
 
-  const handlePaymentSubmit = async (amount: number, comment?: string) => {
+  const handlePaymentSubmit = async (amount: number, comment?: string, receipt?: File) => {
     if (!order) return;
 
     try {
       setPaymentLoading(true);
-      const response = await ordersApi.updateOrderPayment(order.id, amount, comment);
+      const response = await ordersApi.updateOrderPayment(order.id, amount, comment, receipt);
 
       await loadOrder();
 
@@ -235,7 +236,12 @@ const OrderDetails: React.FC = () => {
       setShowPaymentModal(false);
     } catch (error: any) {
       console.error('Ошибка регистрации оплаты:', error);
-      toast.error(error.message || 'Ошибка при регистрации оплаты');
+      toast.error(error.response?.data?.message || error.message || 'Ошибка при регистрации оплаты');
+      if (!error.response) {
+        await loadOrder();
+        setShowPaymentModal(false);
+      }
+      throw error;
     } finally {
       setPaymentLoading(false);
     }
@@ -369,13 +375,10 @@ const OrderDetails: React.FC = () => {
       });
     }
 
-    if (
-      canEditOrders &&
-      ['Создана', 'Отправлена поставщику', 'Частично подтверждена', 'Подтверждена'].includes(order.status)
-    ) {
+    if (canEditOrders && order.editPolicy?.canEdit) {
       actions.push({
         key: 'edit',
-        label: 'Редактировать',
+        label: order.editPolicy.mode === 'correction' ? 'Корректировать' : 'Редактировать',
         icon: Edit,
         onClick: () => setShowEditOrderModal(true),
         variant: 'primary',
@@ -417,7 +420,7 @@ const OrderDetails: React.FC = () => {
       });
     }
 
-    if (canDeleteOrders && order.status === 'Создана') {
+    if (canDeleteOrders && order.editPolicy?.canDelete) {
       actions.push({
         key: 'delete',
         label: 'Удалить',
@@ -595,6 +598,11 @@ const OrderDetails: React.FC = () => {
           <Alert variant="info" title="Поставщик не назначен">
             Это черновик закупки. Назначьте поставщика через редактирование заявки, чтобы
             отправить её, изменить статус или зарегистрировать оплату.
+          </Alert>
+        )}
+        {canEditOrders && order.editPolicy && !order.editPolicy.canEdit && order.editPolicy.reason && (
+          <Alert variant="info" title="Изменение заявки недоступно">
+            {order.editPolicy.reason}
           </Alert>
         )}
 
@@ -1007,6 +1015,32 @@ const OrderDetails: React.FC = () => {
                   </div>
                 </div>
               ))}
+              {order.corrections?.map((correction) => (
+                <div key={`correction-${correction.id}`} className="flex gap-4">
+                  <div className="flex-shrink-0">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-info-light text-info-dark">
+                      <Edit className="h-4 w-4" />
+                    </div>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="mb-1 font-medium text-brand-black">
+                      {correction.correctionType === 'post_receipt_correction'
+                        ? 'Корректировка после приёмки'
+                        : 'Изменение заявки'}
+                    </div>
+                    <div className="text-sm text-text-muted">
+                      {correction.changer?.name} • {new Date(correction.createdAt).toLocaleString('ru-RU')}
+                    </div>
+                    <div className="mt-2 rounded-xl border border-border-subtle bg-surface-inset p-3 text-sm text-brand-black">
+                      <div>{correction.reason}</div>
+                      <div className="mt-1 text-text-muted">
+                        Сумма: {formatPriceKZT(correction.beforeData.totalAmount)} →{' '}
+                        {formatPriceKZT(correction.afterData.totalAmount)}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </CardBody>
           </Card>
 
@@ -1037,10 +1071,21 @@ const OrderDetails: React.FC = () => {
                       <div className="text-sm text-text-muted">
                         {payment.creator?.name} • {new Date(payment.createdAt).toLocaleString('ru-RU')}
                       </div>
-                      {payment.notes && (
+                      {payment.comment && (
                         <div className="text-sm text-brand-black mt-2 bg-brand-white p-2 rounded-card border border-border">
-                          {payment.notes}
+                          {payment.comment}
                         </div>
+                      )}
+                      {payment.receiptUrl && (
+                        <a
+                          href={getImageUrl(payment.receiptUrl) || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-info hover:underline"
+                        >
+                          <FileText className="h-4 w-4" aria-hidden />
+                          Открыть чек
+                        </a>
                       )}
                     </div>
                   </div>
@@ -1085,9 +1130,11 @@ const OrderDetails: React.FC = () => {
                   valueClassName="text-success-dark"
                 />
                 <FinanceStat
-                  label="Остаток"
-                  value={formatPriceKZT(Number(order.totalAmount) - Number(order.paidAmount))}
-                  valueClassName="text-danger-dark"
+                  label={Number(order.paidAmount) > Number(order.totalAmount) ? 'Переплата' : 'Остаток'}
+                  value={formatPriceKZT(Math.abs(Number(order.totalAmount) - Number(order.paidAmount)))}
+                  valueClassName={Number(order.paidAmount) > Number(order.totalAmount)
+                    ? 'text-success-dark'
+                    : 'text-danger-dark'}
                 />
               </div>
 

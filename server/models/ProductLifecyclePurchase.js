@@ -7,7 +7,7 @@ const ProductLifecyclePurchase = sequelize.define('ProductLifecyclePurchase', {
   supplierId: { type: DataTypes.INTEGER, allowNull: false },
   orderId: { type: DataTypes.INTEGER, allowNull: false },
   orderItemId: { type: DataTypes.INTEGER, allowNull: false, unique: true },
-  warehouseReceiptId: { type: DataTypes.INTEGER, allowNull: true, unique: true },
+  warehouseReceiptId: { type: DataTypes.INTEGER, allowNull: true },
   quantity: { type: DataTypes.INTEGER, allowNull: false, validate: { min: 1 } },
   purchasePrice: { type: DataTypes.DECIMAL(12, 2), allowNull: false, validate: { min: 0 } },
   purchasedAt: { type: DataTypes.DATE, allowNull: false },

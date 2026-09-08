@@ -48,6 +48,7 @@ function buildOrderItemSyncPlan({
   existingItems = [],
   lifecyclePurchases = [],
   incomingItems = [],
+  allowLifecycleRelease = false,
 }) {
   const existingById = new Map(existingItems.map((item) => [Number(item.id), item]));
   const lifecycleByOrderItemId = new Map(
@@ -127,11 +128,20 @@ function buildOrderItemSyncPlan({
   });
 
   const deleteIds = [];
+  const releasedLifecyclePurchases = [];
   existingItems.forEach((item) => {
     const itemId = Number(item.id);
     if (touchedExistingIds.has(itemId)) return;
     if (lifecycleByOrderItemId.has(itemId)) {
-      throw new Error('Cannot delete lifecycle-linked order item');
+      if (!allowLifecycleRelease) {
+        throw new Error('Cannot delete lifecycle-linked order item');
+      }
+      const purchase = lifecycleByOrderItemId.get(itemId);
+      releasedLifecyclePurchases.push({
+        id: Number(purchase.id),
+        orderItemId: itemId,
+        productId: Number(purchase.productId),
+      });
     }
     deleteIds.push(itemId);
   });
@@ -141,6 +151,7 @@ function buildOrderItemSyncPlan({
     creates,
     deleteIds,
     lifecyclePurchaseUpdates,
+    releasedLifecyclePurchases,
     totalAmount: totalAmount.toFixed(2),
   };
 }

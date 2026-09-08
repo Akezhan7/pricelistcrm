@@ -4,7 +4,7 @@ import type { ProductWithPrice } from '../types';
 import { filterProductsBySearch, getSupplierListPrice } from '../utils/orderItems';
 import { ProductListItem } from './ProductListItem';
 import { SupplierProductGridCard } from './SupplierProductGridCard';
-import { EmptyState, IconButton, Input } from './ui';
+import { Button, EmptyState, IconButton, Input } from './ui';
 
 type CatalogMode = 'pick' | 'select';
 type CatalogLayout = 'list' | 'grid';
@@ -31,6 +31,9 @@ interface SupplierProductCatalogProps {
   onEditProduct?: (product: ProductWithPrice) => void;
   onManageSuppliers?: (product: ProductWithPrice) => void;
   loadingProductId?: number | null;
+  hasMore?: boolean;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 export const SupplierProductCatalog: React.FC<SupplierProductCatalogProps> = ({
@@ -53,6 +56,9 @@ export const SupplierProductCatalog: React.FC<SupplierProductCatalogProps> = ({
   onEditProduct,
   onManageSuppliers,
   loadingProductId = null,
+  hasMore = false,
+  loadingMore = false,
+  onLoadMore,
 }) => {
   const filtered = useMemo(
     () => filterProductsBySearch(products, search),
@@ -78,7 +84,6 @@ export const SupplierProductCatalog: React.FC<SupplierProductCatalogProps> = ({
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Поиск товара по названию или артикулу..."
           className="pl-10 pr-10 bg-surface-inset border-border-subtle focus:border-brand-yellow focus:ring-2 focus:ring-brand-yellow/20"
-          disabled={loading}
         />
         {search && (
           <div className="absolute right-1 top-1/2 -translate-y-1/2">
@@ -309,6 +314,20 @@ export const SupplierProductCatalog: React.FC<SupplierProductCatalogProps> = ({
                 </ProductListItem>
               );
             })}
+          </div>
+        )}
+        {!loading && filtered.length > 0 && hasMore && onLoadMore && (
+          <div className="flex justify-center px-1 py-3">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              loading={loadingMore}
+              disabled={loadingMore}
+              onClick={onLoadMore}
+            >
+              Показать ещё
+            </Button>
           </div>
         )}
       </div>

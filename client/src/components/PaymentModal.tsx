@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
+import { FileText, Paperclip, X } from 'lucide-react';
 import type { Order } from '../types';
 import { Modal } from './ui/Modal';
 import { FormFooter } from './ui/FormFooter';
@@ -7,12 +8,13 @@ import { Textarea } from './ui/Textarea';
 import { Button } from './ui/Button';
 import { Badge } from './ui/Badge';
 import { FormField } from './ui/FormField';
+import { IconButton } from './ui/IconButton';
 import { formatPriceKZT } from '../utils/format';
 
 interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (amount: number, comment?: string) => Promise<void>;
+  onSubmit: (amount: number, comment?: string, receipt?: File) => Promise<void>;
   order: Order;
   loading?: boolean;
 }
@@ -26,7 +28,11 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 }) => {
   const [amount, setAmount] = useState<string>('');
   const [comment, setComment] = useState<string>('');
-  const [errors, setErrors] = useState<{ amount?: string }>({});
+  const [receipt, setReceipt] = useState<File | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+  const [errors, setErrors] = useState<{ amount?: string; receipt?: string }>({});
+  const isBusy = loading || submitting;
 
   const totalAmount =
     typeof order.totalAmount === 'string' ? parseFloat(order.totalAmount) : order.totalAmount;
@@ -36,9 +42,14 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isBusy || submittingRef.current) return;
 
-    const newErrors: { amount?: string } = {};
+    const newErrors: { amount?: string; receipt?: string } = {};
     const paymentAmount = parseFloat(amount);
+
+    if (errors.receipt) {
+      newErrors.receipt = errors.receipt;
+    }
 
     if (!amount || isNaN(paymentAmount) || paymentAmount <= 0) {
       newErrors.amount = 'Введите корректную сумму оплаты';
@@ -51,28 +62,69 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       return;
     }
 
+    submittingRef.current = true;
+    setSubmitting(true);
     try {
-      await onSubmit(paymentAmount, comment.trim() || undefined);
+      await onSubmit(paymentAmount, comment.trim() || undefined, receipt || undefined);
       setAmount('');
       setComment('');
+      setReceipt(null);
       setErrors({});
       onClose();
     } catch (error) {
       console.error('Ошибка при регистрации оплаты:', error);
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
     }
   };
 
   const handleClose = () => {
-    if (loading) return;
+    if (isBusy) return;
     setAmount('');
     setComment('');
+    setReceipt(null);
     setErrors({});
     onClose();
   };
 
+  const handleReceiptChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0] || null;
+    if (!file) {
+      setReceipt(null);
+      return;
+    }
+
+    const allowedTypes = [
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+      'application/pdf',
+    ];
+    if (!allowedTypes.includes(file.type)) {
+      setReceipt(null);
+      setErrors((current) => ({
+        ...current,
+        receipt: 'Разрешены изображения JPEG, PNG, GIF, WebP и PDF',
+      }));
+      event.target.value = '';
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setReceipt(null);
+      setErrors((current) => ({ ...current, receipt: 'Размер файла не должен превышать 5 МБ' }));
+      event.target.value = '';
+      return;
+    }
+
+    setReceipt(file);
+    setErrors((current) => ({ ...current, receipt: undefined }));
+  };
+
   const setQuickAmount = (value: number) => {
     setAmount(value.toString());
-    setErrors({});
+    setErrors((current) => ({ ...current, amount: undefined }));
   };
 
   return (
@@ -81,13 +133,13 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       onClose={handleClose}
       title="Регистрация оплаты"
       size="md"
-      closeOnOverlayClick={!loading}
+      closeOnOverlayClick={!isBusy}
       footer={
         <FormFooter
           onCancel={handleClose}
           submitLabel="Зарегистрировать оплату"
-          submitLoading={loading}
-          submitDisabled={loading || !amount || parseFloat(amount) <= 0}
+          submitLoading={isBusy}
+          submitDisabled={isBusy || !amount || parseFloat(amount) <= 0}
           onSubmit={() => handleSubmit({ preventDefault: () => {} } as React.FormEvent)}
           submitType="button"
         />
@@ -137,7 +189,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           placeholder="0.00"
           min={0}
           step="0.01"
-          disabled={loading}
+          disabled={isBusy}
           required
         />
 
@@ -145,17 +197,17 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           <FormField label="Быстрый выбор">
             <div className="flex flex-wrap gap-2">
               {remainingAmount >= 1000 && (
-                <Button type="button" variant="secondary" size="sm" onClick={() => setQuickAmount(1000)} disabled={loading}>
+                <Button type="button" variant="secondary" size="sm" onClick={() => setQuickAmount(1000)} disabled={isBusy}>
                   1 000
                 </Button>
               )}
               {remainingAmount >= 5000 && (
-                <Button type="button" variant="secondary" size="sm" onClick={() => setQuickAmount(5000)} disabled={loading}>
+                <Button type="button" variant="secondary" size="sm" onClick={() => setQuickAmount(5000)} disabled={isBusy}>
                   5 000
                 </Button>
               )}
               {remainingAmount >= 10000 && (
-                <Button type="button" variant="secondary" size="sm" onClick={() => setQuickAmount(10000)} disabled={loading}>
+                <Button type="button" variant="secondary" size="sm" onClick={() => setQuickAmount(10000)} disabled={isBusy}>
                   10 000
                 </Button>
               )}
@@ -164,7 +216,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                 variant="accent"
                 size="sm"
                 onClick={() => setQuickAmount(remainingAmount)}
-                disabled={loading}
+                disabled={isBusy}
               >
                 Полная оплата ({formatPriceKZT(remainingAmount)})
               </Button>
@@ -179,10 +231,56 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           placeholder="Способ оплаты, номер транзакции и т.д."
           rows={3}
           maxLength={500}
-          disabled={loading}
+          disabled={isBusy}
           helperText={`${comment.length}/500 символов`}
           className="resize-none"
         />
+
+        <div>
+          <label
+            className="mb-1.5 block text-caption font-medium text-brand-black"
+            htmlFor="payment-receipt"
+          >
+            Чек (необязательно)
+          </label>
+          <div className="flex min-h-11 items-center gap-2 rounded-lg border border-border-input bg-brand-white px-3 py-2">
+            <Paperclip className="h-4 w-4 shrink-0 text-text-muted" aria-hidden />
+            <label
+              htmlFor="payment-receipt"
+              className="min-w-0 flex-1 cursor-pointer text-body text-brand-black"
+            >
+              {receipt ? (
+                <span className="flex min-w-0 items-center gap-2">
+                  <FileText className="h-4 w-4 shrink-0 text-brand-yellow" aria-hidden />
+                  <span className="truncate">{receipt.name}</span>
+                </span>
+              ) : (
+                'Выбрать изображение или PDF'
+              )}
+            </label>
+            <input
+              id="payment-receipt"
+              type="file"
+              accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,image/jpeg,image/png,image/gif,image/webp,application/pdf"
+              className="sr-only"
+              onChange={handleReceiptChange}
+              disabled={isBusy}
+            />
+            {receipt && (
+              <IconButton
+                icon={X}
+                title="Убрать чек"
+                size="sm"
+                variant="ghost"
+                onClick={() => setReceipt(null)}
+                disabled={isBusy}
+              />
+            )}
+          </div>
+          <p className={errors.receipt ? 'mt-1.5 text-caption text-danger' : 'mt-1.5 text-caption text-text-muted'}>
+            {errors.receipt || 'JPEG, PNG, GIF, WebP или PDF, до 5 МБ'}
+          </p>
+        </div>
       </form>
     </Modal>
   );

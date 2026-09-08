@@ -121,7 +121,8 @@ function buildSaleLaunchUpdatePlan({
     product,
     action: PRODUCT_PERMISSION_ACTIONS.MANAGE_SALE_LAUNCH,
   });
-  if (!product.lifecycleCompletedAt || !launchFlags?.completedAt) {
+  const completedAt = launchFlags?.completedAt || product.lifecycleCompletedAt;
+  if (!completedAt) {
     throw new Error('Sale launch must be completed before later updates');
   }
 
@@ -132,6 +133,10 @@ function buildSaleLaunchUpdatePlan({
     sellerBonusEnabled: requireBoolean(payload.sellerBonusEnabled, 'sellerBonusEnabled'),
     notes: normalizeNotes(payload.notes),
     updatedBy: actor.id,
+    ...(!launchFlags?.completedAt ? {
+      completedAt,
+      completedBy: launchFlags?.completedBy || actor.id,
+    } : {}),
   };
   const changedFields = [
     ...SALE_FLAG_FIELDS.filter(
@@ -145,6 +150,7 @@ function buildSaleLaunchUpdatePlan({
     productUpdate: {
       marketplaceManagerId: actor.id,
       assignedToUserId: actor.id,
+      ...(!product.lifecycleCompletedAt ? { lifecycleCompletedAt: completedAt } : {}),
     },
     changedFields,
     history: changedFields.length > 0 ? {

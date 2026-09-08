@@ -614,6 +614,8 @@ export interface Order {
   items?: OrderItem[];
   statusHistory?: OrderStatusHistory[];
   settlementHistory?: OrderSettlementHistory[];
+  corrections?: OrderCorrection[];
+  editPolicy?: OrderEditPolicy;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -679,6 +681,40 @@ export interface OrderSettlementHistory {
   createdAt: string;
 }
 
+export interface OrderEditPolicy {
+  mode: 'edit' | 'correction' | 'blocked';
+  canEdit: boolean;
+  canDelete: boolean;
+  requiresReason: boolean;
+  reason?: string | null;
+  hasReceipts: boolean;
+  hasPayments: boolean;
+}
+
+export interface OrderCorrectionSnapshot {
+  totalAmount: string;
+  paymentStatus: PaymentStatus;
+  items: Array<{
+    id: number;
+    productId: number;
+    quantity: number;
+    priceAtPurchase: number;
+    totalPrice: string;
+  }>;
+}
+
+export interface OrderCorrection {
+  id: number;
+  orderId: number;
+  correctionType: 'pre_receipt_edit' | 'post_receipt_correction';
+  reason: string;
+  beforeData: OrderCorrectionSnapshot;
+  afterData: OrderCorrectionSnapshot;
+  changedBy: number;
+  changer?: { id: number; name: string };
+  createdAt: string;
+}
+
 export interface CreateOrderDto {
   supplierId: number | null;
   type?: OrderType;
@@ -701,6 +737,7 @@ export interface UpdateOrderDto {
   expectedDeliveryDate?: string;
   deliveryLocation?: string;
   notes?: string;
+  correctionReason?: string;
   items?: Array<{
     id?: number;
     productId: number;

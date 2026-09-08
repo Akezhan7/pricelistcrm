@@ -15,7 +15,7 @@ jest.mock('../services/productsApi', () => ({
   __esModule: true,
   default: {
     getLifecycleOperations: jest.fn(),
-    markProductArrived: jest.fn(),
+    reconcileProductArrival: jest.fn(),
   },
 }));
 
@@ -100,4 +100,66 @@ test('adds a purchase-stage product to the procurement list without creating an 
     requestedQuantity: 4,
     notes: null,
   }));
+});
+
+test('opens the linked order receipt instead of receiving one item separately', async () => {
+  (productsApi.getLifecycleOperations as jest.Mock).mockResolvedValue({
+    purchase: {
+      id: 9,
+      productId: 42,
+      supplierId: 4,
+      supplier: { id: 4, name: 'Ролан' },
+      orderId: 22,
+      order: { id: 22, orderNumber: 'ORD-22', status: 'Забрана' },
+      orderItemId: 31,
+      quantity: 4,
+      purchasePrice: 1000,
+      purchasedAt: '2026-09-08T10:00:00Z',
+      purchasedBy: 1,
+      arrivedAt: null,
+    },
+    warehouseDetails: null,
+    arrivalRecovery: null,
+  });
+
+  render(<ProductPurchaseActions product={product} onChanged={jest.fn()} />);
+
+  fireEvent.click(await screen.findByRole('button', { name: 'Открыть приёмку заявки' }));
+
+  expect(mockNavigate).toHaveBeenCalledWith('/warehouse/receipt?orderId=22&orderItemId=31');
+  expect(productsApi.reconcileProductArrival).not.toHaveBeenCalled();
+});
+
+test('reconciles an existing receipt without creating another warehouse receipt', async () => {
+  const onChanged = jest.fn();
+  (productsApi.getLifecycleOperations as jest.Mock).mockResolvedValue({
+    purchase: {
+      id: 9,
+      productId: 42,
+      supplierId: 4,
+      supplier: { id: 4, name: 'Ролан' },
+      orderId: 22,
+      order: { id: 22, orderNumber: 'ORD-22', status: 'Закрыта' },
+      orderItemId: 31,
+      quantity: 4,
+      purchasePrice: 1000,
+      purchasedAt: '2026-09-08T10:00:00Z',
+      purchasedBy: 1,
+      arrivedAt: null,
+    },
+    warehouseDetails: null,
+    arrivalRecovery: {
+      status: 'available',
+      receiptId: 44,
+      receivedQuantity: 3,
+      receivedAt: '2026-09-08T11:00:00Z',
+    },
+  });
+  (productsApi.reconcileProductArrival as jest.Mock).mockResolvedValue(undefined);
+
+  render(<ProductPurchaseActions product={product} onChanged={onChanged} />);
+  fireEvent.click(await screen.findByRole('button', { name: 'Восстановить этап склада' }));
+
+  await waitFor(() => expect(productsApi.reconcileProductArrival).toHaveBeenCalledWith(42));
+  expect(onChanged).toHaveBeenCalled();
 });

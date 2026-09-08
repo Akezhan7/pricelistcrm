@@ -131,9 +131,14 @@ export const SupplierFinanceModal: React.FC<SupplierFinanceModalProps> = ({
       setReceiptFile(null);
 
       onSuccess?.();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Ошибка создания платежа:', error);
-      toast.error('Ошибка при регистрации платежа');
+      toast.error(error.response?.data?.message || error.message || 'Ошибка при регистрации платежа');
+      if (!error.response) {
+        await loadSupplierData();
+        setShowAddPayment(false);
+        setReceiptFile(null);
+      }
     } finally {
       setSubmitting(false);
     }

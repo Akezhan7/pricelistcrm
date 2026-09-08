@@ -32,7 +32,6 @@ export const ProductPurchaseActions: React.FC<ProductPurchaseActionsProps> = ({
   const [addingToList, setAddingToList] = useState(false);
   const [error, setError] = useState('');
   const [quantity, setQuantity] = useState('1');
-  const [receivedQuantity, setReceivedQuantity] = useState('');
   const [notes, setNotes] = useState('');
 
   const canEdit = Boolean(product.permissions?.allowedActions.includes('manage_purchase'));
@@ -47,9 +46,7 @@ export const ProductPurchaseActions: React.FC<ProductPurchaseActionsProps> = ({
       ]);
       setOperations(lifecycleOperations);
 
-      if (lifecycleOperations.purchase) {
-        setReceivedQuantity(String(lifecycleOperations.purchase.quantity));
-      } else {
+      if (!lifecycleOperations.purchase) {
         const existingItem = procurementData.list?.items.find(
           (item) => Number(item.productId) === Number(product.id)
         ) || null;
@@ -91,18 +88,15 @@ export const ProductPurchaseActions: React.FC<ProductPurchaseActionsProps> = ({
     }
   };
 
-  const handleArrival = async () => {
+  const handleRecovery = async () => {
     setSaving(true);
     setError('');
     try {
-      await productsApi.markProductArrived(product.id, {
-        receivedQuantity: Number(receivedQuantity),
-        notes: notes.trim() || undefined,
-      });
-      toast.success('Поступление подтверждено');
+      await productsApi.reconcileProductArrival(product.id);
+      toast.success('Этап склада восстановлен');
       onChanged();
     } catch (saveError) {
-      setError(getErrorMessage(saveError, 'Не удалось подтвердить поступление'));
+      setError(getErrorMessage(saveError, 'Не удалось восстановить этап склада'));
     } finally {
       setSaving(false);
     }
@@ -118,15 +112,11 @@ export const ProductPurchaseActions: React.FC<ProductPurchaseActionsProps> = ({
   }
 
   const purchaseReady = Number.isInteger(Number(quantity)) && Number(quantity) > 0;
-  const arrivalReady = Number(receivedQuantity) > 0;
-  const purchaseRequirements: RequirementItem[] = purchase
-    ? [
-        {
-          label: 'Фактическое количество поступления указано',
-          met: Number(receivedQuantity) > 0,
-        },
-      ]
-    : [
+  const orderStatus = purchase?.order?.status;
+  const receiptUnavailable = orderStatus
+    ? ['Принята на складе', 'Закрыта', 'Отменена'].includes(orderStatus)
+    : false;
+  const purchaseRequirements: RequirementItem[] = [
         {
           label: 'Количество больше 0',
           met: purchaseReady,
@@ -141,7 +131,9 @@ export const ProductPurchaseActions: React.FC<ProductPurchaseActionsProps> = ({
           <h3 className="text-section-title text-brand-black">{product.name}</h3>
           <p className="mt-1 text-body text-text-muted">{product.article}</p>
         </div>
-        <Badge variant="outline">{procurementItem ? 'В закупочном листе' : 'Первичный закуп'}</Badge>
+        <Badge variant="outline">
+          {procurementItem ? 'В закупочном листе' : purchase ? 'Заявка оформлена' : 'Первичный закуп'}
+        </Badge>
       </div>
 
       {error && <Alert variant="error">{error}</Alert>}
@@ -204,37 +196,46 @@ export const ProductPurchaseActions: React.FC<ProductPurchaseActionsProps> = ({
             <div><p className="text-caption text-text-muted">Количество</p><p className="font-medium tabular-nums">{purchase.quantity} шт.</p></div>
             <div><p className="text-caption text-text-muted">Цена</p><p className="font-medium tabular-nums">{formatPriceKZT(purchase.purchasePrice)}</p></div>
           </div>
-          <div className="space-y-3 rounded-xl border border-border-subtle bg-surface-muted p-3">
-            <Input
-              label="Фактически поступило"
-              type="number"
-              min="1"
-              step="1"
-              value={receivedQuantity}
-              onChange={(event) => setReceivedQuantity(event.target.value)}
-              disabled={!canEdit}
-            />
-            <Textarea
-              label="Комментарий к приемке"
-              rows={3}
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              disabled={!canEdit}
-              className="resize-none"
-            />
-          </div>
-          <Alert variant="info">После подтверждения остаток увеличится, а товар перейдет в очередь склада.</Alert>
-          <RequirementsChecklist items={purchaseRequirements} />
-          {canEdit && (
+          {operations?.arrivalRecovery?.status === 'available' ? (
+            <Alert variant="warning">
+              По документу приёмки уже поступило {operations.arrivalRecovery.receivedQuantity} шт.
+              Остаток повторно начисляться не будет.
+            </Alert>
+          ) : operations?.arrivalRecovery?.status === 'ambiguous' ? (
+            <Alert variant="error">{operations.arrivalRecovery.message}</Alert>
+          ) : receiptUnavailable ? (
+            <Alert variant="warning">
+              Заявка имеет статус «{orderStatus}», но подтверждённого поступления по этой позиции нет.
+              Проверьте документ приёмки или оформите товар в новой заявке.
+            </Alert>
+          ) : (
+            <Alert variant="info">
+              Приёмка проводится целиком по заявке. В открывшейся форме проверьте фактическое количество всех позиций.
+            </Alert>
+          )}
+          {canEdit && operations?.arrivalRecovery?.status === 'available' && (
             <div className="flex justify-end">
               <Button
                 type="button"
                 leftIcon={PackageCheck}
                 loading={saving}
-                disabled={saving || !arrivalReady}
-                onClick={handleArrival}
+                disabled={saving}
+                onClick={handleRecovery}
               >
-                Подтвердить поступление
+                Восстановить этап склада
+              </Button>
+            </div>
+          )}
+          {canEdit && !operations?.arrivalRecovery && !receiptUnavailable && (
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                leftIcon={PackageCheck}
+                onClick={() => navigate(
+                  `/warehouse/receipt?orderId=${purchase.orderId}&orderItemId=${purchase.orderItemId}`
+                )}
+              >
+                Открыть приёмку заявки
               </Button>
             </div>
           )}

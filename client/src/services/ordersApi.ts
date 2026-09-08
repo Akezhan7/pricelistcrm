@@ -114,7 +114,7 @@ class OrdersApi {
     return response.data.data;
   }
 
-  async updateOrderPayment(id: number, amount: number, comment?: string): Promise<{
+  async updateOrderPayment(id: number, amount: number, comment?: string, receipt?: File): Promise<{
     order: Order;
     payment: {
       amount: string;
@@ -123,8 +123,16 @@ class OrdersApi {
       statusChanged: boolean;
       oldStatus: string;
       newStatus: string;
+      receiptUrl?: string | null;
     };
   }> {
+    const payload = receipt ? new FormData() : { amount, comment };
+    if (payload instanceof FormData) {
+      payload.append('amount', String(amount));
+      if (comment) payload.append('comment', comment);
+      payload.append('receipt', receipt as File);
+    }
+
     const response = await api.patch<ApiResponse<{
       order: Order;
       payment: {
@@ -134,8 +142,12 @@ class OrdersApi {
         statusChanged: boolean;
         oldStatus: string;
         newStatus: string;
+        receiptUrl?: string | null;
       };
-    }>>(`${this.baseUrl}/${id}/payment`, { amount, comment });
+    }>>(`${this.baseUrl}/${id}/payment`, payload, receipt ? {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60000,
+    } : undefined);
 
     if (!response.data.success || !response.data.data) {
       throw new Error(response.data.message || 'Ошибка регистрации оплаты');

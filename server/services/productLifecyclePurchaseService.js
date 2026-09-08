@@ -104,11 +104,12 @@ function buildLifecyclePurchasePlan({ product, actor, payload = {}, orderNumber,
   };
 }
 
-function buildLifecycleArrivalPlan({
+function buildLifecycleArrivalReconciliationPlan({
   product,
   lifecyclePurchase,
+  receipt,
+  receiptItem,
   actor,
-  payload = {},
   now = new Date(),
 }) {
   assertLifecycleAction({
@@ -117,54 +118,52 @@ function buildLifecycleArrivalPlan({
     action: PRODUCT_LIFECYCLE_ACTIONS.MARK_ARRIVED,
   });
 
-  if (!lifecyclePurchase?.orderId || lifecyclePurchase.arrivedAt) {
+  if (!lifecyclePurchase?.id || lifecyclePurchase.arrivedAt) {
     throw new Error('Lifecycle purchase must exist and must not be received already');
   }
+  const matchesOrderItem = Number(receiptItem?.orderItemId) === Number(lifecyclePurchase.orderItemId);
+  const matchesStoredReceipt = lifecyclePurchase.warehouseReceiptId
+    && Number(lifecyclePurchase.warehouseReceiptId) === Number(receipt?.id);
+  if (
+    (!matchesOrderItem && !matchesStoredReceipt)
+    || Number(receiptItem?.productId) !== Number(product.id)
+  ) {
+    throw new Error('Warehouse receipt item is not linked to this lifecycle purchase');
+  }
 
-  const expectedQuantity = requiredPositiveInteger(lifecyclePurchase.quantity, 'quantity');
-  const receivedQuantity = requiredPositiveInteger(payload.receivedQuantity, 'receivedQuantity');
-  const notes = optionalText(payload.notes);
-  const discrepancy = expectedQuantity - receivedQuantity;
+  const receivedQuantity = requiredPositiveInteger(
+    receiptItem.receivedQuantity,
+    'receivedQuantity'
+  );
+  const warehouseReceiptId = requiredPositiveInteger(receipt?.id, 'warehouseReceiptId');
+  const arrivedBy = requiredPositiveInteger(receipt?.receivedBy, 'receivedBy');
+  const arrivedAt = receipt?.receivedAt ? new Date(receipt.receivedAt) : now;
 
   return {
     productUpdate: {
-      currentStock: Number(product.currentStock || 0) + receivedQuantity,
       lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.WAREHOUSE,
       lifecycleCompletedAt: null,
       assignedToUserId: null,
     },
-    receipt: {
-      orderId: lifecyclePurchase.orderId,
-      receivedBy: actor.id,
-      receiptType: discrepancy === 0 ? 'full' : 'partial',
-      receivedAt: now,
-      notes,
-    },
-    receiptItem: {
-      productId: product.id,
-      expectedQuantity,
-      receivedQuantity,
-      discrepancy,
-      notes,
-    },
     purchaseUpdate: {
       receivedQuantity,
-      arrivedAt: now,
-      arrivedBy: actor.id,
-      notes: notes || lifecyclePurchase.notes || null,
+      warehouseReceiptId,
+      arrivedAt,
+      arrivedBy,
     },
     history: {
       productId: product.id,
       actorId: actor.id,
-      actionType: 'warehouse_arrival_marked',
+      actionType: 'warehouse_arrival_reconciled',
       fromStatus: PRODUCT_LIFECYCLE_STATUSES.PURCHASE,
       toStatus: PRODUCT_LIFECYCLE_STATUSES.WAREHOUSE,
-      message: 'Initial product batch received at warehouse',
+      message: 'Lifecycle arrival restored from warehouse receipt',
       metadata: {
         orderId: lifecyclePurchase.orderId,
-        expectedQuantity,
+        orderItemId: lifecyclePurchase.orderItemId,
+        warehouseReceiptId,
         receivedQuantity,
-        discrepancy,
+        stockAdjusted: false,
       },
       createdAt: now,
     },
@@ -232,7 +231,7 @@ function buildWarehouseCompletionPlan({ product, actor, payload = {}, now = new 
 }
 
 module.exports = {
-  buildLifecycleArrivalPlan,
+  buildLifecycleArrivalReconciliationPlan,
   buildLifecyclePurchasePlan,
   buildWarehouseCompletionPlan,
 };

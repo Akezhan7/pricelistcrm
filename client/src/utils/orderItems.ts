@@ -75,13 +75,20 @@ export function getSupplierListPrice(product: Product): number {
 
 /** Поиск по названию / артикулу в каталоге поставщика */
 export function filterProductsBySearch<T extends Product>(products: T[], search: string): T[] {
-  const q = search.trim().toLowerCase();
-  if (!q) return products;
-  return products.filter(
-    (p) =>
-      p.name.toLowerCase().includes(q) ||
-      (p.article || '').toLowerCase().includes(q)
-  );
+  const tokens = search.trim().toLocaleLowerCase('ru-RU').split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return products;
+
+  return products.filter((product) => {
+    const searchableValues = [
+      product.name,
+      product.article,
+      product.internalName,
+      product.kaspiName,
+      product.kaspiArticle,
+    ].map((value) => (value || '').toLocaleLowerCase('ru-RU'));
+
+    return tokens.every((token) => searchableValues.some((value) => value.includes(token)));
+  });
 }
 
 function normalizeOrderQuantity(quantity: number): number {

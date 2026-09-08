@@ -124,8 +124,39 @@ function testBuildsPostCompletionFlagUpdate() {
   assert.strictEqual(plan.history.toStatus, PRODUCT_LIFECYCLE_STATUSES.IN_SALE);
 }
 
+function testRepairsMissingFlagsCompletionDateDuringUpdate() {
+  const completedAt = new Date('2026-07-10T14:00:00Z');
+  const plan = buildSaleLaunchUpdatePlan({
+    product: {
+      id: 15,
+      lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
+      lifecycleCompletedAt: completedAt,
+    },
+    launchFlags: {
+      internalAdvertisingStarted: true,
+      externalAdvertisingStarted: false,
+      reviewBonusEnabled: true,
+      sellerBonusEnabled: true,
+      notes: null,
+      completedAt: null,
+      completedBy: null,
+    },
+    actor: { id: 8, role: 'admin' },
+    payload: {
+      internalAdvertisingStarted: true,
+      externalAdvertisingStarted: false,
+      reviewBonusEnabled: true,
+      sellerBonusEnabled: true,
+    },
+  });
+
+  assert.strictEqual(plan.launchFlagsUpdate.completedAt, completedAt);
+  assert.strictEqual(plan.launchFlagsUpdate.completedBy, 8);
+}
+
 testCompletesSaleLaunchWithOptionalFlagsDisabled();
 testRejectsRepeatedSaleLaunchCompletion();
 testBuildsPostCompletionFlagUpdate();
+testRepairsMissingFlagsCompletionDateDuringUpdate();
 
 console.log('Product sale launch service test passed');

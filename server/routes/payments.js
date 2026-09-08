@@ -4,20 +4,13 @@ const { body, param, query, validationResult } = require('express-validator');
 const paymentController = require('../controllers/paymentController');
 const { auth } = require('../middleware/auth');
 const checkRole = require('../middleware/checkRole');
-const { uploadReceipt, handleUploadError } = require('../middleware/upload');
-
-// Wrapper: ловит multer-ошибки и преобразует их в JSON-ответ
-const uploadReceiptSafe = (req, res, next) => {
-  uploadReceipt.single('receipt')(req, res, (err) => {
-    if (err) return handleUploadError(err, req, res, next);
-    next();
-  });
-};
+const { removeUploadedFile, uploadReceiptFile } = require('../middleware/upload');
 
 // Middleware для обработки ошибок валидации
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
+    removeUploadedFile(req.file);
     return res.status(400).json({
       success: false,
       message: 'Ошибка валидации данных',
@@ -169,7 +162,7 @@ router.post('/',
   auth,
   checkRole(['admin', 'accountant', 'purchase_manager']),
   // multer должен отработать до валидаторов, иначе req.body не будет распарсен из multipart
-  uploadReceiptSafe,
+  uploadReceiptFile,
   ...validateCreatePayment,
   handleValidationErrors,
   paymentController.createPayment

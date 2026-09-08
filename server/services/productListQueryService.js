@@ -3,6 +3,9 @@ const { Op } = require('sequelize');
 const PRODUCT_SEARCH_FIELDS = Object.freeze([
   'name',
   'article',
+  'internalName',
+  'kaspiName',
+  'kaspiArticle',
 ]);
 
 function normalizeProductSearchQuery(search) {

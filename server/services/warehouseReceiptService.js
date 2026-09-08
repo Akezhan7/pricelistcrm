@@ -92,4 +92,47 @@ function buildWarehouseReceiptPlan({ order, items } = {}) {
   };
 }
 
-module.exports = { buildWarehouseReceiptPlan };
+function buildLifecycleReceiptUpdates({
+  lifecyclePurchases = [],
+  receiptItems = [],
+  receiptId,
+  receivedAt,
+  receivedBy,
+} = {}) {
+  const normalizedReceiptId = Number(receiptId);
+  const normalizedReceivedBy = Number(receivedBy);
+  if (!Number.isInteger(normalizedReceiptId) || normalizedReceiptId <= 0) {
+    throw requestError(409, 'Warehouse receipt id is invalid');
+  }
+  if (!Number.isInteger(normalizedReceivedBy) || normalizedReceivedBy <= 0) {
+    throw requestError(409, 'Warehouse receiver is invalid');
+  }
+
+  const receiptItemsByOrderItemId = new Map(
+    receiptItems.map((item) => [Number(item.orderItemId), item])
+  );
+
+  return lifecyclePurchases.flatMap((purchase) => {
+    if (purchase.arrivedAt) return [];
+    const receiptItem = receiptItemsByOrderItemId.get(Number(purchase.orderItemId));
+    if (!receiptItem) return [];
+    if (Number(receiptItem.productId) !== Number(purchase.productId)) {
+      throw requestError(409, 'Lifecycle purchase does not match the received product');
+    }
+
+    const receivedQuantity = Number(receiptItem.receivedQuantity);
+    if (!Number.isInteger(receivedQuantity) || receivedQuantity <= 0) return [];
+
+    return [{
+      purchaseId: Number(purchase.id),
+      orderItemId: Number(purchase.orderItemId),
+      productId: Number(purchase.productId),
+      receivedQuantity,
+      warehouseReceiptId: normalizedReceiptId,
+      arrivedAt: receivedAt,
+      arrivedBy: normalizedReceivedBy,
+    }];
+  });
+}
+
+module.exports = { buildLifecycleReceiptUpdates, buildWarehouseReceiptPlan };

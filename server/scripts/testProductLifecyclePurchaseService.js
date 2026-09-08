@@ -5,7 +5,7 @@ const {
 } = require('../constants/productLifecycle');
 const {
   buildLifecyclePurchasePlan,
-  buildLifecycleArrivalPlan,
+  buildLifecycleArrivalReconciliationPlan,
   buildWarehouseCompletionPlan,
 } = require('../services/productLifecyclePurchaseService');
 
@@ -53,43 +53,6 @@ function testBuildsLifecyclePurchasePlan() {
   assert.strictEqual(plan.purchase.purchasedBy, 7);
   assert.strictEqual(plan.purchase.purchasedAt, now);
   assert.strictEqual(plan.history.actionType, 'purchase_marked');
-}
-
-function testBuildsLifecycleArrivalPlan() {
-  const now = new Date('2026-07-10T10:00:00Z');
-  const plan = buildLifecycleArrivalPlan({
-    product: {
-      id: 15,
-      lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.PURCHASE,
-      currentStock: 3,
-    },
-    lifecyclePurchase: {
-      id: 9,
-      productId: 15,
-      orderId: 22,
-      quantity: 12,
-      arrivedAt: null,
-    },
-    actor: { id: 7, role: 'purchase_manager' },
-    payload: { receivedQuantity: '11', notes: ' Недостача 1 шт. ' },
-    now,
-  });
-
-  assert.deepStrictEqual(plan.productUpdate, {
-    currentStock: 14,
-    lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.WAREHOUSE,
-    lifecycleCompletedAt: null,
-    assignedToUserId: null,
-  });
-  assert.deepStrictEqual(plan.receipt, {
-    orderId: 22,
-    receivedBy: 7,
-    receiptType: 'partial',
-    receivedAt: now,
-    notes: 'Недостача 1 шт.',
-  });
-  assert.strictEqual(plan.receiptItem.discrepancy, 1);
-  assert.strictEqual(plan.history.actionType, 'warehouse_arrival_marked');
 }
 
 function testBuildsWarehouseCompletionPlan() {
@@ -160,9 +123,48 @@ function testWarehouseCompletionRequiresCompletePassport() {
   assert.strictEqual(plan.warehouseDetails.height, null);
 }
 
+function testReconcilesDocumentedArrivalWithoutAddingStockAgain() {
+  const receivedAt = new Date('2026-09-08T11:00:00Z');
+  const plan = buildLifecycleArrivalReconciliationPlan({
+    product: {
+      id: 15,
+      lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.PURCHASE,
+      currentStock: 11,
+    },
+    lifecyclePurchase: {
+      id: 9,
+      productId: 15,
+      orderId: 22,
+      orderItemId: 31,
+      arrivedAt: null,
+    },
+    receipt: { id: 44, receivedAt, receivedBy: 7 },
+    receiptItem: {
+      orderItemId: 31,
+      productId: 15,
+      receivedQuantity: 11,
+    },
+    actor: { id: 8, role: 'admin' },
+  });
+
+  assert.deepStrictEqual(plan.productUpdate, {
+    lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.WAREHOUSE,
+    lifecycleCompletedAt: null,
+    assignedToUserId: null,
+  });
+  assert.deepStrictEqual(plan.purchaseUpdate, {
+    receivedQuantity: 11,
+    warehouseReceiptId: 44,
+    arrivedAt: receivedAt,
+    arrivedBy: 7,
+  });
+  assert.strictEqual(plan.history.metadata.stockAdjusted, false);
+  assert.strictEqual(Object.hasOwn(plan.productUpdate, 'currentStock'), false);
+}
+
 testBuildsLifecyclePurchasePlan();
-testBuildsLifecycleArrivalPlan();
 testBuildsWarehouseCompletionPlan();
 testWarehouseCompletionRequiresCompletePassport();
+testReconcilesDocumentedArrivalWithoutAddingStockAgain();
 
 console.log('Product lifecycle purchase service test passed');
