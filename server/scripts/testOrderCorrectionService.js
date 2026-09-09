@@ -11,6 +11,8 @@ function testEditPolicyUsesDocumentsInsteadOfStatusAlone() {
       mode: 'edit',
       canEdit: true,
       canDelete: false,
+      canChangeSupplier: true,
+      supplierChangeRequiresReason: true,
       requiresReason: false,
       reason: null,
       hasReceipts: false,
@@ -30,6 +32,39 @@ function testEditPolicyUsesDocumentsInsteadOfStatusAlone() {
     buildOrderEditPolicy({ status: 'Создана', receiptCount: 0, paymentCount: 0, role: 'admin' }).canDelete,
     true
   );
+}
+
+function testSentUnpaidOrderCanBeReassignedAndArchived() {
+  const policy = buildOrderEditPolicy({
+    status: 'Отправлена поставщику',
+    receiptCount: 0,
+    paymentCount: 0,
+    role: 'admin',
+  });
+
+  assert.strictEqual(policy.canChangeSupplier, true);
+  assert.strictEqual(policy.supplierChangeRequiresReason, true);
+  assert.strictEqual(policy.canDelete, true);
+}
+
+function testSupplierAndDeleteStayBlockedAfterFinancialOrWarehouseDocuments() {
+  const received = buildOrderEditPolicy({
+    status: 'Принята на складе',
+    receiptCount: 1,
+    paymentCount: 0,
+    role: 'admin',
+  });
+  const paid = buildOrderEditPolicy({
+    status: 'Отправлена поставщику',
+    receiptCount: 0,
+    paymentCount: 1,
+    role: 'admin',
+  });
+
+  assert.strictEqual(received.canChangeSupplier, false);
+  assert.strictEqual(received.canDelete, false);
+  assert.strictEqual(paid.canChangeSupplier, false);
+  assert.strictEqual(paid.canDelete, false);
 }
 
 function testPriceCorrectionDoesNotChangeStockAndShowsOverpayment() {
@@ -132,6 +167,8 @@ function testAllowsDetailsOnlyCorrectionWhenControllerDetectedAChange() {
 }
 
 testEditPolicyUsesDocumentsInsteadOfStatusAlone();
+testSentUnpaidOrderCanBeReassignedAndArchived();
+testSupplierAndDeleteStayBlockedAfterFinancialOrWarehouseDocuments();
 testPriceCorrectionDoesNotChangeStockAndShowsOverpayment();
 testQuantityCorrectionPostsOnlyStockDeltaAndAllowsExtraProduct();
 testRejectsCorrectionThatWouldMakeStockNegative();

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import ReactSelect from 'react-select';
-import { ArrowRight, Check, FileText, PackageSearch, Plus, Save, ShoppingBasket, Trash2, X } from 'lucide-react';
+import { ArrowRight, FileText, PackageSearch, PanelRight, Plus, Save, ShoppingBasket, Trash2, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/Layout';
 import { ProcurementProductThumbnail } from '../components/ProcurementProductThumbnail';
@@ -144,17 +144,16 @@ const ProcurementItemRow: React.FC<ItemRowProps> = ({
       : 'Единственный поставщик товара';
 
   return (
-    <div className="border-b border-border-subtle px-4 py-4 last:border-b-0">
-      <div className="grid gap-3 xl:grid-cols-[minmax(15rem,1.5fr)_9rem_10rem_minmax(14rem,1fr)_auto] xl:items-end">
+    <div className="border-b border-border-subtle px-3 py-3 last:border-b-0">
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(14rem,1.4fr)_5.5rem_5.5rem_minmax(13rem,1fr)_7.5rem_minmax(11rem,1fr)_auto] xl:items-end">
         <div className="flex min-w-0 items-center gap-3 self-center">
           <ProcurementProductThumbnail product={item.product} />
           <div className="min-w-0">
             <p className="text-card-title text-brand-black break-words">
               {item.product.internalName || item.product.name}
             </p>
-            <p className="mt-1 text-caption text-text-muted">{item.product.article}</p>
-            <p className="mt-1 text-caption text-text-muted">
-              Добавил: {item.addedBy?.name || 'Сотрудник'}
+            <p className="mt-0.5 text-caption text-text-muted">
+              {item.product.article} · {item.addedBy?.name || 'Сотрудник'}
             </p>
           </div>
         </div>
@@ -177,11 +176,72 @@ const ProcurementItemRow: React.FC<ItemRowProps> = ({
           onChange={(event) => setObservedStock(event.target.value)}
           disabled={busy}
         />
+        <div className="min-w-0">
+          <label className="mb-1.5 block text-caption font-medium text-brand-black">
+            Поставщик
+          </label>
+          <ReactSelect
+            options={supplierOptions}
+            value={selectedSupplierOption}
+            onChange={(option) => selectSupplier(option?.value ?? null)}
+            placeholder={showAllSuppliers ? 'Найти поставщика' : 'Выберите поставщика товара'}
+            noOptionsMessage={() => showAllSuppliers
+              ? 'Поставщики не найдены'
+              : 'У товара нет привязанных поставщиков'}
+            isClearable
+            isDisabled={busy}
+            menuPosition="fixed"
+            menuPortalTarget={document.body}
+            maxMenuHeight={280}
+            styles={{
+              control: (base, state) => ({
+                ...base,
+                minHeight: '40px',
+                borderRadius: '8px',
+                borderColor: state.isFocused ? '#f4bd00' : '#d1d5db',
+                boxShadow: state.isFocused ? '0 0 0 2px rgba(244, 189, 0, 0.2)' : 'none',
+                ':hover': { borderColor: '#9ca3af' },
+              }),
+              menuPortal: (base) => ({ ...base, zIndex: 70 }),
+            }}
+          />
+          <div className="mt-1 flex min-w-0 items-center gap-1">
+            <span className="min-w-0 flex-1 truncate text-caption text-text-muted" title={item.supplierRecommendation.supplier?.name}>
+              {item.supplierRecommendation.supplier
+                ? `${recommendationLabel}: ${item.supplierRecommendation.supplier.name}`
+                : relevantSuppliers.length === 0
+                  ? 'Нет привязанных поставщиков'
+                  : 'Выберите поставщика'}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="shrink-0 px-1.5"
+              disabled={busy}
+              onClick={() => setShowAllSuppliers((current) => !current)}
+            >
+              {showAllSuppliers
+                ? 'Свои'
+                : 'Все'}
+            </Button>
+          </div>
+        </div>
+        <Input
+          label="Цена закупа"
+          type="number"
+          min="0"
+          step="0.01"
+          placeholder="Не указана"
+          value={purchasePrice}
+          onChange={(event) => setPurchasePrice(event.target.value)}
+          disabled={busy || selectedSupplierId === ''}
+        />
         <Input
           label="Комментарий"
           value={notes}
           maxLength={2000}
-          placeholder="Например, проверить упаковку"
+          placeholder="Необязательно"
           onChange={(event) => setNotes(event.target.value)}
           disabled={busy}
         />
@@ -210,93 +270,6 @@ const ProcurementItemRow: React.FC<ItemRowProps> = ({
           />
         </div>
       </div>
-
-      <div className="mt-3 grid gap-3 border-l-2 border-brand-yellow pl-3 md:grid-cols-[minmax(15rem,1fr)_10rem_minmax(16rem,1fr)] md:items-end">
-        <div className="w-full">
-          <label className="mb-1.5 block text-caption font-medium text-brand-black">
-            Поставщик
-          </label>
-          <ReactSelect
-            options={supplierOptions}
-            value={selectedSupplierOption}
-            onChange={(option) => selectSupplier(option?.value ?? null)}
-            placeholder={showAllSuppliers ? 'Найти поставщика' : 'Выберите поставщика товара'}
-            noOptionsMessage={() => showAllSuppliers
-              ? 'Поставщики не найдены'
-              : 'У товара нет привязанных поставщиков'}
-            isClearable
-            isDisabled={busy}
-            menuPosition="fixed"
-            menuPortalTarget={document.body}
-            maxMenuHeight={280}
-            styles={{
-              control: (base, state) => ({
-                ...base,
-                minHeight: '44px',
-                borderRadius: '8px',
-                borderColor: state.isFocused ? '#f4bd00' : '#d1d5db',
-                boxShadow: state.isFocused ? '0 0 0 2px rgba(244, 189, 0, 0.2)' : 'none',
-                ':hover': { borderColor: '#9ca3af' },
-              }),
-              menuPortal: (base) => ({ ...base, zIndex: 70 }),
-            }}
-          />
-          <div className="mt-1.5 flex items-center justify-between gap-2">
-            {!showAllSuppliers && relevantSuppliers.length === 0 && (
-              <span className="text-caption text-text-muted">
-                У товара нет привязанных поставщиков
-              </span>
-            )}
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="ml-auto"
-              disabled={busy}
-              onClick={() => setShowAllSuppliers((current) => !current)}
-            >
-              {showAllSuppliers
-                ? 'Только поставщики товара'
-                : 'Выбрать другого поставщика'}
-            </Button>
-          </div>
-        </div>
-        <Input
-          label="Цена закупа"
-          type="number"
-          min="0"
-          step="0.01"
-          placeholder="Не указана"
-          value={purchasePrice}
-          onChange={(event) => setPurchasePrice(event.target.value)}
-          disabled={busy || selectedSupplierId === ''}
-        />
-        <div className="min-w-0 pb-0.5">
-          {item.supplierRecommendation.supplier ? (
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-caption text-text-muted">
-                {recommendationLabel}: <span className="font-medium text-brand-black">
-                  {item.supplierRecommendation.supplier.name}
-                </span>
-              </p>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                leftIcon={Check}
-                disabled={busy}
-                onClick={() => selectSupplier(item.supplierRecommendation.supplier!.id)}
-              >
-                Применить
-              </Button>
-            </div>
-          ) : (
-            <p className="text-caption text-text-muted">
-              CRM не нашла однозначного поставщика. Выберите его вручную.
-            </p>
-          )}
-        </div>
-      </div>
     </div>
   );
 };
@@ -320,6 +293,8 @@ export const ProcurementListPage: React.FC = () => {
   const [creatingOrders, setCreatingOrders] = useState(false);
   const [createdOrders, setCreatedOrders] = useState<ProcurementCreatedOrder[]>([]);
   const [busyItemId, setBusyItemId] = useState<number | null>(null);
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const [supplierFilter, setSupplierFilter] = useState<number | 'unassigned' | null>(null);
 
   const canAccess = Boolean(user && ALLOWED_ROLES.has(user.role));
   const canCreateOrders = user?.role === 'admin' || user?.role === 'purchase_manager';
@@ -518,6 +493,14 @@ export const ProcurementListPage: React.FC = () => {
   }).format(value);
   const readyGroups = supplierGroups.groups.filter((group) => group.withoutPrice === 0);
   const readyItemCount = readyGroups.reduce((total, group) => total + group.positions, 0);
+  const visibleItems = useMemo(() => {
+    const items = list?.items || [];
+    if (supplierFilter === null) return items;
+    if (supplierFilter === 'unassigned') {
+      return items.filter((item) => !item.selectedSupplierId || !item.selectedSupplier?.isActive);
+    }
+    return items.filter((item) => item.selectedSupplierId === supplierFilter);
+  }, [list, supplierFilter]);
 
   const handleCreateOrders = async () => {
     if (readyGroups.length === 0) {
@@ -551,6 +534,82 @@ export const ProcurementListPage: React.FC = () => {
     }
   };
 
+  const distributionPanel = (withCloseButton = false) => (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="border-b border-border-subtle px-4 py-3">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-body-medium text-brand-black">Распределение</p>
+            <p className="mt-0.5 text-caption text-text-muted">
+              Готово: {readyGroups.length} групп · {readyItemCount} позиций
+            </p>
+          </div>
+          {withCloseButton && (
+            <IconButton icon={X} title="Закрыть распределение" variant="ghost" onClick={() => setSummaryOpen(false)} />
+          )}
+        </div>
+        {canCreateOrders && (
+          <Button
+            type="button"
+            leftIcon={FileText}
+            className="mt-3 w-full"
+            loading={creatingOrders}
+            disabled={creatingOrders || readyGroups.length === 0}
+            onClick={handleCreateOrders}
+          >
+            Создать заявки
+          </Button>
+        )}
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+        <button
+          type="button"
+          className={`flex w-full items-center justify-between border-l-2 px-3 py-2 text-left ${supplierFilter === null ? 'border-brand-yellow bg-brand-yellow/10' : 'border-transparent hover:bg-surface-muted'}`}
+          onClick={() => setSupplierFilter(null)}
+        >
+          <span className="text-body-medium text-brand-black">Все позиции</span>
+          <span className="text-caption text-text-muted">{itemCount}</span>
+        </button>
+        {supplierGroups.groups.map((group) => (
+          <button
+            key={group.id}
+            type="button"
+            className={`mt-1 w-full border-l-2 px-3 py-2 text-left ${supplierFilter === group.id ? 'border-success bg-success/5' : 'border-transparent hover:bg-surface-muted'}`}
+            onClick={() => {
+              setSupplierFilter(group.id);
+              if (withCloseButton) setSummaryOpen(false);
+            }}
+          >
+            <span className="flex items-center justify-between gap-2">
+              <span className="truncate text-body-medium text-brand-black" title={group.name}>{group.name}</span>
+              <span className="shrink-0 text-caption text-text-muted">{group.positions}</span>
+            </span>
+            <span className="mt-0.5 block text-caption text-text-muted">
+              {formatMoney(group.total)} ₸{group.withoutPrice > 0 ? ` · без цены: ${group.withoutPrice}` : ''}
+            </span>
+          </button>
+        ))}
+        {supplierGroups.unassigned > 0 && (
+          <button
+            type="button"
+            className={`mt-1 w-full border-l-2 px-3 py-2 text-left ${supplierFilter === 'unassigned' ? 'border-warning bg-warning/5' : 'border-transparent hover:bg-surface-muted'}`}
+            onClick={() => {
+              setSupplierFilter('unassigned');
+              if (withCloseButton) setSummaryOpen(false);
+            }}
+          >
+            <span className="flex items-center justify-between gap-2">
+              <span className="text-body-medium text-brand-black">Без поставщика</span>
+              <span className="text-caption text-text-muted">{supplierGroups.unassigned}</span>
+            </span>
+            <span className="mt-0.5 block text-caption text-text-muted">Требуют заполнения</span>
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
   if (!canAccess) {
     return (
       <Layout>
@@ -563,7 +622,7 @@ export const ProcurementListPage: React.FC = () => {
 
   return (
     <Layout fullHeight>
-      <div className="flex h-full min-h-0 flex-col gap-4">
+      <div className="flex h-full min-h-0 flex-col gap-3">
         <PageHeader
           icon={ShoppingBasket}
           title="Закупочный лист"
@@ -592,7 +651,7 @@ export const ProcurementListPage: React.FC = () => {
         )}
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-border-subtle bg-brand-white shadow-sm">
-          <div className="shrink-0 border-b border-border-subtle bg-surface-muted px-4 py-4">
+          <div className="shrink-0 border-b border-border-subtle bg-surface-muted px-4 py-3">
             <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-section-title text-brand-black">Добавить товар</p>
@@ -607,7 +666,7 @@ export const ProcurementListPage: React.FC = () => {
 
             {error && <Alert variant="error" className="mt-3">{error}</Alert>}
 
-            <div className="relative mt-4">
+            <div className="relative mt-3">
               <Input
                 leftIcon={PackageSearch}
                 label="Товар"
@@ -709,55 +768,37 @@ export const ProcurementListPage: React.FC = () => {
           </div>
 
           {itemCount > 0 && (
-            <div className="shrink-0 border-b border-border-subtle px-4 py-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-body-medium text-brand-black">
-                    Предварительное распределение
-                  </p>
-                  <p className="text-caption text-text-muted">
-                    Готово к оформлению: {readyGroups.length} групп, {readyItemCount} позиций
-                  </p>
-                </div>
-                {canCreateOrders && (
-                  <Button
-                    type="button"
-                    leftIcon={FileText}
-                    loading={creatingOrders}
-                    disabled={creatingOrders || readyGroups.length === 0}
-                    onClick={handleCreateOrders}
-                  >
-                    Создать заявки
-                  </Button>
-                )}
-              </div>
-              <div className="mt-2 grid gap-x-6 gap-y-2 sm:grid-cols-2 xl:grid-cols-4">
-                {supplierGroups.groups.map((group) => (
-                  <div key={group.id} className="border-l-2 border-success pl-3">
-                    <p className="truncate text-body-medium text-brand-black" title={group.name}>
-                      {group.name}
-                    </p>
-                    <p className="text-caption text-text-muted">
-                      {group.positions} поз. · {formatMoney(group.total)} ₸
-                      {group.withoutPrice > 0
-                        ? ' · без цены: ' + group.withoutPrice
-                        : ''}
-                    </p>
-                  </div>
-                ))}
-                {supplierGroups.unassigned > 0 && (
-                  <div className="border-l-2 border-warning pl-3">
-                    <p className="text-body-medium text-brand-black">Без поставщика</p>
-                    <p className="text-caption text-text-muted">
-                      {supplierGroups.unassigned} позиций требуют выбора
-                    </p>
-                  </div>
-                )}
-              </div>
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border-subtle px-4 py-2 2xl:hidden">
+              <button
+                type="button"
+                className="inline-flex min-w-0 items-center gap-2 text-left"
+                onClick={() => setSummaryOpen(true)}
+              >
+                <PanelRight className="h-4 w-4 shrink-0 text-brand-yellow-dark" aria-hidden />
+                <span className="min-w-0">
+                  <span className="block text-body-medium text-brand-black">Распределение</span>
+                  <span className="block truncate text-caption text-text-muted">
+                    Готово: {readyGroups.length} групп · {readyItemCount} позиций
+                  </span>
+                </span>
+              </button>
+              {canCreateOrders && (
+                <Button
+                  type="button"
+                  size="sm"
+                  leftIcon={FileText}
+                  loading={creatingOrders}
+                  disabled={creatingOrders || readyGroups.length === 0}
+                  onClick={handleCreateOrders}
+                >
+                  Создать заявки
+                </Button>
+              )}
             </div>
           )}
 
-          <div className="min-h-0 flex-1 overflow-y-auto">
+          <div className="flex min-h-0 flex-1">
+            <div className="min-w-0 flex-1 overflow-y-auto">
             {loading ? (
               <div className="flex h-64 items-center justify-center gap-2 text-text-muted">
                 <Spinner size="md" color="brand" />
@@ -770,7 +811,7 @@ export const ProcurementListPage: React.FC = () => {
                 description="Найдите товар по названию или артикулу и укажите необходимое количество"
               />
             ) : (
-              list?.items.map((item) => (
+              visibleItems.map((item) => (
                 <ProcurementItemRow
                   key={item.id}
                   item={item}
@@ -782,8 +823,29 @@ export const ProcurementListPage: React.FC = () => {
                 />
               ))
             )}
+            </div>
+
+            {itemCount > 0 && (
+              <aside className="hidden w-72 shrink-0 border-l border-border-subtle bg-surface-muted/40 2xl:block">
+                {distributionPanel()}
+              </aside>
+            )}
           </div>
         </div>
+
+        {summaryOpen && itemCount > 0 && (
+          <div className="fixed inset-0 z-50 2xl:hidden" role="dialog" aria-modal="true" aria-label="Распределение закупочного листа">
+            <button
+              type="button"
+              className="absolute inset-0 bg-brand-black/35"
+              aria-label="Закрыть распределение"
+              onClick={() => setSummaryOpen(false)}
+            />
+            <aside className="absolute inset-y-0 right-0 w-full max-w-sm bg-brand-white shadow-xl">
+              {distributionPanel(true)}
+            </aside>
+          </div>
+        )}
       </div>
     </Layout>
   );

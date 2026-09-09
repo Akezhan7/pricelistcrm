@@ -71,6 +71,7 @@ function buildOrderEditPolicy({ status, receiptCount = 0, paymentCount = 0, role
   if (status === 'Отменена') {
     return {
       mode: 'blocked', canEdit: false, canDelete: false, requiresReason: false,
+      canChangeSupplier: false, supplierChangeRequiresReason: false,
       reason: 'Отменённую заявку нельзя изменять', hasReceipts, hasPayments,
     };
   }
@@ -81,6 +82,8 @@ function buildOrderEditPolicy({ status, receiptCount = 0, paymentCount = 0, role
       mode: canEdit ? 'correction' : 'blocked',
       canEdit,
       canDelete: false,
+      canChangeSupplier: false,
+      supplierChangeRequiresReason: false,
       requiresReason: canEdit,
       reason: canEdit ? null : 'Корректировать принятую заявку может только администратор',
       hasReceipts,
@@ -89,10 +92,13 @@ function buildOrderEditPolicy({ status, receiptCount = 0, paymentCount = 0, role
   }
 
   const canEdit = ['admin', 'purchase_manager'].includes(role);
+  const canChangeSupplier = canEdit && !hasPayments;
   return {
     mode: canEdit ? 'edit' : 'blocked',
     canEdit,
-    canDelete: canEdit && role === 'admin' && status === 'Создана' && !hasPayments,
+    canDelete: canEdit && role === 'admin' && !hasPayments,
+    canChangeSupplier,
+    supplierChangeRequiresReason: canChangeSupplier && status !== 'Создана',
     requiresReason: false,
     reason: canEdit ? null : 'Недостаточно прав для редактирования заявки',
     hasReceipts,

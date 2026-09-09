@@ -591,6 +591,8 @@ exports.updateOrder = async (req, res) => {
     });
     const beforeData = snapshotOrder(order, existingItems);
     const previousSupplierId = order.supplierId;
+    const previousStatus = order.status;
+    let supplierChanged = false;
     let settlementHistoryData = null;
 
     if (Object.prototype.hasOwnProperty.call(req.body, 'supplierId')) {
@@ -604,9 +606,24 @@ exports.updateOrder = async (req, res) => {
       }
 
       const currentSupplierId = previousSupplierId == null ? null : Number(previousSupplierId);
-      if ((editPolicy.mode === 'correction' || order.status !== 'Создана') && normalizedSupplierId !== currentSupplierId) {
-        const error = new Error('Поставщика можно изменить только у заявки в статусе «Создана» до приёмки');
+      supplierChanged = normalizedSupplierId !== currentSupplierId;
+      if (supplierChanged && !editPolicy.canChangeSupplier) {
+        const error = new Error('Поставщика нельзя изменить после приёмки или регистрации оплаты');
         error.statusCode = 409;
+        throw error;
+      }
+      if (supplierChanged && previousStatus !== 'Создана' && !normalizedSupplierId) {
+        const error = new Error('При переназначении отправленной заявки выберите нового поставщика');
+        error.statusCode = 400;
+        throw error;
+      }
+      if (
+        supplierChanged
+        && editPolicy.supplierChangeRequiresReason
+        && (typeof correctionReason !== 'string' || correctionReason.trim().length < 5)
+      ) {
+        const error = new Error('Укажите причину смены поставщика (минимум 5 символов)');
+        error.statusCode = 400;
         throw error;
       }
 
@@ -623,6 +640,7 @@ exports.updateOrder = async (req, res) => {
       }
 
       order.supplierId = normalizedSupplierId;
+      if (supplierChanged && previousStatus !== 'Создана') order.status = 'Создана';
     }
 
     if (expectedDeliveryDate !== undefined) order.expectedDeliveryDate = expectedDeliveryDate;
@@ -792,15 +810,41 @@ exports.updateOrder = async (req, res) => {
     }
 
     await order.save({ transaction });
-    if (settlementHistoryData) {
-      await OrderSettlementHistory.create(settlementHistoryData, { transaction });
-    }
-
     const finalItems = await OrderItem.findAll({
       where: { orderId: order.id },
       order: [['id', 'ASC']],
       transaction,
     });
+
+    if (supplierChanged) {
+      const orderItemIds = finalItems.map((item) => Number(item.id));
+      if (order.supplierId && orderItemIds.length > 0) {
+        await ProductLifecyclePurchase.update(
+          { supplierId: order.supplierId },
+          { where: { orderId: order.id, orderItemId: { [Op.in]: orderItemIds } }, transaction }
+        );
+        await ProcurementListItem.update(
+          { selectedSupplierId: order.supplierId },
+          { where: { orderItemId: { [Op.in]: orderItemIds } }, transaction }
+        );
+      }
+
+      if (previousStatus !== 'Создана') {
+        await OrderStatusHistory.create({
+          orderId: order.id,
+          oldStatus: previousStatus,
+          newStatus: 'Создана',
+          changedBy: req.user.id,
+          comment: `Поставщик изменён. ${correctionReason.trim()}`,
+          changedAt: new Date(),
+        }, { transaction });
+      }
+    }
+
+    if (settlementHistoryData) {
+      await OrderSettlementHistory.create(settlementHistoryData, { transaction });
+    }
+
     const afterData = snapshotOrder(order, finalItems);
     if (JSON.stringify(beforeData) !== JSON.stringify(afterData)) {
       await OrderCorrection.create({
@@ -1167,7 +1211,7 @@ exports.deleteOrder = async (req, res) => {
         ? 'Заявку с приёмкой нельзя удалить. Используйте корректировку или возврат.'
         : documentCounts.paymentCount > 0
           ? 'Заявку с платежами нельзя удалить. Сначала урегулируйте оплату.'
-          : 'Удалить можно только неоплаченную заявку в статусе «Создана»');
+          : 'Эту заявку нельзя удалить');
       error.statusCode = 409;
       throw error;
     }

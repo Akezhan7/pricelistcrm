@@ -685,6 +685,8 @@ export interface OrderEditPolicy {
   mode: 'edit' | 'correction' | 'blocked';
   canEdit: boolean;
   canDelete: boolean;
+  canChangeSupplier: boolean;
+  supplierChangeRequiresReason: boolean;
   requiresReason: boolean;
   reason?: string | null;
   hasReceipts: boolean;

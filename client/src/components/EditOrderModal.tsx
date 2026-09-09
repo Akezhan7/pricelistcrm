@@ -50,6 +50,9 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
   const [error, setError] = useState<string | null>(null);
   const [loadingData, setLoadingData] = useState(true);
   const isCorrection = order.editPolicy?.mode === 'correction';
+  const supplierChanged = supplierId !== (order.supplierId || null);
+  const requiresSupplierChangeReason = supplierChanged
+    && Boolean(order.editPolicy?.supplierChangeRequiresReason);
 
   useEffect(() => {
     if (isOpen && order) {
@@ -234,8 +237,10 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
         : 'Добавьте хотя бы один товар в заявку';
     }
 
-    if (isCorrection && correctionReason.trim().length < 5) {
-      return 'Укажите причину корректировки (минимум 5 символов)';
+    if ((isCorrection || requiresSupplierChangeReason) && correctionReason.trim().length < 5) {
+      return isCorrection
+        ? 'Укажите причину корректировки (минимум 5 символов)'
+        : 'Укажите причину смены поставщика (минимум 5 символов)';
     }
     
     for (const item of activeItems) {
@@ -267,7 +272,9 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
         expectedDeliveryDate: expectedDeliveryDate || undefined,
         deliveryLocation: deliveryLocation || undefined,
         notes: notes || undefined,
-        correctionReason: isCorrection ? correctionReason.trim() : undefined,
+        correctionReason: isCorrection || requiresSupplierChangeReason
+          ? correctionReason.trim()
+          : undefined,
         items: activeItems.map(item => ({
           id: item.id,
           productId: item.productId,
@@ -352,9 +359,11 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
               label="Поставщик"
               value={supplierId || ''}
               onChange={(event) => setSupplierId(event.target.value ? Number(event.target.value) : null)}
-              disabled={order.status !== 'Создана' || isCorrection}
+              disabled={order.editPolicy ? !order.editPolicy.canChangeSupplier : order.status !== 'Создана'}
             >
-              <option value="">Без поставщика</option>
+              {(order.status === 'Создана' || !order.supplierId) && (
+                <option value="">Без поставщика</option>
+              )}
               {suppliers.map((supplier) => (
                 <option key={supplier.id} value={supplier.id}>
                   {supplier.name} - {supplier.phone}
@@ -488,13 +497,21 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
             className="resize-none"
           />
 
-          {isCorrection && (
+          {requiresSupplierChangeReason && (
+            <Alert variant="warning" title="Поставщик будет изменён">
+              Заявка вернётся в статус «Создана». Проверьте закупочные цены и отправьте её новому поставщику повторно.
+            </Alert>
+          )}
+
+          {(isCorrection || requiresSupplierChangeReason) && (
             <Textarea
-              label="Причина корректировки"
+              label={isCorrection ? 'Причина корректировки' : 'Причина смены поставщика'}
               value={correctionReason}
               onChange={(e) => setCorrectionReason(e.target.value)}
               rows={3}
-              placeholder="Например, поставщик уточнил фактическую цену после поставки"
+              placeholder={isCorrection
+                ? 'Например, поставщик уточнил фактическую цену после поставки'
+                : 'Например, первый поставщик не подтвердил наличие'}
               required
               className="resize-none"
             />

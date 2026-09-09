@@ -583,7 +583,7 @@ const OrderDetails: React.FC = () => {
         <ConfirmDialog
           isOpen={showDeleteConfirm}
           title="Удалить заявку"
-          message={`Вы уверены, что хотите удалить заявку ${order.orderNumber}?`}
+          message={`Заявка ${order.orderNumber} исчезнет из рабочего списка, а связанные товары вернутся в закупочный лист. Продолжить?`}
           confirmLabel="Удалить"
           cancelLabel="Отмена"
           variant="danger"
