@@ -123,7 +123,12 @@ function buildTaskWhere(user, query = {}) {
   const conditions = [];
   const scope = query.scope || 'all';
 
-  if (user.role !== 'admin') {
+  if (Array.isArray(query.assignedTaskIds)) {
+    conditions.push({ id: { [Op.in]: query.assignedTaskIds } });
+    if (user.role === 'admin' && scope === 'created') {
+      conditions.push({ createdByUserId: user.id });
+    }
+  } else if (user.role !== 'admin') {
     conditions.push({ assignedToUserId: user.id });
   } else if (scope === 'assigned') {
     conditions.push({ assignedToUserId: user.id });
@@ -179,10 +184,25 @@ function buildTaskUpdatePayload(input = {}) {
     payload.priority = input.priority;
   }
   if (Object.prototype.hasOwnProperty.call(input, 'dueDate')) {
-    payload.dueDate = input.dueDate || null;
+    payload.dueDate = normalizeTaskDueDate(input.dueDate);
+  }
+  if (Object.prototype.hasOwnProperty.call(input, 'collaboratorUserIds')) {
+    payload.collaboratorUserIds = [...new Set(
+      (Array.isArray(input.collaboratorUserIds) ? input.collaboratorUserIds : [])
+        .map(Number)
+        .filter((id) => Number.isInteger(id) && id > 0)
+    )];
   }
 
   return payload;
+}
+
+function normalizeTaskDueDate(value) {
+  if (!value) return null;
+  const dateOnly = String(value).slice(0, 10);
+  const parsed = new Date(`${dateOnly}T23:59:59.999+05:00`);
+  if (Number.isNaN(parsed.getTime())) throw new Error('Invalid task deadline');
+  return parsed;
 }
 
 function buildTaskCommentEntry({ taskId, authorId, comment }) {
@@ -204,4 +224,5 @@ module.exports = {
   buildTaskWhere,
   getAllowedTaskActions,
   getTaskStatusAfterAction,
+  normalizeTaskDueDate,
 };

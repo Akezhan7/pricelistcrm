@@ -97,6 +97,23 @@ const productAssetFileFilter = (req, file, cb) => {
   }
 };
 
+const taskAttachmentFileFilter = (req, file, cb) => {
+  const allowedMimeTypes = new Set([
+    'image/jpeg', 'image/png', 'image/webp', 'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/zip', 'application/x-zip-compressed',
+  ]);
+  const allowedExtensions = new Set([
+    '.jpg', '.jpeg', '.png', '.webp', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.zip',
+  ]);
+  const extension = path.extname(file.originalname || '').toLowerCase();
+  if (allowedMimeTypes.has(file.mimetype) || allowedExtensions.has(extension)) return cb(null, true);
+  return cb(new Error('Недопустимый тип вложения'), false);
+};
+
 const upload = multer({
   storage,
   fileFilter,
@@ -110,6 +127,16 @@ const uploadReceipt = multer({
   fileFilter: receiptFileFilter,
   limits: {
     fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5 * 1024 * 1024,
+  },
+});
+
+const taskAttachmentsDir = path.join(uploadsDir, 'private-tasks');
+if (!fs.existsSync(taskAttachmentsDir)) fs.mkdirSync(taskAttachmentsDir, { recursive: true });
+const taskAttachmentStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, taskAttachmentsDir),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname || '').toLowerCase();
+    cb(null, `task-${Date.now()}-${Math.round(Math.random() * 1E9)}${ext}`);
   },
 });
 
@@ -128,6 +155,25 @@ const uploadProductAssetChunk = multer({
     files: 1,
   },
 });
+
+const uploadTaskAttachments = multer({
+  storage: taskAttachmentStorage,
+  fileFilter: taskAttachmentFileFilter,
+  limits: { fileSize: 20 * 1024 * 1024, files: 10 },
+});
+
+const uploadTaskAttachmentFiles = (req, res, next) => {
+  uploadTaskAttachments.array('files', 10)(req, res, (error) => {
+    if (!error) return next();
+    (req.files || []).forEach(removeUploadedFile);
+    const message = error.code === 'LIMIT_FILE_SIZE'
+      ? 'Размер одного вложения не должен превышать 20 МБ'
+      : error.code === 'LIMIT_FILE_COUNT'
+        ? 'К задаче можно загрузить не больше 10 файлов за один раз'
+        : error.message;
+    return res.status(400).json({ success: false, message });
+  });
+};
 
 // Middleware для обработки ошибок загрузки
 const handleUploadError = (err, req, res, next) => {
@@ -184,11 +230,14 @@ const removeUploadedFile = (file) => {
 module.exports = {
   PRODUCT_ASSET_CHUNK_FILE_LIMIT,
   uploadsDir,
+  taskAttachmentsDir,
   upload,
   uploadReceipt,
   uploadReceiptFile,
   uploadProductAsset,
   uploadProductAssetChunk,
+  uploadTaskAttachments,
+  uploadTaskAttachmentFiles,
   handleUploadError,
   removeUploadedFile,
 };

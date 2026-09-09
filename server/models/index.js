@@ -33,6 +33,8 @@ const ProductDesignerKpiEntry = require('./ProductDesignerKpiEntry');
 const EmployeeTask = require('./EmployeeTask');
 const EmployeeTaskHistory = require('./EmployeeTaskHistory');
 const EmployeeTaskComment = require('./EmployeeTaskComment');
+const EmployeeTaskAssignee = require('./EmployeeTaskAssignee');
+const EmployeeTaskAttachment = require('./EmployeeTaskAttachment');
 const ProcurementList = require('./ProcurementList');
 const ProcurementListItem = require('./ProcurementListItem');
 
@@ -74,6 +76,8 @@ module.exports = {
   EmployeeTask,
   EmployeeTaskHistory,
   EmployeeTaskComment,
+  EmployeeTaskAssignee,
+  EmployeeTaskAttachment,
   ProcurementList,
   ProcurementListItem,
 };

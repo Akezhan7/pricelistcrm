@@ -4,6 +4,7 @@ import type {
   CreateEmployeeTaskDto,
   EmployeeTask,
   EmployeeTaskComment,
+  EmployeeTaskAttachment,
   EmployeeTaskFilters,
   EmployeeTasksResponse,
   UpdateEmployeeTaskDto,
@@ -59,6 +60,41 @@ class TasksApi {
   async updateTask(id: number, payload: UpdateEmployeeTaskDto): Promise<EmployeeTask> {
     const response = await api.patch<ApiResponse<{ task: EmployeeTask }>>(`${this.baseUrl}/${id}`, payload);
     return unwrap(response, 'Не удалось обновить задачу').task;
+  }
+
+  async uploadAttachments(id: number, files: File[]): Promise<EmployeeTaskAttachment[]> {
+    const form = new FormData();
+    files.forEach((file) => form.append('files', file));
+    const response = await api.post<ApiResponse<{ attachments: EmployeeTaskAttachment[] }>>(
+      `${this.baseUrl}/${id}/attachments`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+    return unwrap(response, 'Не удалось загрузить вложения').attachments;
+  }
+
+  async downloadAttachment(taskId: number, attachment: EmployeeTaskAttachment): Promise<void> {
+    const blob = await this.getAttachmentBlob(taskId, attachment.id);
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = attachment.originalName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+  async getAttachmentBlob(taskId: number, attachmentId: number): Promise<Blob> {
+    const response = await api.get<Blob>(
+      `${this.baseUrl}/${taskId}/attachments/${attachmentId}/download`,
+      { responseType: 'blob' }
+    );
+    return response.data;
+  }
+
+  async deleteAttachment(taskId: number, attachmentId: number): Promise<void> {
+    await api.delete(`${this.baseUrl}/${taskId}/attachments/${attachmentId}`);
   }
 
   async addComment(id: number, comment: string): Promise<EmployeeTaskComment> {

@@ -10,6 +10,7 @@ const {
   buildTaskUpdatePayload,
   buildTaskWhere,
   getAllowedTaskActions,
+  normalizeTaskDueDate,
 } = require('../services/employeeTaskService');
 
 function task(overrides = {}) {
@@ -171,6 +172,7 @@ function testBuildTaskUpdatePayloadAllowsAdminEditableFieldsOnly() {
     assignedToUserId: '5',
     priority: 'urgent',
     dueDate: '2026-08-01',
+    collaboratorUserIds: [7, '8', 7],
     status: EMPLOYEE_TASK_STATUSES.DONE,
     createdByUserId: 99,
   });
@@ -180,8 +182,17 @@ function testBuildTaskUpdatePayloadAllowsAdminEditableFieldsOnly() {
     description: 'Обновленное описание',
     assignedToUserId: 5,
     priority: 'urgent',
-    dueDate: '2026-08-01',
+    dueDate: new Date('2026-08-01T18:59:59.999Z'),
+    collaboratorUserIds: [7, 8],
   });
+}
+
+function testDeadlineEndsAtEndOfSelectedCrmDay() {
+  assert.deepStrictEqual(
+    normalizeTaskDueDate('2026-09-09'),
+    new Date('2026-09-09T18:59:59.999Z')
+  );
+  assert.strictEqual(normalizeTaskDueDate(null), null);
 }
 
 function testBuildTaskCommentEntryTrimsTextAndCapturesAuthor() {
@@ -208,6 +219,7 @@ function run() {
   testOverdueFilterComposesWithSelectedStatus();
   testSearchFilterMatchesTitleAndDescription();
   testBuildTaskUpdatePayloadAllowsAdminEditableFieldsOnly();
+  testDeadlineEndsAtEndOfSelectedCrmDay();
   testBuildTaskCommentEntryTrimsTextAndCapturesAuthor();
 }
 

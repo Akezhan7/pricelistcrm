@@ -69,6 +69,32 @@ describe('tasksApi', () => {
     });
   });
 
+  test('uploads task attachments as multipart form data', async () => {
+    mockedApi.post.mockResolvedValueOnce({
+      data: { success: true, data: { attachments: [] } },
+    });
+    const file = new File(['content'], 'brief.pdf', { type: 'application/pdf' });
+
+    await tasksApi.uploadAttachments(15, [file]);
+
+    expect(mockedApi.post).toHaveBeenCalledWith(
+      '/tasks/15/attachments',
+      expect.any(FormData),
+      { headers: { 'Content-Type': 'multipart/form-data' } }
+    );
+  });
+
+  test('loads an attachment image as an authenticated blob', async () => {
+    const blob = new Blob(['image'], { type: 'image/png' });
+    mockedApi.get.mockResolvedValueOnce({ data: blob });
+
+    await expect(tasksApi.getAttachmentBlob(15, 8)).resolves.toBe(blob);
+
+    expect(mockedApi.get).toHaveBeenCalledWith('/tasks/15/attachments/8/download', {
+      responseType: 'blob',
+    });
+  });
+
   test('sends status action comments to the action endpoint', async () => {
     mockedApi.patch.mockResolvedValueOnce({
       data: { success: true, data: { task: { id: 1 } } },
@@ -80,6 +106,7 @@ describe('tasksApi', () => {
       comment: 'Нужно добавить ссылку',
     });
   });
+
   test('updates task fields through the task endpoint', async () => {
     mockedApi.patch.mockResolvedValueOnce({
       data: { success: true, data: { task: { id: 1 } } },

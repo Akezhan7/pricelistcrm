@@ -103,6 +103,7 @@ app.options('*', (req, res) => {
 });
 
 // Статические файлы — serve uploads from project root to match multer storage
+app.use('/uploads/private-tasks', (_req, res) => res.sendStatus(404));
 app.use('/uploads', express.static(uploadsDir, {
   etag: true,
   lastModified: true,

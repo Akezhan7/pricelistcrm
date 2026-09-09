@@ -186,6 +186,18 @@ export interface EmployeeTaskUser {
   email?: string;
   role: string;
   isActive?: boolean;
+  assignmentRole?: 'primary' | 'collaborator';
+}
+
+export interface EmployeeTaskAttachment {
+  id: number;
+  taskId: number;
+  uploadedByUserId: number;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  uploader?: EmployeeTaskUser;
+  createdAt: string;
 }
 
 export interface EmployeeTaskHistoryEntry {
@@ -220,6 +232,7 @@ export interface EmployeeTask {
   assignedToUserId: number;
   creator?: EmployeeTaskUser;
   assignee?: EmployeeTaskUser;
+  assignees: EmployeeTaskUser[];
   dueDate?: string | null;
   submittedAt?: string | null;
   completedAt?: string | null;
@@ -227,6 +240,7 @@ export interface EmployeeTask {
   allowedActions: EmployeeTaskAction[];
   history?: EmployeeTaskHistoryEntry[];
   comments?: EmployeeTaskComment[];
+  attachments?: EmployeeTaskAttachment[];
   createdAt: string;
   updatedAt: string;
 }
@@ -246,6 +260,7 @@ export interface CreateEmployeeTaskDto {
   title: string;
   description?: string;
   assignedToUserId: number;
+  collaboratorUserIds?: number[];
   priority?: EmployeeTaskPriority;
   dueDate?: string;
   comment?: string;
@@ -255,6 +270,7 @@ export interface UpdateEmployeeTaskDto {
   title?: string;
   description?: string | null;
   assignedToUserId?: number;
+  collaboratorUserIds?: number[];
   priority?: EmployeeTaskPriority;
   dueDate?: string | null;
   comment?: string;

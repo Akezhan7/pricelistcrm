@@ -2,6 +2,7 @@ const express = require('express');
 const { body, param, query } = require('express-validator');
 const { auth, requireRole } = require('../middleware/auth');
 const employeeTaskController = require('../controllers/employeeTaskController');
+const { uploadTaskAttachmentFiles } = require('../middleware/upload');
 const {
   EMPLOYEE_TASK_PRIORITIES,
   EMPLOYEE_TASK_STATUSES,
@@ -35,7 +36,9 @@ router.post(
   body('description').optional({ nullable: true }).isString().trim(),
   body('assignedToUserId').isInt({ min: 1 }),
   body('priority').optional().isIn(priorityValues),
-  body('dueDate').optional({ nullable: true }).isISO8601(),
+  body('dueDate').notEmpty().isISO8601(),
+  body('collaboratorUserIds').optional().isArray({ max: 19 }),
+  body('collaboratorUserIds.*').optional().isInt({ min: 1 }),
   body('comment').optional({ nullable: true }).isString().trim(),
   employeeTaskController.createTask
 );
@@ -55,8 +58,31 @@ router.patch(
   body('assignedToUserId').optional().isInt({ min: 1 }),
   body('priority').optional().isIn(priorityValues),
   body('dueDate').optional({ nullable: true }).isISO8601(),
+  body('collaboratorUserIds').optional().isArray({ max: 19 }),
+  body('collaboratorUserIds.*').optional().isInt({ min: 1 }),
   body('comment').optional({ nullable: true }).isString().trim(),
   employeeTaskController.updateTask
+);
+
+router.post(
+  '/:id/attachments',
+  param('id').isInt({ min: 1 }),
+  uploadTaskAttachmentFiles,
+  employeeTaskController.addTaskAttachments
+);
+
+router.get(
+  '/:id/attachments/:attachmentId/download',
+  param('id').isInt({ min: 1 }),
+  param('attachmentId').isInt({ min: 1 }),
+  employeeTaskController.downloadTaskAttachment
+);
+
+router.delete(
+  '/:id/attachments/:attachmentId',
+  param('id').isInt({ min: 1 }),
+  param('attachmentId').isInt({ min: 1 }),
+  employeeTaskController.deleteTaskAttachment
 );
 
 router.post(

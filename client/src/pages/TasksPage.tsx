@@ -3,18 +3,22 @@ import {
   CheckCircle2,
   ClipboardCheck,
   Clock,
+  Download,
   Eye,
   ListTodo,
   MessageSquare,
+  Paperclip,
   Pencil,
   PlayCircle,
   Plus,
   RefreshCw,
   RotateCcw,
   Search,
+  Trash2,
   XCircle,
 } from 'lucide-react';
 import { Layout } from '../components/Layout';
+import { TaskAttachmentGallery } from '../components/TaskAttachmentGallery';
 import {
   Badge,
   Button,
@@ -35,6 +39,7 @@ import usersApi, { type User } from '../services/usersApi';
 import type {
   CreateEmployeeTaskDto,
   EmployeeTask,
+  EmployeeTaskAttachment,
   EmployeeTaskAction,
   EmployeeTaskPriority,
   EmployeeTaskStatus,
@@ -42,6 +47,7 @@ import type {
 } from '../types';
 import { USER_ROLE_LABELS, type UserRole } from '../constants/userRoles';
 import { cn } from '../utils/cn';
+import { isTaskImageAttachment } from '../utils/taskAttachments';
 
 const PAGE_LIMIT = 20;
 
@@ -102,6 +108,7 @@ const EMPTY_FORM: CreateEmployeeTaskDto = {
   assignedToUserId: 0,
   priority: 'normal',
   dueDate: '',
+  collaboratorUserIds: [],
 };
 
 const EMPTY_EDIT_FORM: UpdateEmployeeTaskDto & {
@@ -111,6 +118,7 @@ const EMPTY_EDIT_FORM: UpdateEmployeeTaskDto & {
   priority: EmployeeTaskPriority;
   dueDate: string;
   comment: string;
+  collaboratorUserIds: number[];
 } = {
   title: '',
   description: '',
@@ -118,6 +126,7 @@ const EMPTY_EDIT_FORM: UpdateEmployeeTaskDto & {
   priority: 'normal',
   dueDate: '',
   comment: '',
+  collaboratorUserIds: [],
 };
 
 function getStatusLabel(status: EmployeeTaskStatus) {
@@ -187,6 +196,71 @@ function isOverdue(task: EmployeeTask) {
   );
 }
 
+function getDeadlineStyle(task: EmployeeTask) {
+  if (!task.dueDate || ['done', 'cancelled'].includes(task.status)) {
+    return 'border-border-subtle';
+  }
+  const due = new Date(task.dueDate).getTime();
+  const created = new Date(task.createdAt).getTime();
+  const remaining = due - Date.now();
+  if (remaining <= 0) return 'border-danger/60 bg-danger/5';
+  const ratio = remaining / Math.max(due - created, 1);
+  if (ratio <= 0.15) return 'border-danger/50 bg-danger/5';
+  if (ratio <= 0.35) return 'border-orange-400/60 bg-orange-50/50';
+  if (ratio <= 0.65) return 'border-warning/60 bg-warning/5';
+  return 'border-success/40 bg-success/5';
+}
+
+function formatFileSize(size: number) {
+  if (size < 1024 * 1024) return `${Math.max(Math.round(size / 1024), 1)} КБ`;
+  return `${(size / (1024 * 1024)).toFixed(1)} МБ`;
+}
+
+function CollaboratorPicker({
+  users,
+  primaryUserId,
+  value,
+  onChange,
+  disabled = false,
+}: {
+  users: User[];
+  primaryUserId: number;
+  value: number[];
+  onChange: (value: number[]) => void;
+  disabled?: boolean;
+}) {
+  const availableUsers = users.filter((item) => item.id !== Number(primaryUserId));
+
+  return (
+    <fieldset disabled={disabled}>
+      <legend className="mb-2 text-body-medium text-brand-black">Соисполнители</legend>
+      <div className="max-h-36 overflow-y-auto rounded-lg border border-border-subtle bg-brand-white p-2">
+        {availableUsers.length === 0 ? (
+          <p className="px-2 py-1 text-body text-text-muted">Других активных сотрудников нет.</p>
+        ) : (
+          availableUsers.map((item) => {
+            const checked = value.includes(item.id);
+            return (
+              <label key={item.id} className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-2 hover:bg-surface-muted">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => onChange(checked ? value.filter((id) => id !== item.id) : [...value, item.id])}
+                  className="h-4 w-4 accent-brand-yellow"
+                />
+                <span className="min-w-0 text-body text-brand-black">
+                  {item.name} <span className="text-text-muted">· {getRoleLabel(item.role)}</span>
+                </span>
+              </label>
+            );
+          })
+        )}
+      </div>
+      <p className="mt-1 text-caption text-text-muted">Соисполнители видят задачу, файлы и обсуждение. Этапы меняет основной ответственный.</p>
+    </fieldset>
+  );
+}
+
 export const TasksPage: React.FC = () => {
   const { user } = useAuth();
   const toast = useToast();
@@ -205,11 +279,23 @@ export const TasksPage: React.FC = () => {
   const [editing, setEditing] = useState(false);
   const [editTaskId, setEditTaskId] = useState<number | null>(null);
   const [editForm, setEditForm] = useState(EMPTY_EDIT_FORM);
+  const [editAttachments, setEditAttachments] = useState<EmployeeTaskAttachment[]>([]);
+  const [editAttachmentFiles, setEditAttachmentFiles] = useState<File[]>([]);
+  const [loadingEditAttachments, setLoadingEditAttachments] = useState(false);
+  const [uploadingEditAttachments, setUploadingEditAttachments] = useState(false);
+  const [attachmentGallery, setAttachmentGallery] = useState<{
+    taskId: number;
+    attachments: EmployeeTaskAttachment[];
+    initialAttachmentId: number;
+  } | null>(null);
   const [reopenDetailsAfterEdit, setReopenDetailsAfterEdit] = useState(false);
   const [commentText, setCommentText] = useState('');
   const [addingComment, setAddingComment] = useState(false);
   const [actionComment, setActionComment] = useState('');
   const [form, setForm] = useState<CreateEmployeeTaskDto>(EMPTY_FORM);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
+  const [uploadingAttachments, setUploadingAttachments] = useState(false);
   const [filters, setFilters] = useState<{
     scope: 'all' | 'assigned' | 'created';
     search: string;
@@ -233,6 +319,22 @@ export const TasksPage: React.FC = () => {
     limit: PAGE_LIMIT,
     totalPages: 1,
   });
+
+  const selectAttachmentFiles = (
+    files: File[],
+    existingCount: number,
+    setter: React.Dispatch<React.SetStateAction<File[]>>
+  ) => {
+    if (existingCount + files.length > 10) {
+      toast.error('К задаче можно прикрепить не больше 10 файлов');
+      return;
+    }
+    if (files.some((file) => file.size > 20 * 1024 * 1024)) {
+      toast.error('Размер одного файла не должен превышать 20 МБ');
+      return;
+    }
+    setter(files);
+  };
 
   const loadTasks = useCallback(async () => {
     setLoading(true);
@@ -303,7 +405,7 @@ export const TasksPage: React.FC = () => {
 
   const handleCreateTask = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!form.title.trim() || !form.assignedToUserId) return;
+    if (!form.title.trim() || !form.assignedToUserId || !form.dueDate) return;
 
     setCreating(true);
     try {
@@ -311,14 +413,26 @@ export const TasksPage: React.FC = () => {
         title: form.title.trim(),
         assignedToUserId: Number(form.assignedToUserId),
         priority: form.priority || 'normal',
+        collaboratorUserIds: form.collaboratorUserIds || [],
       };
       if (form.description?.trim()) payload.description = form.description.trim();
       if (form.dueDate) payload.dueDate = form.dueDate;
 
-      await tasksApi.createTask(payload);
+      const created = await tasksApi.createTask(payload);
+      let attachmentUploadFailed = false;
+      if (pendingFiles.length > 0) {
+        try {
+          await tasksApi.uploadAttachments(created.id, pendingFiles);
+        } catch (error) {
+          attachmentUploadFailed = true;
+          console.error('Задача создана, но вложения не загрузились:', error);
+        }
+      }
       setCreateOpen(false);
       setForm(EMPTY_FORM);
-      toast.success('Задача создана');
+      setPendingFiles([]);
+      if (attachmentUploadFailed) toast.error('Задача создана, но файлы не загрузились. Добавьте их из карточки задачи.');
+      else toast.success('Задача создана');
       await loadTasks();
     } catch (error) {
       console.error('Ошибка создания задачи:', error);
@@ -328,9 +442,11 @@ export const TasksPage: React.FC = () => {
     }
   };
 
-  const openEditTask = (task: EmployeeTask, options: { closeDetails?: boolean } = {}) => {
+  const openEditTask = async (task: EmployeeTask, options: { closeDetails?: boolean } = {}) => {
     setEditTaskId(task.id);
     setReopenDetailsAfterEdit(Boolean(options.closeDetails));
+    setEditAttachments(task.attachments || []);
+    setEditAttachmentFiles([]);
     if (options.closeDetails) {
       setSelectedTask(null);
     }
@@ -341,8 +457,21 @@ export const TasksPage: React.FC = () => {
       priority: task.priority,
       dueDate: toDateInputValue(task.dueDate),
       comment: '',
+      collaboratorUserIds: (task.assignees || [])
+        .filter((item) => item.assignmentRole === 'collaborator')
+        .map((item) => item.id),
     });
     setEditOpen(true);
+    setLoadingEditAttachments(true);
+    try {
+      const detailedTask = await tasksApi.getTask(task.id);
+      setEditAttachments(detailedTask.attachments || []);
+    } catch (error) {
+      console.error('Ошибка загрузки вложений задачи:', error);
+      toast.error('Не удалось загрузить вложения задачи');
+    } finally {
+      setLoadingEditAttachments(false);
+    }
   };
 
   const handleUpdateTask = async (event: React.FormEvent) => {
@@ -357,6 +486,7 @@ export const TasksPage: React.FC = () => {
         assignedToUserId: Number(editForm.assignedToUserId),
         priority: editForm.priority,
         dueDate: editForm.dueDate || null,
+        collaboratorUserIds: editForm.collaboratorUserIds,
       };
       if (editForm.comment?.trim()) payload.comment = editForm.comment.trim();
 
@@ -367,6 +497,8 @@ export const TasksPage: React.FC = () => {
       setEditOpen(false);
       setEditTaskId(null);
       setEditForm(EMPTY_EDIT_FORM);
+      setEditAttachments([]);
+      setEditAttachmentFiles([]);
       setReopenDetailsAfterEdit(false);
       toast.success('Задача обновлена');
       await loadTasks();
@@ -393,6 +525,73 @@ export const TasksPage: React.FC = () => {
       toast.error('Не удалось добавить комментарий');
     } finally {
       setAddingComment(false);
+    }
+  };
+
+  const handleUploadAttachments = async () => {
+    if (!selectedTask || attachmentFiles.length === 0) return;
+    setUploadingAttachments(true);
+    try {
+      await tasksApi.uploadAttachments(selectedTask.id, attachmentFiles);
+      setAttachmentFiles([]);
+      setSelectedTask(await tasksApi.getTask(selectedTask.id));
+      toast.success('Файлы загружены');
+    } catch (error) {
+      console.error('Ошибка загрузки вложений:', error);
+      toast.error('Не удалось загрузить файлы');
+    } finally {
+      setUploadingAttachments(false);
+    }
+  };
+
+  const handleDownloadAttachment = async (attachment: NonNullable<EmployeeTask['attachments']>[number]) => {
+    if (!selectedTask) return;
+    try {
+      await tasksApi.downloadAttachment(selectedTask.id, attachment);
+    } catch (error) {
+      console.error('Ошибка скачивания вложения:', error);
+      toast.error('Не удалось скачать файл');
+    }
+  };
+
+  const handleDeleteAttachment = async (attachmentId: number) => {
+    if (!selectedTask || !window.confirm('Удалить этот файл?')) return;
+    try {
+      await tasksApi.deleteAttachment(selectedTask.id, attachmentId);
+      setSelectedTask(await tasksApi.getTask(selectedTask.id));
+      toast.success('Файл удалён');
+    } catch (error) {
+      console.error('Ошибка удаления вложения:', error);
+      toast.error('Не удалось удалить файл');
+    }
+  };
+
+  const handleUploadEditAttachments = async () => {
+    if (!editTaskId || editAttachmentFiles.length === 0) return;
+    setUploadingEditAttachments(true);
+    try {
+      await tasksApi.uploadAttachments(editTaskId, editAttachmentFiles);
+      const refreshed = await tasksApi.getTask(editTaskId);
+      setEditAttachments(refreshed.attachments || []);
+      setEditAttachmentFiles([]);
+      toast.success('Файлы загружены');
+    } catch (error) {
+      console.error('Ошибка загрузки вложений:', error);
+      toast.error('Не удалось загрузить файлы');
+    } finally {
+      setUploadingEditAttachments(false);
+    }
+  };
+
+  const handleDeleteEditAttachment = async (attachmentId: number) => {
+    if (!editTaskId || !window.confirm('Удалить этот файл?')) return;
+    try {
+      await tasksApi.deleteAttachment(editTaskId, attachmentId);
+      setEditAttachments((current) => current.filter((attachment) => attachment.id !== attachmentId));
+      toast.success('Файл удалён');
+    } catch (error) {
+      console.error('Ошибка удаления вложения:', error);
+      toast.error('Не удалось удалить файл');
     }
   };
 
@@ -556,7 +755,7 @@ export const TasksPage: React.FC = () => {
                     key={task.id}
                     className={cn(
                       'rounded-xl border bg-brand-white p-4 shadow-sm transition-shadow hover:shadow-card-hover',
-                      isOverdue(task) ? 'border-danger/30' : 'border-border-subtle'
+                      getDeadlineStyle(task)
                     )}
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -584,14 +783,20 @@ export const TasksPage: React.FC = () => {
                       />
                     </div>
 
-                    <div className="mt-4 grid grid-cols-1 gap-2 text-caption sm:grid-cols-3">
+                    <div className="mt-4 grid grid-cols-2 gap-2 text-caption lg:grid-cols-4">
                       <div className="rounded-lg bg-surface-inset px-3 py-2">
                         <span className="block text-text-muted">Поставил</span>
                         <span className="text-brand-black">{task.creator?.name || 'Не указано'}</span>
                       </div>
                       <div className="rounded-lg bg-surface-inset px-3 py-2">
-                        <span className="block text-text-muted">Ответственный</span>
-                        <span className="text-brand-black">{task.assignee?.name || 'Не назначен'}</span>
+                        <span className="block text-text-muted">Ответственные</span>
+                        <span className="line-clamp-2 text-brand-black">
+                          {(task.assignees || []).map((item) => item.name).join(', ') || task.assignee?.name || 'Не назначены'}
+                        </span>
+                      </div>
+                      <div className="rounded-lg bg-surface-inset px-3 py-2">
+                        <span className="block text-text-muted">Создана</span>
+                        <span className="text-brand-black">{formatDate(task.createdAt)}</span>
                       </div>
                       <div className="rounded-lg bg-surface-inset px-3 py-2">
                         <span className="block text-text-muted">Срок</span>
@@ -652,7 +857,10 @@ export const TasksPage: React.FC = () => {
 
       <Modal
         isOpen={createOpen}
-        onClose={() => setCreateOpen(false)}
+        onClose={() => {
+          setCreateOpen(false);
+          setPendingFiles([]);
+        }}
         title="Создать задачу"
         size="lg"
       >
@@ -702,17 +910,40 @@ export const TasksPage: React.FC = () => {
               ))}
             </Select>
           </div>
+          <CollaboratorPicker
+            users={activeUsers}
+            primaryUserId={Number(form.assignedToUserId)}
+            value={form.collaboratorUserIds || []}
+            onChange={(collaboratorUserIds) => setForm((current) => ({ ...current, collaboratorUserIds }))}
+            disabled={loadingUsers}
+          />
           <Input
-            label="Срок"
+            label="Дедлайн"
             type="date"
             value={form.dueDate || ''}
             onChange={(event) => setForm((current) => ({ ...current, dueDate: event.target.value }))}
+            required
           />
+          <div>
+            <label className="mb-2 block text-body-medium text-brand-black" htmlFor="task-create-files">Файлы</label>
+            <input
+              id="task-create-files"
+              type="file"
+              multiple
+              accept="image/jpeg,image/png,image/webp,application/pdf,.doc,.docx,.xls,.xlsx,.zip"
+              onChange={(event) => selectAttachmentFiles(Array.from(event.target.files || []), 0, setPendingFiles)}
+              className="block w-full rounded-lg border border-border-subtle bg-brand-white px-3 py-2 text-body text-text-muted file:mr-3 file:rounded-md file:border-0 file:bg-surface-muted file:px-3 file:py-1.5 file:text-body-medium file:text-brand-black"
+            />
+            <p className="mt-1 text-caption text-text-muted">До 10 файлов, каждый до 20 МБ.</p>
+          </div>
           <div className="flex flex-wrap justify-end gap-2 border-t border-border-subtle pt-4">
-            <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => {
+              setCreateOpen(false);
+              setPendingFiles([]);
+            }}>
               Отмена
             </Button>
-            <Button type="submit" loading={creating} disabled={!form.title.trim() || !form.assignedToUserId}>
+            <Button type="submit" loading={creating} disabled={!form.title.trim() || !form.assignedToUserId || !form.dueDate}>
               Создать задачу
             </Button>
           </div>
@@ -721,7 +952,11 @@ export const TasksPage: React.FC = () => {
 
       <Modal
         isOpen={editOpen}
-        onClose={() => setEditOpen(false)}
+        onClose={() => {
+          setEditOpen(false);
+          setEditAttachments([]);
+          setEditAttachmentFiles([]);
+        }}
         title="Редактировать задачу"
         size="lg"
       >
@@ -769,12 +1004,103 @@ export const TasksPage: React.FC = () => {
               ))}
             </Select>
           </div>
+          <CollaboratorPicker
+            users={activeUsers}
+            primaryUserId={Number(editForm.assignedToUserId)}
+            value={editForm.collaboratorUserIds}
+            onChange={(collaboratorUserIds) => setEditForm((current) => ({ ...current, collaboratorUserIds }))}
+            disabled={loadingUsers}
+          />
           <Input
-            label="Срок"
+            label="Дедлайн"
             type="date"
             value={editForm.dueDate || ''}
             onChange={(event) => setEditForm((current) => ({ ...current, dueDate: event.target.value }))}
           />
+          <div>
+            <div className="mb-2 flex items-center gap-2">
+              <Paperclip className="h-4 w-4 text-text-muted" />
+              <p className="text-body-medium text-brand-black">Вложения</p>
+              <Badge variant="outline">{editAttachments.length}</Badge>
+            </div>
+            {loadingEditAttachments ? (
+              <div className="flex h-16 items-center justify-center rounded-lg border border-border-subtle">
+                <Spinner size="sm" color="brand" />
+              </div>
+            ) : (
+              <div className="max-h-44 space-y-2 overflow-y-auto">
+                {editAttachments.map((attachment) => (
+                  <div key={attachment.id} className="flex items-center gap-3 rounded-lg border border-border-subtle bg-brand-white px-3 py-2">
+                    <Paperclip className="h-4 w-4 shrink-0 text-text-muted" />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-body-medium text-brand-black">{attachment.originalName}</p>
+                      <p className="text-caption text-text-muted">{formatFileSize(attachment.size)}</p>
+                    </div>
+                    {isTaskImageAttachment(attachment) && (
+                      <IconButton
+                        icon={Eye}
+                        title="Открыть изображение"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => editTaskId && setAttachmentGallery({
+                          taskId: editTaskId,
+                          attachments: editAttachments,
+                          initialAttachmentId: attachment.id,
+                        })}
+                      />
+                    )}
+                    <IconButton
+                      icon={Download}
+                      title="Скачать файл"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => editTaskId && tasksApi.downloadAttachment(editTaskId, attachment).catch(() => {
+                        toast.error('Не удалось скачать файл');
+                      })}
+                    />
+                    <IconButton
+                      icon={Trash2}
+                      title="Удалить файл"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleDeleteEditAttachment(attachment.id)}
+                    />
+                  </div>
+                ))}
+                {editAttachments.length === 0 && (
+                  <p className="text-body text-text-muted">Файлов пока нет.</p>
+                )}
+              </div>
+            )}
+            <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+              <div className="min-w-0 flex-1">
+                <label className="mb-1 block text-caption text-text-muted" htmlFor="task-edit-files">Добавить файлы</label>
+                <input
+                  id="task-edit-files"
+                  type="file"
+                  multiple
+                  accept="image/jpeg,image/png,image/webp,application/pdf,.doc,.docx,.xls,.xlsx,.zip"
+                  onChange={(event) => selectAttachmentFiles(
+                    Array.from(event.target.files || []),
+                    editAttachments.length,
+                    setEditAttachmentFiles
+                  )}
+                  className="block w-full rounded-lg border border-border-subtle bg-brand-white px-3 py-2 text-body text-text-muted file:mr-3 file:rounded-md file:border-0 file:bg-surface-muted file:px-3 file:py-1 file:text-body-medium"
+                />
+              </div>
+              <Button
+                type="button"
+                variant="secondary"
+                leftIcon={Paperclip}
+                loading={uploadingEditAttachments}
+                disabled={editAttachmentFiles.length === 0 || loadingEditAttachments}
+                onClick={handleUploadEditAttachments}
+              >
+                Загрузить
+              </Button>
+            </div>
+            <p className="mt-1 text-caption text-text-muted">До 10 файлов, каждый до 20 МБ.</p>
+          </div>
           <Textarea
             label="Комментарий к изменению"
             value={editForm.comment}
@@ -783,7 +1109,11 @@ export const TasksPage: React.FC = () => {
             className="min-h-[88px]"
           />
           <div className="flex flex-wrap justify-end gap-2 border-t border-border-subtle pt-4">
-            <Button type="button" variant="secondary" onClick={() => setEditOpen(false)}>
+            <Button type="button" variant="secondary" onClick={() => {
+              setEditOpen(false);
+              setEditAttachments([]);
+              setEditAttachmentFiles([]);
+            }}>
               Отмена
             </Button>
             <Button type="submit" loading={editing} disabled={!editForm.title.trim() || !editForm.assignedToUserId}>
@@ -795,7 +1125,10 @@ export const TasksPage: React.FC = () => {
 
       <Modal
         isOpen={Boolean(selectedTask) || detailsLoading}
-        onClose={() => setSelectedTask(null)}
+        onClose={() => {
+          setSelectedTask(null);
+          setAttachmentFiles([]);
+        }}
         title="Задача"
         size="xl"
       >
@@ -831,14 +1164,20 @@ export const TasksPage: React.FC = () => {
               )}
             </div>
 
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
               <div className="rounded-lg bg-surface-inset px-3 py-2">
                 <p className="text-caption text-text-muted">Поставил</p>
                 <p className="text-body-medium text-brand-black">{selectedTask.creator?.name || 'Не указано'}</p>
               </div>
               <div className="rounded-lg bg-surface-inset px-3 py-2">
-                <p className="text-caption text-text-muted">Ответственный</p>
-                <p className="text-body-medium text-brand-black">{selectedTask.assignee?.name || 'Не назначен'}</p>
+                <p className="text-caption text-text-muted">Ответственные</p>
+                <p className="text-body-medium text-brand-black">
+                  {(selectedTask.assignees || []).map((item) => item.name).join(', ') || selectedTask.assignee?.name || 'Не назначены'}
+                </p>
+              </div>
+              <div className="rounded-lg bg-surface-inset px-3 py-2">
+                <p className="text-caption text-text-muted">Создана</p>
+                <p className="text-body-medium text-brand-black">{formatDateTime(selectedTask.createdAt)}</p>
               </div>
               <div className="rounded-lg bg-surface-inset px-3 py-2">
                 <p className="text-caption text-text-muted">Срок</p>
@@ -846,6 +1185,90 @@ export const TasksPage: React.FC = () => {
                   {formatDate(selectedTask.dueDate)}
                 </p>
               </div>
+            </div>
+
+            <div>
+              <div className="mb-3 flex items-center gap-2">
+                <Paperclip className="h-4 w-4 text-text-muted" />
+                <h3 className="text-card-title text-brand-black">Вложения</h3>
+                <Badge variant="outline">{selectedTask.attachments?.length || 0}</Badge>
+              </div>
+              <div className="space-y-2">
+                {(selectedTask.attachments || []).map((attachment) => {
+                  const canDelete = isAdmin || Number(attachment.uploadedByUserId) === Number(user?.id);
+                  return (
+                    <div key={attachment.id} className="flex items-center gap-3 rounded-lg border border-border-subtle bg-brand-white px-3 py-2">
+                      <Paperclip className="h-4 w-4 shrink-0 text-text-muted" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-body-medium text-brand-black">{attachment.originalName}</p>
+                        <p className="text-caption text-text-muted">
+                          {formatFileSize(attachment.size)} · {attachment.uploader?.name || 'Сотрудник'} · {formatDateTime(attachment.createdAt)}
+                        </p>
+                      </div>
+                      {isTaskImageAttachment(attachment) && (
+                        <IconButton
+                          icon={Eye}
+                          title="Открыть изображение"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setAttachmentGallery({
+                            taskId: selectedTask.id,
+                            attachments: selectedTask.attachments || [],
+                            initialAttachmentId: attachment.id,
+                          })}
+                        />
+                      )}
+                      <IconButton
+                        icon={Download}
+                        title="Скачать файл"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleDownloadAttachment(attachment)}
+                      />
+                      {canDelete && (
+                        <IconButton
+                          icon={Trash2}
+                          title="Удалить файл"
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleDeleteAttachment(attachment.id)}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+                {(!selectedTask.attachments || selectedTask.attachments.length === 0) && (
+                  <p className="text-body text-text-muted">Файлов пока нет.</p>
+                )}
+              </div>
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end">
+                <div className="min-w-0 flex-1">
+                  <label className="mb-1 block text-caption text-text-muted" htmlFor="task-detail-files">Добавить файлы</label>
+                  <input
+                    id="task-detail-files"
+                    type="file"
+                    multiple
+                    accept="image/jpeg,image/png,image/webp,application/pdf,.doc,.docx,.xls,.xlsx,.zip"
+                    onChange={(event) => selectAttachmentFiles(
+                      Array.from(event.target.files || []),
+                      selectedTask.attachments?.length || 0,
+                      setAttachmentFiles
+                    )}
+                    className="block w-full rounded-lg border border-border-subtle bg-brand-white px-3 py-2 text-body text-text-muted file:mr-3 file:rounded-md file:border-0 file:bg-surface-muted file:px-3 file:py-1 file:text-body-medium"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  leftIcon={Paperclip}
+                  loading={uploadingAttachments}
+                  disabled={attachmentFiles.length === 0}
+                  onClick={handleUploadAttachments}
+                >
+                  Загрузить
+                </Button>
+              </div>
+              <p className="mt-1 text-caption text-text-muted">До 10 файлов, каждый до 20 МБ.</p>
             </div>
 
             {selectedTask.allowedActions.length > 0 && (
@@ -946,6 +1369,15 @@ export const TasksPage: React.FC = () => {
           </div>
         )}
       </Modal>
+
+      {attachmentGallery && (
+        <TaskAttachmentGallery
+          taskId={attachmentGallery.taskId}
+          attachments={attachmentGallery.attachments}
+          initialAttachmentId={attachmentGallery.initialAttachmentId}
+          onClose={() => setAttachmentGallery(null)}
+        />
+      )}
     </Layout>
   );
 };

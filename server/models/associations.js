@@ -31,6 +31,8 @@ const ProductDesignerKpiEntry = require('./ProductDesignerKpiEntry');
 const EmployeeTask = require('./EmployeeTask');
 const EmployeeTaskHistory = require('./EmployeeTaskHistory');
 const EmployeeTaskComment = require('./EmployeeTaskComment');
+const EmployeeTaskAssignee = require('./EmployeeTaskAssignee');
+const EmployeeTaskAttachment = require('./EmployeeTaskAttachment');
 const ProcurementList = require('./ProcurementList');
 const ProcurementListItem = require('./ProcurementListItem');
 
@@ -900,6 +902,16 @@ User.hasMany(EmployeeTaskComment, {
   as: 'employeeTaskComments',
 });
 
+EmployeeTask.hasMany(EmployeeTaskAssignee, { foreignKey: 'taskId', as: 'assignments', onDelete: 'CASCADE' });
+EmployeeTaskAssignee.belongsTo(EmployeeTask, { foreignKey: 'taskId', as: 'task' });
+EmployeeTaskAssignee.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+User.hasMany(EmployeeTaskAssignee, { foreignKey: 'userId', as: 'employeeTaskAssignments' });
+
+EmployeeTask.hasMany(EmployeeTaskAttachment, { foreignKey: 'taskId', as: 'attachments', onDelete: 'CASCADE' });
+EmployeeTaskAttachment.belongsTo(EmployeeTask, { foreignKey: 'taskId', as: 'task' });
+EmployeeTaskAttachment.belongsTo(User, { foreignKey: 'uploadedByUserId', as: 'uploader' });
+User.hasMany(EmployeeTaskAttachment, { foreignKey: 'uploadedByUserId', as: 'employeeTaskAttachments' });
+
 module.exports = {
   Market,
   Sector,
@@ -932,4 +944,6 @@ module.exports = {
   EmployeeTask,
   EmployeeTaskHistory,
   EmployeeTaskComment,
+  EmployeeTaskAssignee,
+  EmployeeTaskAttachment,
 };
