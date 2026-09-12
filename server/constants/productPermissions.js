@@ -90,8 +90,11 @@ function getSupportingActions({ user, product }) {
   }
 
   if (
-    [PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE, PRODUCT_LIFECYCLE_STATUSES.IN_SALE].includes(status)
-    && hasRole(user, 'admin', 'marketplace_manager')
+    isAdmin
+    || (
+      hasRole(user, 'marketplace_manager')
+      && status !== PRODUCT_LIFECYCLE_STATUSES.ARCHIVED
+    )
   ) {
     actions.push(PRODUCT_PERMISSION_ACTIONS.MANAGE_MARKETPLACE);
   }

@@ -82,6 +82,22 @@ function testOperationalRolesStayInTheirArea() {
   assert(!accountant.allowedActions.includes(PRODUCT_PERMISSION_ACTIONS.MANAGE_WAREHOUSE));
 }
 
+function testMarketplaceManagerCanMaintainListingsOutsideMarketplaceStage() {
+  const purchase = permissionsFor('marketplace_manager', {
+    lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.PURCHASE,
+  }, 20);
+  const warehouse = permissionsFor('marketplace_manager', {
+    lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.WAREHOUSE,
+  }, 20);
+  const archived = permissionsFor('marketplace_manager', {
+    lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.ARCHIVED,
+  }, 20);
+
+  assert(purchase.allowedActions.includes(PRODUCT_PERMISSION_ACTIONS.MANAGE_MARKETPLACE));
+  assert(warehouse.allowedActions.includes(PRODUCT_PERMISSION_ACTIONS.MANAGE_MARKETPLACE));
+  assert(!archived.allowedActions.includes(PRODUCT_PERMISSION_ACTIONS.MANAGE_MARKETPLACE));
+}
+
 function testWarehouseLocationCanBeEditedOutsideWarehouseStage() {
   const admin = permissionsFor('admin', {
     lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE,
@@ -145,6 +161,7 @@ function run() {
   testOnlyPrivilegedAdminCanManageKpiWeight();
   testDesignerMustBeAssigned();
   testOperationalRolesStayInTheirArea();
+  testMarketplaceManagerCanMaintainListingsOutsideMarketplaceStage();
   testWarehouseLocationCanBeEditedOutsideWarehouseStage();
   testForbiddenProductFieldsAreRejected();
   testForbiddenActionsExposeHttp403();

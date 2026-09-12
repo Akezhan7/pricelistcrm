@@ -332,10 +332,11 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Input
-            label="Артикул площадки"
+            label="Рекламная кампания"
             value={form.marketplaceArticle}
             onChange={(event) => updateField('marketplaceArticle', event.target.value)}
             disabled={!canEdit}
+            placeholder="Название рекламной кампании"
           />
 
           <Input
