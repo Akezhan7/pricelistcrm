@@ -671,7 +671,7 @@ export const ProcurementListPage: React.FC = () => {
                 leftIcon={PackageSearch}
                 label="Товар"
                 value={search}
-                placeholder="Название или артикул"
+                placeholder="Название, артикул или код товара"
                 onChange={(event) => {
                   setSearch(event.target.value);
                   if (selectedProduct) setSelectedProduct(null);
@@ -808,7 +808,7 @@ export const ProcurementListPage: React.FC = () => {
               <EmptyState
                 icon={ShoppingBasket}
                 title="Закупочный лист пока пуст"
-                description="Найдите товар по названию или артикулу и укажите необходимое количество"
+                description="Найдите товар по названию, артикулу или коду и укажите необходимое количество"
               />
             ) : (
               visibleItems.map((item) => (

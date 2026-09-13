@@ -21,6 +21,7 @@ type ProductMarketplacePanelProps = {
 type MarketplaceFormState = {
   status: MarketplaceListingStatus;
   sku: string;
+  productCode: string;
   marketplaceArticle: string;
   marketplaceName: string;
   price: string;
@@ -31,6 +32,7 @@ type MarketplaceFormState = {
 const initialFormState: MarketplaceFormState = {
   status: 'placing',
   sku: '',
+  productCode: '',
   marketplaceArticle: '',
   marketplaceName: '',
   price: '',
@@ -81,6 +83,7 @@ function buildFormState(
   return {
     status: listing.status || 'placing',
     sku: listing.sku || '',
+    productCode: listing.productCode || '',
     marketplaceArticle: listing.marketplaceArticle || '',
     marketplaceName: listing.marketplaceName || '',
     price: listing.price === null || listing.price === undefined ? '' : String(listing.price),
@@ -183,6 +186,7 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
       marketplace: 'kaspi',
       status: source.status,
       sku: source.sku.trim() || null,
+      productCode: source.productCode.trim() || null,
       marketplaceArticle: source.marketplaceArticle.trim() || null,
       marketplaceName: source.marketplaceName.trim() || null,
       price: source.price.trim() ? Number(source.price) : null,
@@ -313,12 +317,22 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Input
+            label="Код товара"
+            value={form.productCode}
+            onChange={(event) => updateField('productCode', event.target.value)}
+            disabled={!canEdit}
+            placeholder="Код товара на площадке"
+          />
+
+          <Input
             label="Название на Kaspi"
             value={form.marketplaceName}
             onChange={(event) => updateField('marketplaceName', event.target.value)}
             disabled={!canEdit}
           />
+        </div>
 
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Input
             label="Цена продажи"
             type="number"
@@ -328,9 +342,6 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
             onChange={(event) => updateField('price', event.target.value)}
             disabled={!canEdit}
           />
-        </div>
-
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Input
             label="Рекламная кампания"
             value={form.marketplaceArticle}
@@ -338,15 +349,15 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
             disabled={!canEdit}
             placeholder="Название рекламной кампании"
           />
-
-          <Input
-            label="Ссылка на карточку"
-            value={form.url}
-            onChange={(event) => updateField('url', event.target.value)}
-            disabled={!canEdit}
-            placeholder="https://kaspi.kz/..."
-          />
         </div>
+
+        <Input
+          label="Ссылка на карточку"
+          value={form.url}
+          onChange={(event) => updateField('url', event.target.value)}
+          disabled={!canEdit}
+          placeholder="https://kaspi.kz/..."
+        />
 
         <Textarea
           label="Описание / заметки"

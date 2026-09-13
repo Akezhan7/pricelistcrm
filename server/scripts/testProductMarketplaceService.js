@@ -9,6 +9,7 @@ const {
   assertKaspiPlacementReady,
   buildKaspiLegacyProductUpdate,
   buildMarketplaceListingData,
+  buildMarketplaceListingUpdate,
   buildMarketplaceOwnershipUpdate,
   buildMarketplacePlacementReadyPlan,
 } = require('../services/productMarketplaceService');
@@ -21,6 +22,7 @@ function testBuildsMarketplaceListingData() {
       marketplace: MARKETPLACE_KEYS.KASPI,
       status: MARKETPLACE_LISTING_STATUSES.PUBLISHED,
       sku: ' KSP-001 ',
+      productCode: ' 123456789 ',
       marketplaceName: ' Kaspi Product ',
       marketplaceArticle: ' EXT-123 ',
       price: '12990',
@@ -34,6 +36,7 @@ function testBuildsMarketplaceListingData() {
     marketplace: MARKETPLACE_KEYS.KASPI,
     status: MARKETPLACE_LISTING_STATUSES.PUBLISHED,
     sku: 'KSP-001',
+    productCode: '123456789',
     marketplaceName: 'Kaspi Product',
     marketplaceArticle: 'EXT-123',
     price: 12990,
@@ -56,6 +59,16 @@ function testBuildsLegacyProductUpdateForKaspi() {
     kaspiName: 'Kaspi Product 2',
     sellingPrice: 15990,
   });
+}
+
+function testUpdatesMarketplaceProductCode() {
+  assert.deepStrictEqual(
+    buildMarketplaceListingUpdate({
+      actor: { id: 7 },
+      payload: { productCode: ' KASPI-7788 ' },
+    }),
+    { productCode: 'KASPI-7788', managedBy: 7 }
+  );
 }
 
 function testMarketplaceEditClaimsCurrentMarketplaceWork() {
@@ -162,6 +175,7 @@ function testBuildsPlacementReadyPlan() {
 }
 
 testBuildsMarketplaceListingData();
+testUpdatesMarketplaceProductCode();
 testBuildsLegacyProductUpdateForKaspi();
 testMarketplaceEditClaimsCurrentMarketplaceWork();
 testPlacementRequiresPublishedKaspiListing();

@@ -11,6 +11,7 @@ const {
   Payment,
   User,
   WarehouseReceipt,
+  ProductMarketplaceListing,
 } = require('../models');
 const { DEBT_STATUSES } = require('../services/orderStatusPolicyService');
 const path = require('path');
@@ -131,6 +132,14 @@ const getSupplierById = async (req, res) => {
           },
           where: { isActive: true },
           required: false,
+          include: [
+            {
+              model: ProductMarketplaceListing,
+              as: 'marketplaceListings',
+              attributes: ['id', 'marketplace', 'productCode'],
+              required: false,
+            },
+          ],
         },
         {
           model: Market,

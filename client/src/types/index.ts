@@ -107,6 +107,10 @@ export interface Product {
   responsibility?: ProductResponsibility;
   isActive: boolean;
   suppliers?: SupplierWithPrice[];
+  marketplaceListings?: Array<Pick<
+    ProductMarketplaceListing,
+    'id' | 'marketplace' | 'productCode'
+  >>;
   variations?: ProductVariation[];
   createdAt: string;
   updatedAt: string;
@@ -356,6 +360,7 @@ export interface ProductMarketplaceListing {
   marketplace: MarketplaceKey;
   status: MarketplaceListingStatus;
   sku?: string | null;
+  productCode?: string | null;
   marketplaceArticle?: string | null;
   marketplaceName?: string | null;
   price?: string | number | null;
@@ -1133,6 +1138,12 @@ export interface StockAnalyticsItem {
   name: string;
   internalName?: string;
   article: string;
+  kaspiName?: string;
+  kaspiArticle?: string;
+  marketplaceListings?: Array<Pick<
+    ProductMarketplaceListing,
+    'id' | 'marketplace' | 'productCode'
+  >>;
   categoryId?: number;
   category?: {
     id: number;

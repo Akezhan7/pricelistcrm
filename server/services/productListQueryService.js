@@ -18,15 +18,32 @@ function normalizeProductSearchTokens(search) {
   return normalizedSearch ? Array.from(new Set(normalizedSearch.split(' '))) : [];
 }
 
-function buildProductSearchFilter(search) {
+function buildMarketplaceProductCodeSearch(token, sql) {
+  if (!sql?.escape || !sql?.literal) {
+    throw new Error('Sequelize instance is required for product search');
+  }
+
+  const escapedPattern = sql.escape(`%${token}%`);
+  return sql.literal(`EXISTS (
+    SELECT 1
+    FROM "product_marketplace_listings" AS "marketplaceProductCode"
+    WHERE "marketplaceProductCode"."product_id" = "Product"."id"
+      AND "marketplaceProductCode"."product_code" ILIKE ${escapedPattern}
+  )`);
+}
+
+function buildProductSearchFilter(search, sql) {
   const tokens = normalizeProductSearchTokens(search);
   if (tokens.length === 0) return {};
 
   return {
     [Op.and]: tokens.map((token) => ({
-      [Op.or]: PRODUCT_SEARCH_FIELDS.map((field) => ({
-        [field]: { [Op.iLike]: `%${token}%` },
-      })),
+      [Op.or]: [
+        ...PRODUCT_SEARCH_FIELDS.map((field) => ({
+          [field]: { [Op.iLike]: `%${token}%` },
+        })),
+        buildMarketplaceProductCodeSearch(token, sql),
+      ],
     })),
   };
 }
@@ -37,6 +54,12 @@ function buildProductSearchOrder(search, sql) {
 
   const escapedSearch = sql.escape(normalizedSearch);
   const relevance = sql.literal(`CASE
+    WHEN EXISTS (
+      SELECT 1
+      FROM "product_marketplace_listings" AS "marketplaceProductCode"
+      WHERE "marketplaceProductCode"."product_id" = "Product"."id"
+        AND LOWER("marketplaceProductCode"."product_code") = ${escapedSearch}
+    ) THEN 0
     WHEN LOWER("Product"."article") = ${escapedSearch} THEN 0
     WHEN LOWER("Product"."name") = ${escapedSearch} THEN 1
     WHEN POSITION(${escapedSearch} IN LOWER("Product"."name")) = 1 THEN 2

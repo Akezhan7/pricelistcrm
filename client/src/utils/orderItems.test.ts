@@ -1,10 +1,10 @@
 import {
-  filterProductsBySearch,
   getMainOrderLineQuantities,
   getSupplierSuggestions,
   updateMainOrderLineQuantity,
   type OrderLineForm,
 } from './orderItems';
+import { filterProductsBySearch } from './productSearch';
 import type { Product } from '../types';
 
 const baseProduct = {
@@ -84,4 +84,15 @@ test('keeps server search results found by internal and Kaspi names', () => {
 
   expect(filterProductsBySearch([internalMatch], 'плиткорез')).toEqual([internalMatch]);
   expect(filterProductsBySearch([kaspiMatch], 'маркер')).toEqual([kaspiMatch]);
+});
+
+test('finds marketplace product codes with the same normalized token rules', () => {
+  const codeMatch = {
+    ...product(5, []),
+    name: 'Аккумуляторный инструмент',
+    marketplaceListings: [{ id: 7, marketplace: 'kaspi' as const, productCode: 'KASPI-77-AA' }],
+  };
+
+  expect(filterProductsBySearch([codeMatch], 'kaspi-77')).toEqual([codeMatch]);
+  expect(filterProductsBySearch([codeMatch], 'ИНСТРУМЕНТ аккумуляторный')).toEqual([codeMatch]);
 });

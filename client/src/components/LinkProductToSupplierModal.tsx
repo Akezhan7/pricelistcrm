@@ -149,7 +149,7 @@ export const LinkProductToSupplierModal: React.FC<LinkProductToSupplierModalProp
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Поиск по названию или артикулу..."
+            placeholder="Название, артикул или код товара..."
             className="w-full pl-10 pr-4 py-2.5 bg-brand-white border border-border-input rounded-lg shadow-sm hover:border-text-muted/60 focus:outline-none focus:ring-2 focus:ring-brand-yellow/20 focus:border-brand-yellow text-sm transition-colors"
             autoFocus
           />

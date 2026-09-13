@@ -73,24 +73,6 @@ export function getSupplierListPrice(product: Product): number {
   return Number(supplierPrice ?? product.costPrice ?? 0);
 }
 
-/** Поиск по названию / артикулу в каталоге поставщика */
-export function filterProductsBySearch<T extends Product>(products: T[], search: string): T[] {
-  const tokens = search.trim().toLocaleLowerCase('ru-RU').split(/\s+/).filter(Boolean);
-  if (tokens.length === 0) return products;
-
-  return products.filter((product) => {
-    const searchableValues = [
-      product.name,
-      product.article,
-      product.internalName,
-      product.kaspiName,
-      product.kaspiArticle,
-    ].map((value) => (value || '').toLocaleLowerCase('ru-RU'));
-
-    return tokens.every((token) => searchableValues.some((value) => value.includes(token)));
-  });
-}
-
 function normalizeOrderQuantity(quantity: number): number {
   return Number.isFinite(quantity) && quantity >= 1 ? Math.floor(quantity) : 1;
 }

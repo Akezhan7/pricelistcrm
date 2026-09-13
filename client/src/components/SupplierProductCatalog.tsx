@@ -1,7 +1,8 @@
 import React, { useMemo } from 'react';
 import { Search, Check, Plus, Minus, Loader2, Edit, Users, Package, X } from 'lucide-react';
 import type { ProductWithPrice } from '../types';
-import { filterProductsBySearch, getSupplierListPrice } from '../utils/orderItems';
+import { getSupplierListPrice } from '../utils/orderItems';
+import { filterProductsBySearch } from '../utils/productSearch';
 import { ProductListItem } from './ProductListItem';
 import { SupplierProductGridCard } from './SupplierProductGridCard';
 import { Button, EmptyState, IconButton, Input } from './ui';
@@ -82,7 +83,7 @@ export const SupplierProductCatalog: React.FC<SupplierProductCatalogProps> = ({
           type="text"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          placeholder="Поиск товара по названию или артикулу..."
+          placeholder="Название, артикул или код товара..."
           className="pl-10 pr-10 bg-surface-inset border-border-subtle focus:border-brand-yellow focus:ring-2 focus:ring-brand-yellow/20"
         />
         {search && (

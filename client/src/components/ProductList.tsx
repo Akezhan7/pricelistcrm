@@ -50,6 +50,7 @@ import {
   getBulkSelectableProductIds,
   type ProductBulkActionMode,
 } from '../utils/productBulkSelection';
+import { filterProductsBySearch } from '../utils/productSearch';
 
 type ProductListProps = {
   products: Product[];
@@ -136,23 +137,9 @@ export const ProductList: React.FC<ProductListProps> = ({
     if (isServerPaginated) return products;
     let filtered = products;
 
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (product) =>
-          product.name.toLowerCase().includes(query) ||
-          product.article.toLowerCase().includes(query)
-      );
-    }
+    filtered = filterProductsBySearch(filtered, searchQuery);
 
-    if (localSearchQuery.trim()) {
-      const query = localSearchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (product) =>
-          product.name.toLowerCase().includes(query) ||
-          product.article.toLowerCase().includes(query)
-      );
-    }
+    filtered = filterProductsBySearch(filtered, localSearchQuery);
 
     return filtered;
   }, [isServerPaginated, products, searchQuery, localSearchQuery]);
@@ -438,7 +425,7 @@ export const ProductList: React.FC<ProductListProps> = ({
           <Input
             leftIcon={Search}
             type="text"
-            placeholder="Поиск по названию или артикулу..."
+            placeholder="Название, артикул или код товара..."
             value={onSearchQueryChange ? searchQuery : localSearchQuery}
             onChange={(e) => {
               if (onSearchQueryChange) onSearchQueryChange(e.target.value);

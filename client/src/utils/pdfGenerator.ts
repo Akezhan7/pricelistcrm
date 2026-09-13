@@ -4,6 +4,7 @@ import type { Order } from '../types';
 import type { ReconciliationReport } from '../services/suppliersApi';
 import { BRAND } from '../theme/tokens';
 import getImageUrl from './image';
+import { calculateCanvasPageSlices } from './pdfPagination';
 
 /** Базовый контейнер PDF: на всю ширину A4, без внешней рамки */
 const initPdfContainer = (): HTMLDivElement => {
@@ -135,20 +136,34 @@ const renderHtmlToPdf = async (
     });
 
     const imgWidth = 210; // A4 portrait width, mm
-    const pageHeight = 297; // A4 portrait height, mm
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    const pageSlices = calculateCanvasPageSlices(canvas.width, canvas.height);
 
-    const imgData = canvas.toDataURL('image/png');
-    pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+    pageSlices.forEach((slice, pageIndex) => {
+      const pageCanvas = document.createElement('canvas');
+      pageCanvas.width = canvas.width;
+      pageCanvas.height = slice.height;
+      const context = pageCanvas.getContext('2d');
 
-    let heightLeft = imgHeight;
-    let position = 0;
-    while (heightLeft >= pageHeight) {
-      position = heightLeft - pageHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, 'PNG', 0, -position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
-    }
+      if (!context) {
+        throw new Error('Не удалось подготовить страницу PDF');
+      }
+
+      context.drawImage(
+        canvas,
+        0,
+        slice.sourceY,
+        canvas.width,
+        slice.height,
+        0,
+        0,
+        canvas.width,
+        slice.height
+      );
+
+      if (pageIndex > 0) pdf.addPage();
+      const pageImageHeight = (slice.height * imgWidth) / canvas.width;
+      pdf.addImage(pageCanvas.toDataURL('image/png'), 'PNG', 0, 0, imgWidth, pageImageHeight);
+    });
 
     pdf.save(filename);
   } finally {

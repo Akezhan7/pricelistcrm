@@ -28,15 +28,21 @@ function testBuildsCaseInsensitiveTokenSearch() {
     ['малярный', 'скотч']
   );
 
-  const filter = buildProductSearchFilter('Малярный СКОТЧ');
+  const sql = {
+    escape: (value) => `'${value}'`,
+    literal: (value) => ({ sql: value }),
+  };
+  const filter = buildProductSearchFilter('Малярный СКОТЧ', sql);
   assert.ok(Array.isArray(filter[Op.and]));
   assert.strictEqual(filter[Op.and].length, 2);
 
   const firstTokenFields = filter[Op.and][0][Op.or];
-  assert.strictEqual(firstTokenFields.length, 5);
+  assert.strictEqual(firstTokenFields.length, 6);
   assert.deepStrictEqual(firstTokenFields[0].name, { [Op.iLike]: '%малярный%' });
   assert.deepStrictEqual(firstTokenFields[1].article, { [Op.iLike]: '%малярный%' });
   assert.deepStrictEqual(firstTokenFields[2].internalName, { [Op.iLike]: '%малярный%' });
+  assert.match(firstTokenFields[5].sql, /product_marketplace_listings/);
+  assert.match(firstTokenFields[5].sql, /product_code.*ILIKE '%малярный%'/s);
 
   const secondTokenFields = filter[Op.and][1][Op.or];
   assert.deepStrictEqual(secondTokenFields[0].name, { [Op.iLike]: '%скотч%' });
@@ -45,8 +51,14 @@ function testBuildsCaseInsensitiveTokenSearch() {
 testBuildsCaseInsensitiveTokenSearch();
 
 function testSearchesAllProductNamesAndArticles() {
-  const filter = buildProductSearchFilter('drill');
-  const searchedFields = filter[Op.and][0][Op.or].map((condition) => Object.keys(condition)[0]);
+  const sql = {
+    escape: (value) => `'${value}'`,
+    literal: (value) => ({ sql: value }),
+  };
+  const filter = buildProductSearchFilter('drill', sql);
+  const searchedFields = filter[Op.and][0][Op.or]
+    .slice(0, 5)
+    .map((condition) => Object.keys(condition)[0]);
 
   assert.deepStrictEqual(searchedFields, [
     'name',
@@ -66,6 +78,7 @@ function testBuildsRelevantSearchOrder() {
 
   assert.strictEqual(order.length, 2);
   assert.match(order[0][0].sql, /LOWER\("Product"\."article"\) = 'marker'/);
+  assert.match(order[0][0].sql, /LOWER\("marketplaceProductCode"\."product_code"\) = 'marker'/);
   assert.match(order[0][0].sql, /LOWER\("Product"\."name"\) = 'marker'/);
   assert.match(order[0][0].sql, /POSITION\('marker' IN LOWER\("Product"\."name"\)\) = 1/);
   assert.deepStrictEqual(order[1], ['name', 'ASC']);

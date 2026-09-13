@@ -23,6 +23,7 @@ const {
   buildWarehouseReceiptPlan,
 } = require('../services/warehouseReceiptService');
 const { PRODUCT_LIFECYCLE_STATUSES } = require('../constants/productLifecycle');
+const { buildProductSearchFilter } = require('../services/productListQueryService');
 
 /**
  * Получить список заявок, ожидающих приёмки
@@ -329,13 +330,7 @@ const getStockReport = async (req, res) => {
       whereClause.categoryId = categoryId;
     }
 
-    if (search) {
-      whereClause[Op.or] = [
-        { name: { [Op.like]: `%${search}%` } },
-        { internalName: { [Op.like]: `%${search}%` } },
-        { article: { [Op.like]: `%${search}%` } },
-      ];
-    }
+    Object.assign(whereClause, buildProductSearchFilter(search, sequelize));
 
     // Фильтр по статусу остатка
     if (stockStatus) {

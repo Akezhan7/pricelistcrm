@@ -34,6 +34,10 @@ const ProductMarketplaceListing = sequelize.define('ProductMarketplaceListing', 
     type: DataTypes.STRING(120),
     allowNull: true,
   },
+  productCode: {
+    type: DataTypes.STRING(120),
+    allowNull: true,
+  },
   marketplaceArticle: {
     type: DataTypes.STRING(120),
     allowNull: true,

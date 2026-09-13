@@ -41,6 +41,7 @@ import type { StockAnalytics, Category, StockStatus } from '../types';
 import getImageUrl from '../utils/image';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '../utils/cn';
+import { filterProductsBySearch } from '../utils/productSearch';
 
 interface StatCardProps {
   label: string;
@@ -151,17 +152,7 @@ export const StockDashboard: React.FC = () => {
       products = analytics[selectedStatus];
     }
 
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      products = products.filter(
-        (p) =>
-          p.name.toLowerCase().includes(query) ||
-          p.internalName?.toLowerCase().includes(query) ||
-          p.article.toLowerCase().includes(query)
-      );
-    }
-
-    return products;
+    return filterProductsBySearch(products, searchQuery);
   };
 
   const getPaginatedProducts = () => {
@@ -303,11 +294,11 @@ export const StockDashboard: React.FC = () => {
                 />
                 <Input
                   type="text"
-                  placeholder="Поиск товара..."
+                  placeholder="Название, артикул или код товара..."
                   className="pl-10"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  aria-label="Поиск товара"
+                  aria-label="Поиск по названию, артикулу или коду товара"
                 />
               </div>
               <Select

@@ -78,6 +78,7 @@ function buildMarketplaceListingData({ productId, actor, payload = {} }) {
     marketplace: normalizeMarketplace(payload.marketplace),
     status: normalizeMarketplaceStatus(payload.status),
     sku: normalizeNullableString(payload.sku),
+    productCode: normalizeNullableString(payload.productCode),
     marketplaceName: normalizeNullableString(payload.marketplaceName),
     marketplaceArticle: normalizeNullableString(payload.marketplaceArticle),
     price: normalizePrice(payload.price),
@@ -95,6 +96,9 @@ function buildMarketplaceListingUpdate({ actor, payload = {} }) {
   }
   if (Object.prototype.hasOwnProperty.call(payload, 'sku')) {
     update.sku = normalizeNullableString(payload.sku);
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, 'productCode')) {
+    update.productCode = normalizeNullableString(payload.productCode);
   }
   if (Object.prototype.hasOwnProperty.call(payload, 'marketplaceName')) {
     update.marketplaceName = normalizeNullableString(payload.marketplaceName);

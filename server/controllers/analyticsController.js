@@ -9,6 +9,7 @@ const {
   OrderItem,
   User,
   ProductDesignerKpiEntry,
+  ProductMarketplaceListing,
 } = require('../models');
 const { Op } = require('sequelize');
 const { getStockStatus } = require('./productController');
@@ -494,12 +495,29 @@ const getStockAnalytics = async (req, res) => {
     // Получаем товары
     const products = await Product.findAll({
       where: whereClause,
-      attributes: ['id', 'name', 'internalName', 'article', 'currentStock', 'minStock', 'categoryId', 'image'],
+      attributes: [
+        'id',
+        'name',
+        'internalName',
+        'article',
+        'kaspiName',
+        'kaspiArticle',
+        'currentStock',
+        'minStock',
+        'categoryId',
+        'image',
+      ],
       include: [
         {
           model: Category,
           as: 'category',
           attributes: ['id', 'name'],
+        },
+        {
+          model: ProductMarketplaceListing,
+          as: 'marketplaceListings',
+          attributes: ['id', 'marketplace', 'productCode'],
+          required: false,
         },
       ],
     });

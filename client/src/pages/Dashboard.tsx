@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { ProductList } from '../components/ProductList';
 import { SupplierCards } from '../components/SupplierCards';
@@ -29,7 +29,9 @@ import {
 import api from '../utils/api';
 import { cn } from '../utils/cn';
 
-const API_LIST_LIMIT = 1000;
+const PRODUCT_LIST_LIMIT = 30;
+const SUPPLIER_LIST_LIMIT = 1000;
+const SEARCH_DEBOUNCE_MS = 300;
 
 type MobileStep = 'products' | 'suppliers';
 
@@ -86,52 +88,78 @@ export const Dashboard: React.FC = () => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [productsLoaded, setProductsLoaded] = useState(false);
+  const [suppliersLoaded, setSuppliersLoaded] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
   const [totalProducts, setTotalProducts] = useState(0);
+  const [catalogTotalProducts, setCatalogTotalProducts] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [mobileStep, setMobileStep] = useState<MobileStep>('products');
+  const productsRequestRef = useRef<AbortController | null>(null);
 
   const canEdit = user?.role === 'admin' || user?.role === 'purchase_manager';
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        const [productsRes, suppliersRes] = await Promise.all([
-          api.get(`/products?limit=${API_LIST_LIMIT}`),
-          api.get(`/suppliers?limit=${API_LIST_LIMIT}`),
-        ]);
+  const fetchProducts = useCallback(async () => {
+    productsRequestRef.current?.abort();
+    const requestController = new AbortController();
+    productsRequestRef.current = requestController;
 
-        setProducts(productsRes.data.data.products);
-        setSuppliers(suppliersRes.data.data.suppliers);
-        setTotalProducts(
-          productsRes.data.data.pagination?.total || productsRes.data.data.products.length
-        );
-      } catch (error) {
-        console.error('Ошибка загрузки данных:', error);
-      } finally {
-        setLoading(false);
+    try {
+      const params = new URLSearchParams({
+        limit: String(PRODUCT_LIST_LIMIT),
+        page: String(currentPage),
+      });
+      if (debouncedSearchQuery.trim()) params.set('search', debouncedSearchQuery.trim());
+      const productsRes = await api.get(`/products?${params.toString()}`, {
+        signal: requestController.signal,
+      });
+      const total = productsRes.data.data.pagination?.total || productsRes.data.data.products.length;
+      setProducts(productsRes.data.data.products);
+      setTotalProducts(total);
+      if (!debouncedSearchQuery.trim()) setCatalogTotalProducts(total);
+    } catch (error) {
+      if ((error as { code?: string })?.code !== 'ERR_CANCELED') {
+        console.error('Ошибка загрузки товаров:', error);
       }
-    };
+    } finally {
+      if (productsRequestRef.current === requestController) {
+        productsRequestRef.current = null;
+        setProductsLoaded(true);
+      }
+    }
+  }, [currentPage, debouncedSearchQuery]);
 
-    fetchData();
+  const fetchSuppliers = useCallback(async () => {
+    try {
+      const suppliersRes = await api.get(`/suppliers?limit=${SUPPLIER_LIST_LIMIT}`);
+      setSuppliers(suppliersRes.data.data.suppliers);
+    } catch (error) {
+      console.error('Ошибка загрузки поставщиков:', error);
+    } finally {
+      setSuppliersLoaded(true);
+    }
   }, []);
 
-  const refreshData = async () => {
-    try {
-      const [productsRes, suppliersRes] = await Promise.all([
-        api.get(`/products?limit=${API_LIST_LIMIT}`),
-        api.get(`/suppliers?limit=${API_LIST_LIMIT}`),
-      ]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setCurrentPage(1);
+      setDebouncedSearchQuery(searchQuery);
+    }, SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [searchQuery]);
 
-      setProducts(productsRes.data.data.products);
-      setSuppliers(suppliersRes.data.data.suppliers);
-      setTotalProducts(
-        productsRes.data.data.pagination?.total || productsRes.data.data.products.length
-      );
-    } catch (error) {
-      console.error('Ошибка обновления данных:', error);
-    }
+  useEffect(() => {
+    fetchProducts();
+    return () => productsRequestRef.current?.abort();
+  }, [fetchProducts]);
+
+  useEffect(() => {
+    fetchSuppliers();
+  }, [fetchSuppliers]);
+
+  const refreshData = async () => {
+    await Promise.all([fetchProducts(), fetchSuppliers()]);
   };
 
   const filteredSuppliers = selectedProduct
@@ -173,7 +201,7 @@ export const Dashboard: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [suppliers]);
 
-  if (loading) {
+  if (!productsLoaded || !suppliersLoaded) {
     return (
       <Layout fullHeight>
         <div className="flex flex-col items-center justify-center h-full gap-4">
@@ -218,7 +246,7 @@ export const Dashboard: React.FC = () => {
           <div className="dashboard-metrics grid grid-cols-3 gap-3">
             <DashboardMetric
               label="Товары"
-              value={totalProducts}
+              value={catalogTotalProducts}
               icon={Package}
               active={workflowStep === 1 && mobileStep === 'products'}
             />
@@ -401,10 +429,15 @@ export const Dashboard: React.FC = () => {
                 <ProductList
                   products={products}
                   searchQuery={searchQuery}
+                  onSearchQueryChange={setSearchQuery}
                   selectedProduct={selectedProduct}
                   onSelectProduct={handleSelectProduct}
                   onRefresh={refreshData}
                   canEdit={canEdit}
+                  currentPage={currentPage}
+                  totalItems={totalProducts}
+                  itemsPerPage={PRODUCT_LIST_LIMIT}
+                  onPageChange={setCurrentPage}
                   compact
                   className="dashboard-product-list"
                 />

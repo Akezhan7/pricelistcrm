@@ -293,7 +293,7 @@ export const ProductWorkflowPage: React.FC = () => {
                 label="Поиск"
                 value={searchQuery}
                 onChange={(event) => updateQuery({ search: event.target.value })}
-                placeholder="Название, артикул, Kaspi SKU"
+                placeholder="Название, артикул или код товара"
               />
             </div>
 

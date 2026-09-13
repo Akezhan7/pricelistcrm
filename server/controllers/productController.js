@@ -136,6 +136,12 @@ function buildProductListInclude() {
   return [
     buildProductSupplierInclude(),
     {
+      model: ProductMarketplaceListing,
+      as: 'marketplaceListings',
+      attributes: ['id', 'marketplace', 'productCode'],
+      required: false,
+    },
+    {
       model: Category,
       as: 'category',
       attributes: ['id', 'name'],
@@ -392,7 +398,7 @@ const getAllProducts = async (req, res) => {
       }
     }
 
-    Object.assign(whereClause, buildProductSearchFilter(search));
+    Object.assign(whereClause, buildProductSearchFilter(search, sequelize));
 
     const parsedLimit = parseInt(limit, 10);
     const parsedPage = parseInt(page, 10);
@@ -450,7 +456,7 @@ const getProductSelectionIds = async (req, res) => {
       isActive: true,
       ...categoryFilter,
       ...supplierFilter,
-      ...buildProductSearchFilter(search),
+      ...buildProductSearchFilter(search, sequelize),
       lifecycleStatus: mode === 'assign_designer' ? 'new' : 'in_sale',
     };
     if (mode === 'start_lifecycle') where.lifecycleStartedAt = { [Op.is]: null };
@@ -487,16 +493,9 @@ const getProductWorkflowQueue = async (req, res) => {
       filters: req.query,
     });
 
-    const whereClause = { ...workflowQuery.where };
-    if (search) {
-      whereClause[Op.or] = [
-        { name: { [Op.like]: `%${search}%` } },
-        { article: { [Op.like]: `%${search}%` } },
-        { internalName: { [Op.like]: `%${search}%` } },
-        { kaspiName: { [Op.like]: `%${search}%` } },
-        { kaspiArticle: { [Op.like]: `%${search}%` } },
-      ];
-    }
+    const whereClause = search
+      ? { [Op.and]: [workflowQuery.where, buildProductSearchFilter(search, sequelize)] }
+      : { ...workflowQuery.where };
 
     const countWhereClause = { ...whereClause };
     const statusCountRows = await Product.findAll({
@@ -2219,6 +2218,7 @@ const saveProductMarketplaceListing = async (req, res) => {
           marketplace: listing.marketplace,
           status: listing.status,
           sku: listing.sku,
+          productCode: listing.productCode,
         },
         createdAt: now,
       },
@@ -2361,6 +2361,7 @@ const updateProductMarketplaceListing = async (req, res) => {
           marketplace: listing.marketplace,
           status: listing.status,
           sku: listing.sku,
+          productCode: listing.productCode,
         },
         createdAt: now,
       },

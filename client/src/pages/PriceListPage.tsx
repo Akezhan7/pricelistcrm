@@ -205,9 +205,9 @@ export const PriceListPage: React.FC = () => {
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Поиск по названию или артикулу..."
+            placeholder="Название, артикул или код товара..."
             className="pl-10 text-sm"
-            aria-label="Поиск по названию или артикулу"
+            aria-label="Поиск по названию, артикулу или коду товара"
           />
         </div>
       </div>
