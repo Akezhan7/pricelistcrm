@@ -2,6 +2,11 @@ import type { Product } from '../types';
 
 export type ProductBulkActionMode = 'assign_designer' | 'start_lifecycle';
 
+export function canStartProductLifecycle(product: Product): boolean {
+  return product.lifecycleStatus === 'in_sale'
+    && (!product.lifecycleStartedAt || Boolean(product.lifecycleCompletedAt));
+}
+
 export function getBulkSelectableProductIds(
   products: Product[],
   mode: ProductBulkActionMode
@@ -10,7 +15,7 @@ export function getBulkSelectableProductIds(
     .filter((product) => (
       mode === 'assign_designer'
         ? product.lifecycleStatus === 'new'
-        : product.lifecycleStatus === 'in_sale' && !product.lifecycleStartedAt
+        : canStartProductLifecycle(product)
     ))
     .map((product) => product.id);
 }

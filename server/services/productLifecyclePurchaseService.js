@@ -3,6 +3,11 @@ const {
   PRODUCT_LIFECYCLE_STATUSES,
   canPerformLifecycleAction,
 } = require('../constants/productLifecycle');
+const {
+  LIFECYCLE_ROUTE_STAGES,
+  buildLifecycleStageCompletionUpdate,
+  withLifecycleRunMetadata,
+} = require('./productLifecycleRouteService');
 
 function requiredPositiveInteger(value, fieldName) {
   const parsed = Number(value);
@@ -138,12 +143,18 @@ function buildLifecycleArrivalReconciliationPlan({
   const warehouseReceiptId = requiredPositiveInteger(receipt?.id, 'warehouseReceiptId');
   const arrivedBy = requiredPositiveInteger(receipt?.receivedBy, 'receivedBy');
   const arrivedAt = receipt?.receivedAt ? new Date(receipt.receivedAt) : now;
+  const routeUpdate = buildLifecycleStageCompletionUpdate({
+    product,
+    completedStage: LIFECYCLE_ROUTE_STAGES.PURCHASE,
+    now: arrivedAt,
+  });
 
   return {
     productUpdate: {
       lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.WAREHOUSE,
       lifecycleCompletedAt: null,
       assignedToUserId: null,
+      ...(routeUpdate || {}),
     },
     purchaseUpdate: {
       receivedQuantity,
@@ -158,7 +169,13 @@ function buildLifecycleArrivalReconciliationPlan({
       fromStatus: PRODUCT_LIFECYCLE_STATUSES.PURCHASE,
       toStatus: PRODUCT_LIFECYCLE_STATUSES.WAREHOUSE,
       message: 'Lifecycle arrival restored from warehouse receipt',
-      metadata: {
+      metadata: routeUpdate ? withLifecycleRunMetadata(product, {
+        orderId: lifecyclePurchase.orderId,
+        orderItemId: lifecyclePurchase.orderItemId,
+        warehouseReceiptId,
+        receivedQuantity,
+        stockAdjusted: false,
+      }) : {
         orderId: lifecyclePurchase.orderId,
         orderItemId: lifecyclePurchase.orderItemId,
         warehouseReceiptId,
@@ -194,6 +211,11 @@ function buildWarehouseCompletionPlan({ product, actor, payload = {}, now = new 
     ? oldCostPrice
     : requiredNonNegativeNumber(payload.costPrice, 'costPrice');
   const priceChanged = oldCostPrice !== newCostPrice;
+  const routeUpdate = buildLifecycleStageCompletionUpdate({
+    product,
+    completedStage: LIFECYCLE_ROUTE_STAGES.WAREHOUSE,
+    now,
+  });
 
   return {
     warehouseDetails,
@@ -202,6 +224,7 @@ function buildWarehouseCompletionPlan({ product, actor, payload = {}, now = new 
       lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
       lifecycleCompletedAt: null,
       assignedToUserId: product.marketplaceManagerId || null,
+      ...(routeUpdate || {}),
     },
     priceHistory: priceChanged ? {
       productId: product.id,
@@ -219,7 +242,12 @@ function buildWarehouseCompletionPlan({ product, actor, payload = {}, now = new 
       fromStatus: PRODUCT_LIFECYCLE_STATUSES.WAREHOUSE,
       toStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
       message: 'Warehouse passport completed',
-      metadata: {
+      metadata: routeUpdate ? withLifecycleRunMetadata(product, {
+        sector: warehouseDetails.sector,
+        shelf: warehouseDetails.shelf,
+        cell: warehouseDetails.cell,
+        costPriceChanged: priceChanged,
+      }) : {
         sector: warehouseDetails.sector,
         shelf: warehouseDetails.shelf,
         cell: warehouseDetails.cell,

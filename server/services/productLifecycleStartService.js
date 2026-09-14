@@ -1,10 +1,10 @@
 const { PRODUCT_LIFECYCLE_STATUSES } = require('../constants/productLifecycle');
-
-const STARTABLE_LIFECYCLE_STATUSES = Object.freeze([
-  PRODUCT_LIFECYCLE_STATUSES.NEW,
-  PRODUCT_LIFECYCLE_STATUSES.ASSIGNED_TO_DESIGNER,
-  PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE,
-]);
+const {
+  LIFECYCLE_ROUTE_STAGES,
+  getLifecycleStageStatus,
+  hasActiveLifecycleRoute,
+  normalizeLifecycleRoute,
+} = require('./productLifecycleRouteService');
 
 function toPositiveInteger(value, fieldName) {
   const parsed = Number(value);
@@ -16,14 +16,10 @@ function toPositiveInteger(value, fieldName) {
   return parsed;
 }
 
-function normalizeTargetStatus(value) {
-  const status = String(value || '').trim();
-
-  if (!STARTABLE_LIFECYCLE_STATUSES.includes(status)) {
-    throw new Error('Unsupported lifecycle start status');
-  }
-
-  return status;
+function normalizeReason(value) {
+  if (value === undefined || value === null) return null;
+  const reason = String(value).trim();
+  return reason || null;
 }
 
 function assertCanStartLifecycle({ actor, product }) {
@@ -34,9 +30,12 @@ function assertCanStartLifecycle({ actor, product }) {
   if (
     !product
     || product.lifecycleStatus !== PRODUCT_LIFECYCLE_STATUSES.IN_SALE
-    || product.lifecycleStartedAt
   ) {
-    throw new Error('Only legacy catalog products can be started in lifecycle');
+    throw new Error('Only products in sale can be started in lifecycle');
+  }
+
+  if (hasActiveLifecycleRoute(product)) {
+    throw new Error('Product already has an active lifecycle');
   }
 }
 
@@ -48,25 +47,38 @@ function buildStartLifecyclePlan({
 }) {
   assertCanStartLifecycle({ actor, product });
 
-  const targetStatus = normalizeTargetStatus(payload.targetStatus);
+  const route = normalizeLifecycleRoute(payload.stages);
+  const firstStage = route[0];
+  const targetStatus = getLifecycleStageStatus(firstStage);
+  const repeated = Boolean(product.lifecycleStartedAt);
+  const reason = normalizeReason(payload.reason);
+  if (repeated && !reason) {
+    throw new Error('reason is required for repeated lifecycle');
+  }
+
+  const lifecycleRunNumber = Math.max(Number(product.lifecycleRunNumber) || 0, repeated ? 1 : 0) + 1;
   const productUpdate = {
     lifecycleStatus: targetStatus,
     lifecycleStartedAt: now,
     lifecycleCompletedAt: null,
+    lifecycleRunNumber,
+    lifecycleRoute: route,
+    lifecycleRouteIndex: 0,
+    lifecycleRunReason: reason,
     assignedToUserId: null,
-    designerId: null,
     reviewedByUserId: null,
-    kpiWeight: null,
   };
 
-  if (targetStatus === PRODUCT_LIFECYCLE_STATUSES.ASSIGNED_TO_DESIGNER) {
+  if (firstStage === LIFECYCLE_ROUTE_STAGES.DESIGN) {
     const designerId = toPositiveInteger(payload.designerId, 'designerId');
     productUpdate.designerId = designerId;
     productUpdate.assignedToUserId = designerId;
+    productUpdate.kpiWeight = null;
   }
 
-  if (targetStatus === PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE) {
-    productUpdate.marketplaceManagerId = null;
+  if (firstStage === LIFECYCLE_ROUTE_STAGES.MARKETPLACE
+    || firstStage === LIFECYCLE_ROUTE_STAGES.SALE_LAUNCH) {
+    productUpdate.assignedToUserId = product.marketplaceManagerId || null;
   }
 
   return {
@@ -77,13 +89,18 @@ function buildStartLifecyclePlan({
       actionType: 'lifecycle_started',
       fromStatus: product.lifecycleStatus,
       toStatus: targetStatus,
-      message: 'Legacy catalog product started in lifecycle',
+      message: repeated ? 'Repeated lifecycle started' : 'Catalog product started in lifecycle',
       metadata: {
-        targetStatus,
+        lifecycleRunNumber,
+        route,
+        reason,
+        repeated,
         designerId: productUpdate.designerId,
       },
       createdAt: now,
     },
+    resetSaleLaunch: route.includes(LIFECYCLE_ROUTE_STAGES.SALE_LAUNCH),
+    resetLifecyclePurchase: repeated && route.includes(LIFECYCLE_ROUTE_STAGES.PURCHASE),
   };
 }
 
@@ -128,11 +145,16 @@ function buildBulkStartLifecyclePlan({
       update: plan.productUpdate,
     })),
     historyEntries: plans.map((plan) => plan.historyEntry),
+    resetSaleLaunchProductIds: plans
+      .map((plan, index) => plan.resetSaleLaunch ? normalizedProductIds[index] : null)
+      .filter(Boolean),
+    resetLifecyclePurchaseProductIds: plans
+      .map((plan, index) => plan.resetLifecyclePurchase ? normalizedProductIds[index] : null)
+      .filter(Boolean),
   };
 }
 
 module.exports = {
-  STARTABLE_LIFECYCLE_STATUSES,
   buildBulkStartLifecyclePlan,
   buildStartLifecyclePlan,
 };

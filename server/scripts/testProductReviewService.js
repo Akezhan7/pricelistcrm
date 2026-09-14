@@ -75,6 +75,27 @@ function testApproveReviewPlan() {
   });
 }
 
+function testApproveReviewCompletesDesignOnlyRoute() {
+  const now = new Date('2026-09-14T10:00:00Z');
+  const product = {
+    id: 107,
+    lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.REVIEW,
+    designerId: designer.id,
+    marketplaceManagerId: 9,
+    lifecycleRoute: ['design'],
+    lifecycleRouteIndex: 0,
+    lifecycleRunNumber: 2,
+  };
+
+  const plan = buildApproveReviewPlan({ actor: admin, product, kpiWeight: 1, now });
+
+  assert.strictEqual(plan.productUpdate.lifecycleStatus, PRODUCT_LIFECYCLE_STATUSES.IN_SALE);
+  assert.strictEqual(plan.productUpdate.lifecycleCompletedAt, now);
+  assert.strictEqual(plan.productUpdate.lifecycleRouteIndex, 1);
+  assert.strictEqual(plan.kpiEntry.lifecycleRunNumber, 2);
+  assert.strictEqual(plan.historyEntry.metadata.lifecycleRunNumber, 2);
+}
+
 function testApproveReviewPlanRequiresKpiWeight() {
   assert.throws(
     () =>
@@ -172,6 +193,7 @@ function testResubmitRevisionPlan() {
 
 testSubmitReviewPlan();
 testApproveReviewPlan();
+testApproveReviewCompletesDesignOnlyRoute();
 testApproveReviewPlanRequiresKpiWeight();
 testRequestRevisionRequiresComment();
 testRequestRevisionPlan();

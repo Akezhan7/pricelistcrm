@@ -47,6 +47,7 @@ import api from '../utils/api';
 import { PRODUCT_LIFECYCLE_FILTERS } from '../constants/productLifecycle';
 import { cn } from '../utils/cn';
 import {
+  canStartProductLifecycle,
   getBulkSelectableProductIds,
   type ProductBulkActionMode,
 } from '../utils/productBulkSelection';
@@ -76,10 +77,6 @@ type ProductListProps = {
   denseCatalog?: boolean;
   className?: string;
 };
-
-function isLegacyCatalogProduct(product: Product) {
-  return product.lifecycleStatus === 'in_sale' && !product.lifecycleStartedAt;
-}
 
 export const ProductList: React.FC<ProductListProps> = ({
   products,
@@ -332,10 +329,10 @@ export const ProductList: React.FC<ProductListProps> = ({
         onClick: () => setProductForMarketplace(product),
       });
     }
-    if (canAssignDesigner && isLegacyCatalogProduct(product)) {
+    if (canAssignDesigner && canStartProductLifecycle(product)) {
       overflowActions.push({
         key: 'lifecycle',
-        label: 'Запустить lifecycle',
+        label: product.lifecycleStartedAt ? 'Запустить новый цикл' : 'Запустить цикл',
         icon: Rocket,
         onClick: () => setProductForLifecycleStart(product),
       });
@@ -643,10 +640,10 @@ export const ProductList: React.FC<ProductListProps> = ({
                             }}
                           />
                         )}
-                        {canAssignDesigner && isLegacyCatalogProduct(product) && (
+                        {canAssignDesigner && canStartProductLifecycle(product) && (
                           <IconButton
                             icon={Rocket}
-                            title="Запустить lifecycle"
+                            title={product.lifecycleStartedAt ? 'Запустить новый цикл' : 'Запустить цикл'}
                             size="md"
                             variant="ghost"
                             className="h-8 w-8 min-h-8 min-w-8"

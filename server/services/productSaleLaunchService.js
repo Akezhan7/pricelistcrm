@@ -11,6 +11,11 @@ const {
   MARKETPLACE_KEYS,
   MARKETPLACE_LISTING_STATUSES,
 } = require('./productMarketplaceService');
+const {
+  LIFECYCLE_ROUTE_STAGES,
+  buildLifecycleStageCompletionUpdate,
+  withLifecycleRunMetadata,
+} = require('./productLifecycleRouteService');
 
 const SALE_FLAG_FIELDS = Object.freeze([
   'internalAdvertisingStarted',
@@ -74,6 +79,11 @@ function buildSaleLaunchCompletionPlan({
     completedBy: actor.id,
     completedAt: now,
   };
+  const routeUpdate = buildLifecycleStageCompletionUpdate({
+    product,
+    completedStage: LIFECYCLE_ROUTE_STAGES.SALE_LAUNCH,
+    now,
+  });
 
   return {
     launchFlags,
@@ -82,6 +92,7 @@ function buildSaleLaunchCompletionPlan({
       lifecycleCompletedAt: now,
       marketplaceManagerId: actor.id,
       assignedToUserId: actor.id,
+      ...(routeUpdate || {}),
     },
     marketplaceListingUpdate: {
       status: MARKETPLACE_LISTING_STATUSES.IN_SALE,
@@ -94,7 +105,13 @@ function buildSaleLaunchCompletionPlan({
       fromStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
       toStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
       message: 'Sale launch completed',
-      metadata: {
+      metadata: routeUpdate ? withLifecycleRunMetadata(product, {
+        marketplaceListingId: kaspiListing.id,
+        internalAdvertisingStarted: launchFlags.internalAdvertisingStarted,
+        externalAdvertisingStarted: launchFlags.externalAdvertisingStarted,
+        reviewBonusEnabled: launchFlags.reviewBonusEnabled,
+        sellerBonusEnabled: launchFlags.sellerBonusEnabled,
+      }) : {
         marketplaceListingId: kaspiListing.id,
         internalAdvertisingStarted: launchFlags.internalAdvertisingStarted,
         externalAdvertisingStarted: launchFlags.externalAdvertisingStarted,

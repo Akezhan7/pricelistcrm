@@ -119,6 +119,29 @@ const Product = sequelize.define('Product', {
     allowNull: true,
     comment: 'When product reached sale status',
   },
+  lifecycleRunNumber: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 0,
+    validate: { min: 0 },
+    comment: 'Sequential lifecycle run number',
+  },
+  lifecycleRoute: {
+    type: DataTypes.JSONB,
+    allowNull: true,
+    comment: 'Ordered business stages selected for the active lifecycle run',
+  },
+  lifecycleRouteIndex: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    validate: { min: 0 },
+    comment: 'Current stage position in lifecycle route',
+  },
+  lifecycleRunReason: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+    comment: 'Reason supplied when a completed product is started again',
+  },
   assignedToUserId: {
     type: DataTypes.INTEGER,
     allowNull: true,

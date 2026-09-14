@@ -109,6 +109,18 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
   const canMarkPlacementReady = Boolean(
     product.permissions?.allowedActions.includes('mark_placement_ready')
   );
+  const nextRouteStage = product.lifecycleRoute?.[
+    Number(product.lifecycleRouteIndex ?? 0) + 1
+  ];
+  const placementActionLabel = nextRouteStage === 'warehouse'
+    ? 'Передать на склад'
+    : nextRouteStage === 'sale_launch'
+      ? 'Передать на запуск продаж'
+      : nextRouteStage
+        ? 'Завершить этап маркетплейса'
+        : product.lifecycleRoute
+          ? 'Завершить этап маркетплейса'
+          : 'Передать в закуп';
   const priceNumber = Number(form.price);
   const hasRequiredKaspiData = useMemo(
     () =>
@@ -236,15 +248,19 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
         showToast: false,
         overrides: shouldAutoPublishBeforePurchase ? { status: 'published' } : {},
       });
-      await api.post(`/products/${product.id}/lifecycle/mark-placement-ready`);
-      toast.success(
-        shouldAutoPublishBeforePurchase
-          ? 'Карточка отмечена опубликованной, товар передан в закуп'
-          : 'Товар передан в закуп'
-      );
+      const response = await api.post(`/products/${product.id}/lifecycle/mark-placement-ready`);
+      const nextProduct = response.data.data.product as Product;
+      const successMessage = nextProduct.lifecycleStatus === 'purchase'
+        ? 'Товар передан в закуп'
+        : nextProduct.lifecycleStatus === 'warehouse'
+          ? 'Товар передан на склад'
+          : nextProduct.lifecycleStatus === 'in_sale' && !nextProduct.lifecycleCompletedAt
+            ? 'Товар передан на запуск продаж'
+            : 'Этап маркетплейса завершён';
+      toast.success(successMessage);
       onChanged();
     } catch (err: unknown) {
-      setError(getErrorMessage(err, 'Не удалось передать товар в закуп'));
+      setError(getErrorMessage(err, 'Не удалось завершить этап маркетплейса'));
     } finally {
       setMarkingReady(false);
     }
@@ -423,8 +439,8 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
               onClick={handleMarkReady}
             >
               {shouldAutoPublishBeforePurchase
-                ? 'Отметить опубликовано и передать в закуп'
-                : 'Передать в закуп'}
+                ? `Опубликовать и ${placementActionLabel.toLowerCase()}`
+                : placementActionLabel}
             </Button>
           )}
         </div>

@@ -23,6 +23,11 @@ const {
   buildWarehouseReceiptPlan,
 } = require('../services/warehouseReceiptService');
 const { PRODUCT_LIFECYCLE_STATUSES } = require('../constants/productLifecycle');
+const {
+  LIFECYCLE_ROUTE_STAGES,
+  buildLifecycleStageCompletionUpdate,
+  withLifecycleRunMetadata,
+} = require('../services/productLifecycleRouteService');
 const { buildProductSearchFilter } = require('../services/productListQueryService');
 
 /**
@@ -189,6 +194,13 @@ const receiveOrder = async (req, res) => {
       const lifecycleUpdate = product.lifecycleStatus === PRODUCT_LIFECYCLE_STATUSES.PURCHASE
         ? lifecycleUpdateByOrderItemId.get(update.id)
         : null;
+      const routeUpdate = lifecycleUpdate
+        ? buildLifecycleStageCompletionUpdate({
+            product,
+            completedStage: LIFECYCLE_ROUTE_STAGES.PURCHASE,
+            now,
+          })
+        : null;
 
       await orderItem.update({
         orderedQuantity: update.orderedQuantity,
@@ -202,6 +214,7 @@ const receiveOrder = async (req, res) => {
               lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.WAREHOUSE,
               lifecycleCompletedAt: null,
               assignedToUserId: null,
+              ...(routeUpdate || {}),
             }
           : {}),
       }, {
@@ -237,9 +250,14 @@ const receiveOrder = async (req, res) => {
           actorId: req.user.id,
           actionType: 'warehouse_arrival_marked',
           fromStatus: PRODUCT_LIFECYCLE_STATUSES.PURCHASE,
-          toStatus: PRODUCT_LIFECYCLE_STATUSES.WAREHOUSE,
+          toStatus: routeUpdate?.lifecycleStatus || PRODUCT_LIFECYCLE_STATUSES.WAREHOUSE,
           message: 'Product received from grouped supplier order',
-          metadata: {
+          metadata: routeUpdate ? withLifecycleRunMetadata(product, {
+            orderId: order.id,
+            warehouseReceiptId: receipt.id,
+            expectedQuantity: update.orderedQuantity,
+            receivedQuantity: lifecycleUpdate.receivedQuantity,
+          }) : {
             orderId: order.id,
             warehouseReceiptId: receipt.id,
             expectedQuantity: update.orderedQuantity,

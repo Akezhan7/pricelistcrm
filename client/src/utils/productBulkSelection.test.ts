@@ -30,12 +30,13 @@ test('returns every new product id for bulk designer assignment', () => {
   expect(getBulkSelectableProductIds(products, 'assign_designer')).toEqual([1, 2]);
 });
 
-test('returns only legacy catalog products for bulk lifecycle start', () => {
+test('returns catalog products without an active lifecycle for bulk lifecycle start', () => {
   const products = [
     product(1, 'in_sale'),
-    product(2, 'in_sale', '2026-08-20T10:00:00Z'),
+    { ...product(2, 'in_sale', '2026-08-20T10:00:00Z'), lifecycleCompletedAt: '2026-08-21T10:00:00Z' },
+    { ...product(4, 'in_sale', '2026-08-20T10:00:00Z'), lifecycleCompletedAt: null },
     product(3, 'new'),
   ];
 
-  expect(getBulkSelectableProductIds(products, 'start_lifecycle')).toEqual([1]);
+  expect(getBulkSelectableProductIds(products, 'start_lifecycle')).toEqual([1, 2]);
 });

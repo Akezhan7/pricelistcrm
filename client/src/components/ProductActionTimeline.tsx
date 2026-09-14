@@ -26,6 +26,7 @@ type ProductActionTimelineProps = {
 };
 
 const EVENT_LABELS: Record<string, string> = {
+  lifecycle_started: 'Цикл товара запущен',
   product_created: 'Товар создан',
   product_updated: 'Карточка обновлена',
   product_archived: 'Товар архивирован',
@@ -105,9 +106,34 @@ function EventDetails({ event }: { event: ProductHistoryEvent }) {
     ? metadata.changedFields.filter((field): field is string => typeof field === 'string')
     : [];
   const changes = asRecord(metadata.changes);
+  const lifecycleRoute = Array.isArray(metadata.route)
+    ? metadata.route.filter((stage): stage is string => typeof stage === 'string')
+    : [];
+  const routeLabels: Record<string, string> = {
+    design: 'Материалы и дизайн',
+    marketplace: 'Маркетплейс',
+    purchase: 'Закуп',
+    warehouse: 'Склад',
+    sale_launch: 'Запуск продаж и реклама',
+  };
 
   return (
     <div className="mt-2 space-y-2 text-caption text-text-muted">
+      {event.actionType === 'lifecycle_started' && (
+        <div className="space-y-2">
+          <p>
+            Цикл №{String(metadata.lifecycleRunNumber || 1)}
+            {metadata.reason ? ` · ${String(metadata.reason)}` : ''}
+          </p>
+          {lifecycleRoute.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {lifecycleRoute.map((stage) => (
+                <Badge key={stage} variant="outline">{routeLabels[stage] || stage}</Badge>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
       {event.source === 'price' && (
         <p>
           {formatPriceKZT(metadata.oldPrice as number)} → {formatPriceKZT(metadata.newPrice as number)}

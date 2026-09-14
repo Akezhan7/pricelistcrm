@@ -7,6 +7,11 @@ const {
 const {
   buildApproveReviewKpiPlan,
 } = require('./productDesignerKpiService');
+const {
+  LIFECYCLE_ROUTE_STAGES,
+  buildLifecycleStageCompletionUpdate,
+  withLifecycleRunMetadata,
+} = require('./productLifecycleRouteService');
 
 const PRODUCT_REVISION_STATUSES = Object.freeze({
   OPEN: 'open',
@@ -79,6 +84,11 @@ function buildApproveReviewPlan({ actor, product, kpiWeight, now = new Date() })
     kpiWeight,
     now,
   });
+  const routeUpdate = buildLifecycleStageCompletionUpdate({
+    product,
+    completedStage: LIFECYCLE_ROUTE_STAGES.DESIGN,
+    now,
+  });
   const productUpdate = {
     ...createLifecycleActionUpdate({
       action: PRODUCT_LIFECYCLE_ACTIONS.APPROVE,
@@ -89,11 +99,21 @@ function buildApproveReviewPlan({ actor, product, kpiWeight, now = new Date() })
     reviewedByUserId: actor.id,
     assignedToUserId: product.marketplaceManagerId || null,
     ...kpiPlan.productUpdate,
+    ...(routeUpdate || {}),
   };
+  const kpiEntry = {
+    ...kpiPlan.kpiEntry,
+    ...((Number(product.lifecycleRunNumber) || 0) > 0
+      ? { lifecycleRunNumber: Number(product.lifecycleRunNumber) }
+      : {}),
+  };
+  const historyMetadata = routeUpdate
+    ? withLifecycleRunMetadata(product, kpiPlan.historyMetadata)
+    : kpiPlan.historyMetadata;
 
   return {
     productUpdate,
-    kpiEntry: kpiPlan.kpiEntry,
+    kpiEntry,
     historyEntry: buildHistoryEntry({
       product,
       actor,
@@ -101,7 +121,7 @@ function buildApproveReviewPlan({ actor, product, kpiWeight, now = new Date() })
       fromStatus,
       toStatus: productUpdate.lifecycleStatus,
       message: 'Product review approved',
-      metadata: kpiPlan.historyMetadata,
+      metadata: historyMetadata,
       now,
     }),
   };

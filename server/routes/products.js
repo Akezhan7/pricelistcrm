@@ -385,8 +385,10 @@ router.post('/lifecycle/bulk-start',
     body('productIds.*')
       .isInt({ min: 1 })
       .withMessage('productIds must contain positive integer ids'),
-    body('targetStatus').isString().isLength({ min: 1, max: 40 }),
+    body('stages').isArray({ min: 1, max: 5 }),
+    body('stages.*').isIn(['design', 'marketplace', 'purchase', 'warehouse', 'sale_launch']),
     body('designerId').optional({ values: 'falsy' }).isInt({ min: 1 }),
+    body('reason').optional({ nullable: true }).isString().trim().isLength({ max: 1000 }),
   ],
   bulkStartProductLifecycle
 );
@@ -395,8 +397,10 @@ router.post('/:id/lifecycle/start',
   auth,
   requireRole('admin'),
   [
-    body('targetStatus').isString().isLength({ min: 1, max: 40 }),
+    body('stages').isArray({ min: 1, max: 5 }),
+    body('stages.*').isIn(['design', 'marketplace', 'purchase', 'warehouse', 'sale_launch']),
     body('designerId').optional({ values: 'falsy' }).isInt({ min: 1 }),
+    body('reason').optional({ nullable: true }).isString().trim().isLength({ max: 1000 }),
   ],
   startProductLifecycle
 );

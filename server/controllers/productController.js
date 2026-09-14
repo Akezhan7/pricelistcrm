@@ -97,6 +97,7 @@ const {
   buildMarketplaceOwnershipUpdate,
   buildMarketplacePlacementReadyPlan,
 } = require('../services/productMarketplaceService');
+const { LIFECYCLE_ROUTE_STAGES } = require('../services/productLifecycleRouteService');
 
 const productUserInclude = [
   {
@@ -459,7 +460,12 @@ const getProductSelectionIds = async (req, res) => {
       ...buildProductSearchFilter(search, sequelize),
       lifecycleStatus: mode === 'assign_designer' ? 'new' : 'in_sale',
     };
-    if (mode === 'start_lifecycle') where.lifecycleStartedAt = { [Op.is]: null };
+    if (mode === 'start_lifecycle') {
+      where[Op.or] = [
+        { lifecycleStartedAt: { [Op.is]: null } },
+        { lifecycleCompletedAt: { [Op.ne]: null } },
+      ];
+    }
 
     const products = await Product.findAll({
       where,
@@ -1274,6 +1280,17 @@ const startProductLifecycle = async (req, res) => {
   let transactionFinished = false;
 
   try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(400).json({
+        success: false,
+        message: 'Validation errors',
+        errors: errors.array(),
+      });
+    }
+
     const { id } = req.params;
     const product = await Product.findOne({
       where: { id, isActive: true },
@@ -1290,15 +1307,8 @@ const startProductLifecycle = async (req, res) => {
       });
     }
 
-    if (req.body.targetStatus === PRODUCT_LIFECYCLE_ACTIONS.ASSIGN_DESIGNER) {
-      return res.status(400).json({
-        success: false,
-        message: 'Use lifecycle status key, not action key',
-      });
-    }
-
     if (
-      req.body.targetStatus === PRODUCT_LIFECYCLE_STATUSES.ASSIGNED_TO_DESIGNER
+      req.body.stages?.includes(LIFECYCLE_ROUTE_STAGES.DESIGN)
       && req.body.designerId
     ) {
       const designer = await User.findOne({
@@ -1324,6 +1334,18 @@ const startProductLifecycle = async (req, res) => {
       now,
     });
 
+    if (plan.resetSaleLaunch) {
+      await ProductLaunchFlags.update(
+        { completedAt: null, completedBy: null },
+        { where: { productId: product.id }, transaction }
+      );
+    }
+    if (plan.resetLifecyclePurchase) {
+      await ProductLifecyclePurchase.destroy({
+        where: { productId: product.id },
+        transaction,
+      });
+    }
     await product.update(plan.productUpdate, { transaction });
     await ProductActionHistory.create(plan.historyEntry, { transaction });
 
@@ -1360,7 +1382,7 @@ const startProductLifecycle = async (req, res) => {
       transactionFinished = true;
     }
 
-    if (/Only admin|Only legacy|Unsupported|designerId/i.test(error.message)) {
+    if (/Only admin|in sale|active lifecycle|Unsupported|designerId|stages|reason/i.test(error.message)) {
       return res.status(400).json({
         success: false,
         message: error.message,
@@ -1391,18 +1413,9 @@ const bulkStartProductLifecycle = async (req, res) => {
       });
     }
 
-    const { productIds, targetStatus, designerId } = req.body;
+    const { productIds, stages, designerId, reason } = req.body;
 
-    if (targetStatus === PRODUCT_LIFECYCLE_ACTIONS.ASSIGN_DESIGNER) {
-      await transaction.rollback();
-      transactionFinished = true;
-      return res.status(400).json({
-        success: false,
-        message: 'Use lifecycle status key, not action key',
-      });
-    }
-
-    if (targetStatus === PRODUCT_LIFECYCLE_STATUSES.ASSIGNED_TO_DESIGNER) {
+    if (stages?.includes(LIFECYCLE_ROUTE_STAGES.DESIGN)) {
       if (!designerId) {
         await transaction.rollback();
         transactionFinished = true;
@@ -1441,13 +1454,26 @@ const bulkStartProductLifecycle = async (req, res) => {
       actor: req.user,
       productIds,
       products,
-      payload: { targetStatus, designerId },
+      payload: { stages, designerId, reason },
       now: new Date(),
     });
 
     const productsById = new Map(products.map((product) => [Number(product.id), product]));
     for (const item of plan.updates) {
       await productsById.get(item.productId).update(item.update, { transaction });
+    }
+
+    if (plan.resetSaleLaunchProductIds.length > 0) {
+      await ProductLaunchFlags.update(
+        { completedAt: null, completedBy: null },
+        { where: { productId: { [Op.in]: plan.resetSaleLaunchProductIds } }, transaction }
+      );
+    }
+    if (plan.resetLifecyclePurchaseProductIds.length > 0) {
+      await ProductLifecyclePurchase.destroy({
+        where: { productId: { [Op.in]: plan.resetLifecyclePurchaseProductIds } },
+        transaction,
+      });
     }
 
     await ProductActionHistory.bulkCreate(plan.historyEntries, { transaction });
@@ -1466,7 +1492,7 @@ const bulkStartProductLifecycle = async (req, res) => {
     }
 
     if (
-      /Only admin|Only legacy|Unsupported|designerId|productIds|not all selected/i.test(
+      /Only admin|in sale|active lifecycle|Unsupported|designerId|productIds|not all selected|stages|reason/i.test(
         error.message
       )
     ) {
@@ -1796,6 +1822,7 @@ const updateProductKpiWeight = async (req, res) => {
 
     const kpiEntry = await ProductDesignerKpiEntry.findOne({
       where: { productId: product.id },
+      order: [['lifecycleRunNumber', 'DESC'], ['creditedAt', 'DESC']],
       transaction,
       lock: true,
     });

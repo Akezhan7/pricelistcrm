@@ -88,6 +88,10 @@ export interface Product {
   lifecycleStatus?: ProductLifecycleStatus;
   lifecycleStartedAt?: string | null;
   lifecycleCompletedAt?: string | null;
+  lifecycleRunNumber?: number;
+  lifecycleRoute?: ProductLifecycleRouteStage[] | null;
+  lifecycleRouteIndex?: number | null;
+  lifecycleRunReason?: string | null;
   assignedToUserId?: number | null;
   assignedTo?: LifecycleUserRef;
   designerId?: number | null;
@@ -115,6 +119,13 @@ export interface Product {
   createdAt: string;
   updatedAt: string;
 }
+
+export type ProductLifecycleRouteStage =
+  | 'design'
+  | 'marketplace'
+  | 'purchase'
+  | 'warehouse'
+  | 'sale_launch';
 
 export interface ProductWorkflowAction {
   nextActionKey: string;

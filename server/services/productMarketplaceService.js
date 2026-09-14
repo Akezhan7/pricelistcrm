@@ -5,6 +5,11 @@ const {
 const {
   createLifecycleActionUpdate,
 } = require('./productLifecycleService');
+const {
+  LIFECYCLE_ROUTE_STAGES,
+  buildLifecycleStageCompletionUpdate,
+  withLifecycleRunMetadata,
+} = require('./productLifecycleRouteService');
 
 const MARKETPLACE_KEYS = Object.freeze({
   KASPI: 'kaspi',
@@ -179,6 +184,12 @@ function buildMarketplacePlacementReadyPlan({ actor, product, kaspiListing, now 
     product,
     now,
   });
+  const routeUpdate = buildLifecycleStageCompletionUpdate({
+    product,
+    completedStage: LIFECYCLE_ROUTE_STAGES.MARKETPLACE,
+    now,
+  });
+  Object.assign(productUpdate, routeUpdate || {});
 
   return {
     productUpdate,
@@ -189,7 +200,11 @@ function buildMarketplacePlacementReadyPlan({ actor, product, kaspiListing, now 
       fromStatus,
       toStatus: productUpdate.lifecycleStatus,
       message: 'Marketplace placement marked as ready',
-      metadata: {
+      metadata: routeUpdate ? withLifecycleRunMetadata(product, {
+        marketplaceListingId: kaspiListing.id,
+        marketplace: kaspiListing.marketplace,
+        sku: kaspiListing.sku,
+      }) : {
         marketplaceListingId: kaspiListing.id,
         marketplace: kaspiListing.marketplace,
         sku: kaspiListing.sku,

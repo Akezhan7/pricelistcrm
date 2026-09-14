@@ -5,7 +5,7 @@ const {
   buildStartLifecyclePlan,
 } = require('../services/productLifecycleStartService');
 
-function makeLegacyProduct(overrides = {}) {
+function makeCatalogProduct(overrides = {}) {
   return {
     id: 101,
     lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
@@ -14,31 +14,30 @@ function makeLegacyProduct(overrides = {}) {
     designerId: 44,
     assignedToUserId: 44,
     marketplaceManagerId: 55,
+    lifecycleRunNumber: 0,
+    lifecycleRoute: null,
+    lifecycleRouteIndex: null,
     ...overrides,
   };
 }
 
-function testStartAsNew() {
+function testStartLegacyProductWithSelectedRoute() {
   const now = new Date('2026-07-13T10:00:00Z');
   const plan = buildStartLifecyclePlan({
     actor: { id: 1, role: 'admin' },
-    product: makeLegacyProduct(),
-    payload: { targetStatus: PRODUCT_LIFECYCLE_STATUSES.NEW },
+    product: makeCatalogProduct(),
+    payload: { stages: ['marketplace', 'sale_launch'] },
     now,
   });
 
-  assert.deepStrictEqual(plan.productUpdate, {
-    lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.NEW,
-    lifecycleStartedAt: now,
-    lifecycleCompletedAt: null,
-    assignedToUserId: null,
-    designerId: null,
-    reviewedByUserId: null,
-    kpiWeight: null,
-  });
+  assert.strictEqual(plan.productUpdate.lifecycleStatus, PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE);
+  assert.deepStrictEqual(plan.productUpdate.lifecycleRoute, ['marketplace', 'sale_launch']);
+  assert.strictEqual(plan.productUpdate.lifecycleRouteIndex, 0);
+  assert.strictEqual(plan.productUpdate.lifecycleRunNumber, 1);
   assert.strictEqual(plan.historyEntry.actionType, 'lifecycle_started');
   assert.strictEqual(plan.historyEntry.fromStatus, PRODUCT_LIFECYCLE_STATUSES.IN_SALE);
-  assert.strictEqual(plan.historyEntry.toStatus, PRODUCT_LIFECYCLE_STATUSES.NEW);
+  assert.strictEqual(plan.historyEntry.toStatus, PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE);
+  assert.strictEqual(plan.historyEntry.metadata.lifecycleRunNumber, 1);
 }
 
 function testStartWithDesignerRequiresDesignerId() {
@@ -46,8 +45,8 @@ function testStartWithDesignerRequiresDesignerId() {
     () =>
       buildStartLifecyclePlan({
         actor: { id: 1, role: 'admin' },
-        product: makeLegacyProduct(),
-        payload: { targetStatus: PRODUCT_LIFECYCLE_STATUSES.ASSIGNED_TO_DESIGNER },
+        product: makeCatalogProduct(),
+        payload: { stages: ['design'] },
       }),
     /designerId is required/
   );
@@ -57,9 +56,9 @@ function testStartWithDesigner() {
   const now = new Date('2026-07-13T11:00:00Z');
   const plan = buildStartLifecyclePlan({
     actor: { id: 1, role: 'admin' },
-    product: makeLegacyProduct(),
+    product: makeCatalogProduct(),
     payload: {
-      targetStatus: PRODUCT_LIFECYCLE_STATUSES.ASSIGNED_TO_DESIGNER,
+      stages: ['design'],
       designerId: 25,
     },
     now,
@@ -70,15 +69,52 @@ function testStartWithDesigner() {
   assert.strictEqual(plan.productUpdate.assignedToUserId, 25);
 }
 
-function testRejectsActiveLifecycle() {
+function testRestartsCompletedLifecycleWithReason() {
+  const now = new Date('2026-07-13T11:30:00Z');
+  const plan = buildStartLifecyclePlan({
+    actor: { id: 1, role: 'admin' },
+    product: makeCatalogProduct({
+      lifecycleStartedAt: new Date('2026-07-10T10:00:00Z'),
+      lifecycleCompletedAt: new Date('2026-07-11T10:00:00Z'),
+      lifecycleRunNumber: 1,
+    }),
+    payload: { stages: ['design'], designerId: 25, reason: 'Добавить недостающие материалы' },
+    now,
+  });
+
+  assert.strictEqual(plan.productUpdate.lifecycleRunNumber, 2);
+  assert.strictEqual(plan.productUpdate.lifecycleRunReason, 'Добавить недостающие материалы');
+  assert.strictEqual(plan.historyEntry.metadata.repeated, true);
+}
+
+function testRejectsRepeatedLifecycleWithoutReason() {
   assert.throws(
     () =>
       buildStartLifecyclePlan({
         actor: { id: 1, role: 'admin' },
-        product: makeLegacyProduct({ lifecycleStartedAt: new Date('2026-07-10T10:00:00Z') }),
-        payload: { targetStatus: PRODUCT_LIFECYCLE_STATUSES.NEW },
+        product: makeCatalogProduct({
+          lifecycleStartedAt: new Date('2026-07-10T10:00:00Z'),
+          lifecycleCompletedAt: new Date('2026-07-11T10:00:00Z'),
+        }),
+        payload: { stages: ['design'], designerId: 25 },
       }),
-    /Only legacy catalog products/
+    /reason is required/i
+  );
+}
+
+function testRejectsActiveLifecycle() {
+  assert.throws(
+    () => buildStartLifecyclePlan({
+      actor: { id: 1, role: 'admin' },
+      product: makeCatalogProduct({
+        lifecycleStartedAt: new Date('2026-07-10T10:00:00Z'),
+        lifecycleCompletedAt: null,
+        lifecycleRoute: ['sale_launch'],
+        lifecycleRouteIndex: 0,
+      }),
+      payload: { stages: ['marketplace'], reason: 'Повторное размещение' },
+    }),
+    /active lifecycle/i
   );
 }
 
@@ -87,8 +123,8 @@ function testRejectsNonAdmin() {
     () =>
       buildStartLifecyclePlan({
         actor: { id: 2, role: 'marketplace_manager' },
-        product: makeLegacyProduct(),
-        payload: { targetStatus: PRODUCT_LIFECYCLE_STATUSES.NEW },
+        product: makeCatalogProduct(),
+        payload: { stages: ['marketplace'] },
       }),
     /Only admin/
   );
@@ -99,8 +135,8 @@ function testBuildsBulkLifecyclePlan() {
   const plan = buildBulkStartLifecyclePlan({
     actor: { id: 1, role: 'admin' },
     productIds: [102, 101, 102],
-    products: [makeLegacyProduct({ id: 101 }), makeLegacyProduct({ id: 102 })],
-    payload: { targetStatus: PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE },
+    products: [makeCatalogProduct({ id: 101 }), makeCatalogProduct({ id: 102 })],
+    payload: { stages: ['purchase'] },
     now,
   });
 
@@ -108,6 +144,7 @@ function testBuildsBulkLifecyclePlan() {
   assert.deepStrictEqual(plan.updates.map((item) => item.productId), [102, 101]);
   assert.strictEqual(plan.historyEntries.length, 2);
   assert.ok(plan.historyEntries.every((entry) => entry.createdAt === now));
+  assert.deepStrictEqual(plan.updates[0].update.lifecycleRoute, ['purchase', 'warehouse']);
 }
 
 function testRejectsBulkPlanWhenOneProductIsNotLegacy() {
@@ -117,18 +154,20 @@ function testRejectsBulkPlanWhenOneProductIsNotLegacy() {
         actor: { id: 1, role: 'admin' },
         productIds: [101, 102],
         products: [
-          makeLegacyProduct({ id: 101 }),
-          makeLegacyProduct({ id: 102, lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.NEW }),
+          makeCatalogProduct({ id: 101 }),
+          makeCatalogProduct({ id: 102, lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.NEW }),
         ],
-        payload: { targetStatus: PRODUCT_LIFECYCLE_STATUSES.NEW },
+        payload: { stages: ['marketplace'] },
       }),
-    /Only legacy catalog products/
+    /in sale/i
   );
 }
 
-testStartAsNew();
+testStartLegacyProductWithSelectedRoute();
 testStartWithDesignerRequiresDesignerId();
 testStartWithDesigner();
+testRestartsCompletedLifecycleWithReason();
+testRejectsRepeatedLifecycleWithoutReason();
 testRejectsActiveLifecycle();
 testRejectsNonAdmin();
 testBuildsBulkLifecyclePlan();
