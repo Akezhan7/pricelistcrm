@@ -290,10 +290,12 @@ export const ProductList: React.FC<ProductListProps> = ({
         onClick: () => openSuppliers(product),
       });
     }
-    if (allowedActions.includes('edit_product_card')) {
+    if (allowedActions.includes('edit_product_card') || product.permissions?.editableFields.includes('image')) {
       primaryActions.push({
         key: 'edit',
-        label: 'Редактировать товар',
+        label: allowedActions.includes('edit_product_card')
+          ? 'Редактировать товар'
+          : 'Редактировать фото и материалы',
         icon: Edit,
         onClick: () => setProductForCard(product),
       });
@@ -547,7 +549,13 @@ export const ProductList: React.FC<ProductListProps> = ({
                 density={denseCatalog ? 'compact' : 'default'}
                 selected={!denseCatalog && selectedProduct?.id === product.id}
                 onClick={() => {
-                  if (denseCatalog && product.permissions?.allowedActions.includes('edit_product_card')) {
+                  if (
+                    denseCatalog
+                    && (
+                      product.permissions?.allowedActions.includes('edit_product_card')
+                      || product.permissions?.editableFields.includes('image')
+                    )
+                  ) {
                     setProductForCard(product);
                     return;
                   }
@@ -659,10 +667,13 @@ export const ProductList: React.FC<ProductListProps> = ({
                             }}
                           />
                         )}
-                        {product.permissions?.allowedActions.includes('edit_product_card') && (
+                        {(product.permissions?.allowedActions.includes('edit_product_card')
+                          || product.permissions?.editableFields.includes('image')) && (
                           <IconButton
                             icon={Edit}
-                            title="Редактировать товар"
+                            title={product.permissions.allowedActions.includes('edit_product_card')
+                              ? 'Редактировать товар'
+                              : 'Редактировать фото и материалы'}
                             size="md"
                             variant="ghost"
                             className="h-8 w-8 min-h-8 min-w-8"

@@ -59,6 +59,57 @@ function testDesignerMustBeAssigned() {
   assert(!foreign.allowedActions.includes(PRODUCT_PERMISSION_ACTIONS.MANAGE_ASSETS));
 }
 
+function testAssignedDesignerCanManageVisualsAtAnyLifecycleStage() {
+  Object.values(PRODUCT_LIFECYCLE_STATUSES).forEach((lifecycleStatus) => {
+    const permissions = permissionsFor('designer', { lifecycleStatus }, 10);
+
+    assert(
+      permissions.allowedActions.includes(PRODUCT_PERMISSION_ACTIONS.MANAGE_ASSETS),
+      `assigned designer must manage assets at ${lifecycleStatus}`
+    );
+    assert(
+      permissions.editableFields.includes('image'),
+      `assigned designer must edit the main image at ${lifecycleStatus}`
+    );
+    assert.strictEqual(permissions.canEditCard, false);
+  });
+}
+
+function testDesignerCanOnlyUpdateImageOnAssignedProduct() {
+  const product = {
+    id: 100,
+    isActive: true,
+    lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
+    designerId: 10,
+  };
+
+  assert.doesNotThrow(() =>
+    assertProductFieldsAllowed({
+      user: { id: 10, role: 'designer' },
+      product,
+      fields: ['image'],
+    })
+  );
+  assert.throws(
+    () =>
+      assertProductFieldsAllowed({
+        user: { id: 10, role: 'designer' },
+        product,
+        fields: ['name'],
+      }),
+    /not permitted.*name/i
+  );
+  assert.throws(
+    () =>
+      assertProductFieldsAllowed({
+        user: { id: 11, role: 'designer' },
+        product,
+        fields: ['image'],
+      }),
+    /not permitted.*image/i
+  );
+}
+
 function testOperationalRolesStayInTheirArea() {
   const marketplace = permissionsFor('marketplace_manager');
   assert.strictEqual(marketplace.canEditCard, true);
@@ -160,6 +211,8 @@ function run() {
   testAdminHasFullProductAccess();
   testOnlyPrivilegedAdminCanManageKpiWeight();
   testDesignerMustBeAssigned();
+  testAssignedDesignerCanManageVisualsAtAnyLifecycleStage();
+  testDesignerCanOnlyUpdateImageOnAssignedProduct();
   testOperationalRolesStayInTheirArea();
   testMarketplaceManagerCanMaintainListingsOutsideMarketplaceStage();
   testWarehouseLocationCanBeEditedOutsideWarehouseStage();

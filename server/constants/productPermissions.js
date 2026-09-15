@@ -33,12 +33,6 @@ const ADMIN_PRODUCT_FIELDS = Object.freeze([
   'suppliers',
 ]);
 
-const DESIGNER_ASSET_STATUSES = new Set([
-  PRODUCT_LIFECYCLE_STATUSES.ASSIGNED_TO_DESIGNER,
-  PRODUCT_LIFECYCLE_STATUSES.CONTENT_CREATED,
-  PRODUCT_LIFECYCLE_STATUSES.REVISION,
-]);
-
 const RESPONSIBLE_ROLE_LABELS = Object.freeze({
   [PRODUCT_LIFECYCLE_STATUSES.NEW]: 'Руководитель',
   [PRODUCT_LIFECYCLE_STATUSES.ASSIGNED_TO_DESIGNER]: 'Дизайнер',
@@ -60,8 +54,10 @@ function isAssignedDesigner(user, product) {
   return hasRole(user, 'designer') && Number(product?.designerId) === Number(user?.id);
 }
 
-function getEditableProductFields(user) {
-  return hasRole(user, 'admin') ? [...ADMIN_PRODUCT_FIELDS] : [];
+function getEditableProductFields(user, product) {
+  if (hasRole(user, 'admin')) return [...ADMIN_PRODUCT_FIELDS];
+  if (isAssignedDesigner(user, product)) return ['image'];
+  return [];
 }
 
 function getSupportingActions({ user, product }) {
@@ -85,7 +81,7 @@ function getSupportingActions({ user, product }) {
     actions.push(PRODUCT_PERMISSION_ACTIONS.MANAGE_VARIATIONS);
   }
 
-  if (isAdmin || (DESIGNER_ASSET_STATUSES.has(status) && isAssignedDesigner(user, product))) {
+  if (isAdmin || isAssignedDesigner(user, product)) {
     actions.push(PRODUCT_PERMISSION_ACTIONS.MANAGE_ASSETS);
   }
 
@@ -141,13 +137,13 @@ function getProductPermissions({ user, product }) {
     canPerformLifecycleAction({ user, product, action })
   );
   const supportingActions = getSupportingActions({ user, product });
-  const editableFields = getEditableProductFields(user);
+  const editableFields = getEditableProductFields(user, product);
 
   return {
     allowedActions: [...new Set([...lifecycleActions, ...supportingActions])],
     editableFields,
     canEditCard:
-      editableFields.length > 0
+      supportingActions.includes(PRODUCT_PERMISSION_ACTIONS.EDIT_PRODUCT_CARD)
       || supportingActions.includes(PRODUCT_PERMISSION_ACTIONS.MANAGE_MARKETPLACE),
     responsibleRoleLabel: RESPONSIBLE_ROLE_LABELS[product.lifecycleStatus] || null,
   };

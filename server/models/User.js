@@ -48,6 +48,12 @@ const User = sequelize.define('User', {
     defaultValue: false,
     comment: 'Allows changing KPI weight after product review approval',
   },
+  canManageUsers: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    comment: 'Allows editing, deactivating and deleting CRM users',
+  },
 }, {
   hooks: {
     beforeCreate: async (user) => {

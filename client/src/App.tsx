@@ -213,7 +213,7 @@ const AppRoutes: React.FC = () => {
       <Route
         path="/users"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requireRole="admin">
             <Users />
           </ProtectedRoute>
         }

@@ -176,7 +176,7 @@ router.post('/',
 
 router.put('/:id', 
   auth, 
-  requireRole('admin'),
+  requireRole('admin', 'designer'),
   upload.single('image'),
   productUpdateValidation,
   handleUploadError,

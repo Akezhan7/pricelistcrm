@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Layout } from '../components/Layout';
-import { Users as UsersIcon, Plus, UserCheck } from 'lucide-react';
+import { Pencil, Plus, Trash2, UserCheck, Users as UsersIcon } from 'lucide-react';
 import {
   Alert,
   Badge,
@@ -8,6 +8,7 @@ import {
   Card,
   EmptyState,
   FormFooter,
+  IconButton,
   Input,
   Modal,
   PageHeader,
@@ -24,12 +25,16 @@ import api from '../utils/api';
 import { toast } from '../context/ToastContext';
 import type { BadgeVariant } from '../components/ui/Badge';
 import { USER_ROLE_LABELS, USER_ROLE_VALUES, type UserRole } from '../constants/userRoles';
+import { DeleteConfirmModal } from '../components/DeleteConfirmModal';
+import { useAuth } from '../context/AuthContext';
 
 interface User {
   id: number;
   name: string;
   email: string;
   role: string;
+  isActive: boolean;
+  canManageUsers?: boolean;
   createdAt: string;
 }
 
@@ -52,7 +57,9 @@ const ROLES = USER_ROLE_VALUES.map((value) => ({
 }));
 
 export const Users: React.FC = () => {
+  const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
+  const [canManageUsers, setCanManageUsers] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -61,8 +68,11 @@ export const Users: React.FC = () => {
     email: '',
     password: '',
     role: 'collector',
+    isActive: true,
   });
   const [submitting, setSubmitting] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -71,8 +81,18 @@ export const Users: React.FC = () => {
   const loadUsers = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/auth/users');
-      setUsers(response.data.data.users || []);
+      try {
+        const response = await api.get('/auth/users/manage');
+        setUsers(response.data.data.users || []);
+        setCanManageUsers(true);
+      } catch (manageError: unknown) {
+        const status = (manageError as { response?: { status?: number } })?.response?.status;
+        if (status !== 403) throw manageError;
+
+        const response = await api.get('/auth/users');
+        setUsers(response.data.data.users || []);
+        setCanManageUsers(false);
+      }
     } catch (error: unknown) {
       console.error('Ошибка загрузки пользователей:', error);
       toast.error('Ошибка загрузки пользователей');
@@ -88,6 +108,19 @@ export const Users: React.FC = () => {
       email: '',
       password: '',
       role: 'collector',
+      isActive: true,
+    });
+    setShowModal(true);
+  };
+
+  const handleEdit = (selectedUser: User) => {
+    setEditingUser(selectedUser);
+    setFormData({
+      name: selectedUser.name,
+      email: selectedUser.email,
+      password: '',
+      role: selectedUser.role,
+      isActive: selectedUser.isActive,
     });
     setShowModal(true);
   };
@@ -104,7 +137,16 @@ export const Users: React.FC = () => {
       setSubmitting(true);
 
       if (editingUser) {
-        toast.info('Редактирование пользователей пока не реализовано');
+        await api.patch(`/auth/users/${editingUser.id}`, {
+          name: formData.name,
+          email: formData.email,
+          role: formData.role,
+          isActive: formData.isActive,
+          ...(formData.password ? { password: formData.password } : {}),
+        });
+        toast.success('Пользователь успешно обновлён');
+        setShowModal(false);
+        await loadUsers();
       } else {
         await api.post('/auth/users', formData);
         toast.success('Пользователь успешно создан');
@@ -117,6 +159,23 @@ export const Users: React.FC = () => {
       toast.error(err.response?.data?.message || 'Ошибка при сохранении пользователя');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!userToDelete) return;
+
+    try {
+      setDeleting(true);
+      await api.delete(`/auth/users/${userToDelete.id}`);
+      toast.success('Учётная запись удалена');
+      setUserToDelete(null);
+      await loadUsers();
+    } catch (error: unknown) {
+      const err = error as { response?: { data?: { message?: string } } };
+      toast.error(err.response?.data?.message || 'Не удалось удалить пользователя');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -139,7 +198,9 @@ export const Users: React.FC = () => {
       <div className="space-y-6">
         <PageHeader
           title="Управление пользователями"
-          description="Создание учётных записей и назначение ролей"
+          description={canManageUsers
+            ? 'Создание, редактирование и управление доступом'
+            : 'Создание учётных записей и назначение ролей'}
           icon={UsersIcon}
           actions={
             <Button variant="primary" leftIcon={Plus} onClick={handleCreate}>
@@ -176,11 +237,40 @@ export const Users: React.FC = () => {
                         <p className="text-body-medium text-brand-black">{user.name}</p>
                         <p className="truncate text-caption text-text-muted">{user.email}</p>
                       </div>
-                      <Badge variant={roleInfo.badge}>{roleInfo.label}</Badge>
+                      <div className="flex shrink-0 flex-col items-end gap-1">
+                        <Badge variant={roleInfo.badge}>{roleInfo.label}</Badge>
+                        {canManageUsers && (
+                          <Badge variant={user.isActive ? 'success' : 'outline'}>
+                            {user.isActive ? 'Активен' : 'Отключён'}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                    <p className="mt-3 border-t border-border-subtle pt-3 text-caption tabular-nums text-text-muted">
-                      Создан: {new Date(user.createdAt).toLocaleDateString('ru-RU')}
-                    </p>
+                    <div className="mt-3 flex items-center justify-between border-t border-border-subtle pt-3">
+                      <p className="text-caption tabular-nums text-text-muted">
+                        Создан: {new Date(user.createdAt).toLocaleDateString('ru-RU')}
+                      </p>
+                      {canManageUsers && (
+                        <div className="flex items-center gap-1">
+                          <IconButton
+                            icon={Pencil}
+                            size="sm"
+                            title="Редактировать пользователя"
+                            onClick={() => handleEdit(user)}
+                          />
+                          <IconButton
+                            icon={Trash2}
+                            size="sm"
+                            variant="danger"
+                            title={Number(currentUser?.id) === user.id
+                              ? 'Нельзя удалить текущую учётную запись'
+                              : 'Удалить пользователя'}
+                            disabled={Number(currentUser?.id) === user.id}
+                            onClick={() => setUserToDelete(user)}
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 );
               })
@@ -193,13 +283,15 @@ export const Users: React.FC = () => {
                 <TableHeaderCell>Имя</TableHeaderCell>
                 <TableHeaderCell>Email</TableHeaderCell>
                 <TableHeaderCell>Роль</TableHeaderCell>
+                {canManageUsers && <TableHeaderCell>Статус</TableHeaderCell>}
                 <TableHeaderCell>Дата создания</TableHeaderCell>
+                {canManageUsers && <TableHeaderCell className="w-24">Действия</TableHeaderCell>}
               </TableRow>
             </TableHead>
             <TableBody>
               {users.length === 0 ? (
                 <TableRow className="hover:bg-transparent">
-                  <TableCell colSpan={4} className="py-12">
+                  <TableCell colSpan={canManageUsers ? 6 : 4} className="py-12">
                     <EmptyState
                       icon={UsersIcon}
                       title="Пользователи не найдены"
@@ -228,9 +320,38 @@ export const Users: React.FC = () => {
                       <TableCell>
                         <Badge variant={roleInfo.badge}>{roleInfo.label}</Badge>
                       </TableCell>
+                      {canManageUsers && (
+                        <TableCell>
+                          <Badge variant={user.isActive ? 'success' : 'outline'}>
+                            {user.isActive ? 'Активен' : 'Отключён'}
+                          </Badge>
+                        </TableCell>
+                      )}
                       <TableCell className="text-caption text-text-muted tabular-nums">
                         {new Date(user.createdAt).toLocaleDateString('ru-RU')}
                       </TableCell>
+                      {canManageUsers && (
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <IconButton
+                              icon={Pencil}
+                              size="sm"
+                              title="Редактировать пользователя"
+                              onClick={() => handleEdit(user)}
+                            />
+                            <IconButton
+                              icon={Trash2}
+                              size="sm"
+                              variant="danger"
+                              title={Number(currentUser?.id) === user.id
+                                ? 'Нельзя удалить текущую учётную запись'
+                                : 'Удалить пользователя'}
+                              disabled={Number(currentUser?.id) === user.id}
+                              onClick={() => setUserToDelete(user)}
+                            />
+                          </div>
+                        </TableCell>
+                      )}
                     </TableRow>
                   );
                 })
@@ -297,23 +418,24 @@ export const Users: React.FC = () => {
             placeholder="ivan@example.com"
           />
 
-          {!editingUser && (
-            <Input
-              label="Пароль"
-              type="password"
-              required
-              minLength={6}
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              placeholder="Минимум 6 символов"
-              helperText="Пользователь сможет изменить пароль после входа"
-            />
-          )}
+          <Input
+            label={editingUser ? 'Новый пароль' : 'Пароль'}
+            type="password"
+            required={!editingUser}
+            minLength={6}
+            value={formData.password}
+            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+            placeholder={editingUser ? 'Оставьте пустым, чтобы не менять' : 'Минимум 6 символов'}
+            helperText={editingUser
+              ? 'Заполняйте только для смены пароля'
+              : 'Пользователь сможет изменить пароль после входа'}
+          />
 
           <Select
             label="Роль"
             required
             value={formData.role}
+            disabled={Boolean(editingUser && Number(currentUser?.id) === editingUser.id)}
             onChange={(e) => setFormData({ ...formData, role: e.target.value })}
           >
             {ROLES.map((role) => (
@@ -322,8 +444,36 @@ export const Users: React.FC = () => {
               </option>
             ))}
           </Select>
+
+          {editingUser && (
+            <label className="flex items-center justify-between gap-4 rounded-lg border border-border-subtle px-3 py-3">
+              <span>
+                <span className="block text-body-medium text-brand-black">Активный пользователь</span>
+                <span className="block text-caption text-text-muted">
+                  Отключённый пользователь не сможет войти в CRM
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                checked={formData.isActive}
+                disabled={Number(currentUser?.id) === editingUser.id}
+                onChange={(event) => setFormData({ ...formData, isActive: event.target.checked })}
+                className="h-5 w-5 rounded border-border-input text-brand-yellow focus:ring-brand-yellow/30"
+              />
+            </label>
+          )}
         </form>
       </Modal>
+
+      <DeleteConfirmModal
+        isOpen={Boolean(userToDelete)}
+        onClose={() => setUserToDelete(null)}
+        onConfirm={handleDelete}
+        loading={deleting}
+        title="Удалить пользователя"
+        message="Учётная запись будет удалена навсегда. Если пользователь связан с рабочими документами, CRM не позволит удалить его."
+        itemName={userToDelete ? `${userToDelete.name} · ${userToDelete.email}` : undefined}
+      />
     </Layout>
   );
 };

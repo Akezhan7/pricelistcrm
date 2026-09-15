@@ -53,4 +53,19 @@ const requireRole = (...roles) => {
   };
 };
 
-module.exports = { auth, requireRole };
+const requireUserManagement = (req, res, next) => {
+  if (!req.user) {
+    return res.status(401).json({ success: false, message: 'Не авторизован' });
+  }
+
+  if (req.user.role !== 'admin' || req.user.canManageUsers !== true) {
+    return res.status(403).json({
+      success: false,
+      message: 'Недостаточно прав для управления пользователями',
+    });
+  }
+
+  return next();
+};
+
+module.exports = { auth, requireRole, requireUserManagement };

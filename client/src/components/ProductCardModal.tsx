@@ -25,7 +25,7 @@ import { ProductAssetsPanel } from './ProductAssetsPanel';
 import { ProductWarehousePanel } from './ProductWarehousePanel';
 import { ProductActionTimeline } from './ProductActionTimeline';
 import { ProductSuppliersModal } from './ProductSuppliersModal';
-import { Alert, Badge, Button, Input, Modal, Spinner } from './ui';
+import { Alert, Badge, Button, FileUploadZone, Input, Modal, Spinner } from './ui';
 
 type ProductCardModalProps = {
   product: Product | null;
@@ -145,6 +145,7 @@ function MainProductTab({
   const [error, setError] = useState('');
 
   const canEdit = Boolean(product.permissions?.allowedActions.includes('edit_product_card'));
+  const canEditImage = Boolean(product.permissions?.editableFields.includes('image'));
   const canManageKpiWeight = Boolean(
     product.permissions?.allowedActions.includes('manage_kpi_weight')
     && product.kpiWeight !== null
@@ -225,10 +226,37 @@ function MainProductTab({
     }
   };
 
+  const handleImageSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!canEditImage || !image) return;
+
+    setSaving(true);
+    setError('');
+    try {
+      const data = new FormData();
+      data.append('image', image);
+      await api.put(`/products/${product.id}`, data, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      toast.success('Главная фотография обновлена');
+      setImage(null);
+      await onSaved();
+    } catch (saveError) {
+      setError(getErrorMessage(saveError, 'Не удалось обновить главную фотографию'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (!canEdit) {
     return (
       <div className="space-y-4">
-        <Alert variant="info">У вас нет прав на редактирование основной карточки товара.</Alert>
+        {error && <Alert variant="error">{error}</Alert>}
+        <Alert variant="info">
+          {canEditImage
+            ? 'Доступно изменение главной фотографии. Остальные данные товара доступны только для просмотра.'
+            : 'У вас нет прав на редактирование основной карточки товара.'}
+        </Alert>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <ReadonlyField label="Внутреннее название" value={product.internalName || product.name} />
           <ReadonlyField label="Артикул" value={product.article} />
@@ -239,6 +267,35 @@ function MainProductTab({
         </div>
         {product.description && (
           <ReadonlyField label="Описание" value={product.description} multiline />
+        )}
+        {canEditImage && (
+          <form onSubmit={handleImageSubmit} className="space-y-3 border-t border-border-subtle pt-4">
+            <h3 className="text-sm font-semibold text-brand-black">Главная фотография</h3>
+            {product.image && !image && (
+              <img
+                src={getImageUrl(product.image) || undefined}
+                alt={product.name}
+                className="block max-h-[min(60vh,32rem)] w-full rounded-xl border border-border-subtle bg-surface-inset object-contain"
+                onError={(event) => {
+                  const currentImage = event.currentTarget;
+                  currentImage.onerror = null;
+                  currentImage.src = '/placeholder.svg';
+                }}
+              />
+            )}
+            <FileUploadZone
+              accept="image/jpeg,image/png,image/gif,image/webp"
+              selectedFile={image}
+              onFileChange={setImage}
+              label={product.image ? 'Изменить изображение' : 'Выбрать изображение'}
+              hint="PNG, JPG, GIF или WebP до 5 МБ"
+            />
+            <div className="flex justify-end">
+              <Button type="submit" leftIcon={Save} loading={saving} disabled={saving || !image}>
+                Сохранить фотографию
+              </Button>
+            </div>
+          </form>
         )}
       </div>
     );
