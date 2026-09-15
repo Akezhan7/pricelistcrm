@@ -8,6 +8,7 @@ const {
 function makeCatalogProduct(overrides = {}) {
   return {
     id: 101,
+    isActive: true,
     lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
     lifecycleStartedAt: null,
     lifecycleCompletedAt: null,
@@ -102,20 +103,86 @@ function testRejectsRepeatedLifecycleWithoutReason() {
   );
 }
 
-function testRejectsActiveLifecycle() {
+function testRestartsActiveLifecycleFromAnyNonArchivedStatus() {
+  const plan = buildStartLifecyclePlan({
+    actor: { id: 1, role: 'admin' },
+    product: makeCatalogProduct({
+      lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.REVIEW,
+      lifecycleStartedAt: new Date('2026-07-10T10:00:00Z'),
+      lifecycleCompletedAt: null,
+      lifecycleRunNumber: 1,
+      lifecycleRoute: ['design', 'marketplace'],
+      lifecycleRouteIndex: 0,
+    }),
+    payload: { stages: ['marketplace'], reason: 'Повторное размещение' },
+  });
+
+  assert.strictEqual(plan.productUpdate.lifecycleStatus, PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE);
+  assert.strictEqual(plan.productUpdate.lifecycleRunNumber, 2);
+  assert.strictEqual(plan.historyEntry.actionType, 'lifecycle_started');
+  assert.deepStrictEqual(plan.historyEntry.metadata.previousRoute, ['design', 'marketplace']);
+}
+
+function testStartsRouteForNewProductWithoutRestartReason() {
+  const plan = buildStartLifecyclePlan({
+    actor: { id: 1, role: 'admin' },
+    product: makeCatalogProduct({
+      lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.NEW,
+      lifecycleStartedAt: new Date('2026-07-10T10:00:00Z'),
+    }),
+    payload: { stages: ['design'], designerId: 25 },
+  });
+
+  assert.strictEqual(plan.productUpdate.lifecycleRunNumber, 1);
+  assert.strictEqual(plan.historyEntry.actionType, 'lifecycle_started');
+}
+
+function testRejectsArchivedProduct() {
+  assert.throws(
+    () => buildStartLifecyclePlan({
+      actor: { id: 1, role: 'admin' },
+      product: makeCatalogProduct({ lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.ARCHIVED }),
+      payload: { stages: ['marketplace'] },
+    }),
+    /archived/i
+  );
+}
+
+function testRejectsRestartWhilePurchaseIsNotReceived() {
   assert.throws(
     () => buildStartLifecyclePlan({
       actor: { id: 1, role: 'admin' },
       product: makeCatalogProduct({
+        lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.PURCHASE,
         lifecycleStartedAt: new Date('2026-07-10T10:00:00Z'),
-        lifecycleCompletedAt: null,
-        lifecycleRoute: ['sale_launch'],
+        lifecycleRunNumber: 1,
+        lifecycleRoute: ['purchase', 'warehouse'],
         lifecycleRouteIndex: 0,
+        lifecyclePurchase: { orderId: 77, arrivedAt: null },
       }),
-      payload: { stages: ['marketplace'], reason: 'Повторное размещение' },
+      payload: { stages: ['design'], designerId: 25, reason: 'Исправить материалы' },
     }),
-    /active lifecycle/i
+    /незавершенная заявка #77/i
   );
+}
+
+function testAllowsRestartAfterPurchaseOrderWasCancelled() {
+  const plan = buildStartLifecyclePlan({
+    actor: { id: 1, role: 'admin' },
+    product: makeCatalogProduct({
+      lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.PURCHASE,
+      lifecycleStartedAt: new Date('2026-07-10T10:00:00Z'),
+      lifecycleRunNumber: 1,
+      lifecyclePurchase: {
+        orderId: 77,
+        arrivedAt: null,
+        order: { status: 'Отменена' },
+      },
+    }),
+    payload: { stages: ['design'], designerId: 25, reason: 'Исправить материалы' },
+  });
+
+  assert.strictEqual(plan.productUpdate.lifecycleStatus, PRODUCT_LIFECYCLE_STATUSES.ASSIGNED_TO_DESIGNER);
 }
 
 function testRejectsNonAdmin() {
@@ -147,20 +214,23 @@ function testBuildsBulkLifecyclePlan() {
   assert.deepStrictEqual(plan.updates[0].update.lifecycleRoute, ['purchase', 'warehouse']);
 }
 
-function testRejectsBulkPlanWhenOneProductIsNotLegacy() {
-  assert.throws(
-    () =>
-      buildBulkStartLifecyclePlan({
-        actor: { id: 1, role: 'admin' },
-        productIds: [101, 102],
-        products: [
-          makeCatalogProduct({ id: 101 }),
-          makeCatalogProduct({ id: 102, lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.NEW }),
-        ],
-        payload: { stages: ['marketplace'] },
+function testBuildsBulkPlanForDifferentLifecycleStatuses() {
+  const plan = buildBulkStartLifecyclePlan({
+    actor: { id: 1, role: 'admin' },
+    productIds: [101, 102],
+    products: [
+      makeCatalogProduct({ id: 101 }),
+      makeCatalogProduct({
+        id: 102,
+        lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.REVISION,
+        lifecycleStartedAt: new Date('2026-07-10T10:00:00Z'),
+        lifecycleRunNumber: 1,
       }),
-    /in sale/i
-  );
+    ],
+    payload: { stages: ['marketplace'], reason: 'Обновить размещение' },
+  });
+
+  assert.deepStrictEqual(plan.productIds, [101, 102]);
 }
 
 testStartLegacyProductWithSelectedRoute();
@@ -168,9 +238,13 @@ testStartWithDesignerRequiresDesignerId();
 testStartWithDesigner();
 testRestartsCompletedLifecycleWithReason();
 testRejectsRepeatedLifecycleWithoutReason();
-testRejectsActiveLifecycle();
+testRestartsActiveLifecycleFromAnyNonArchivedStatus();
+testStartsRouteForNewProductWithoutRestartReason();
+testRejectsArchivedProduct();
+testRejectsRestartWhilePurchaseIsNotReceived();
+testAllowsRestartAfterPurchaseOrderWasCancelled();
 testRejectsNonAdmin();
 testBuildsBulkLifecyclePlan();
-testRejectsBulkPlanWhenOneProductIsNotLegacy();
+testBuildsBulkPlanForDifferentLifecycleStatuses();
 
 console.log('Product lifecycle start service test passed');

@@ -1,8 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Rocket } from 'lucide-react';
 import type { Product, ProductLifecycleRouteStage } from '../types';
 import api from '../utils/api';
 import { toast } from '../context/ToastContext';
+import {
+  getLifecycleStartValidationError,
+  isLifecycleRestart,
+} from '../utils/productBulkSelection';
 import { Alert, Button, Modal, Select, Spinner, Textarea } from './ui';
 
 type WorkflowUser = {
@@ -87,8 +91,10 @@ export const StartProductLifecycleModal: React.FC<StartProductLifecycleModalProp
   const [reason, setReason] = useState('');
   const [users, setUsers] = useState<WorkflowUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [usersError, setUsersError] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [submitAttempted, setSubmitAttempted] = useState(false);
 
   const designers = useMemo(
     () => users.filter((user) => user.role === 'designer'),
@@ -96,13 +102,14 @@ export const StartProductLifecycleModal: React.FC<StartProductLifecycleModalProp
   );
   const requiresDesigner = stages.includes('design');
   const isBulk = productIds.length > 0;
-  const requiresReason = isBulk || Boolean(product?.lifecycleStartedAt);
-  const canSubmit = Boolean(
-    (product || isBulk)
-      && stages.length > 0
-      && (!requiresDesigner || designerId)
-      && (!requiresReason || reason.trim())
-  );
+  const restarting = isLifecycleRestart(product);
+  const requiresReason = isBulk || restarting;
+  const validationError = getLifecycleStartValidationError({
+    stages,
+    designerId,
+    reason,
+    requiresReason,
+  });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -110,17 +117,26 @@ export const StartProductLifecycleModal: React.FC<StartProductLifecycleModalProp
     setDesignerId('');
     setReason('');
     setError('');
+    setUsersError('');
+    setSubmitAttempted(false);
   }, [isOpen, product?.id]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-
+  const loadUsers = useCallback(() => {
+    setUsersError('');
     setLoadingUsers(true);
     api.get('/auth/users?isActive=true')
       .then((response) => setUsers(response.data.data.users || []))
-      .catch(() => setUsers([]))
+      .catch(() => {
+        setUsers([]);
+        setUsersError('Не удалось загрузить список дизайнеров.');
+      })
       .finally(() => setLoadingUsers(false));
-  }, [isOpen]);
+  }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    loadUsers();
+  }, [isOpen, loadUsers]);
 
   const toggleStage = (stage: ProductLifecycleRouteStage) => {
     setStages((current) => {
@@ -139,6 +155,8 @@ export const StartProductLifecycleModal: React.FC<StartProductLifecycleModalProp
 
   const handleSubmit = async () => {
     if (!product && !isBulk) return;
+    setSubmitAttempted(true);
+    if (validationError) return;
 
     setSaving(true);
     setError('');
@@ -155,7 +173,7 @@ export const StartProductLifecycleModal: React.FC<StartProductLifecycleModalProp
       } else if (product) {
         await api.post(`/products/${product.id}/lifecycle/start`, payload);
         toast.success(
-          product.lifecycleStartedAt ? 'Новый цикл товара запущен' : 'Цикл товара запущен'
+          restarting ? 'Маршрут товара перезапущен' : 'Цикл товара запущен'
         );
       }
       onSuccess();
@@ -183,7 +201,9 @@ export const StartProductLifecycleModal: React.FC<StartProductLifecycleModalProp
       onClose={onClose}
       title={isBulk
         ? 'Массовый запуск цикла'
-        : product?.lifecycleStartedAt ? 'Запустить новый цикл' : 'Запустить цикл'}
+        : product?.lifecycleCompletedAt
+          ? 'Запустить новый цикл'
+          : restarting ? 'Перезапустить маршрут' : 'Запустить цикл'}
       size="lg"
     >
       <div className="space-y-4">
@@ -203,6 +223,9 @@ export const StartProductLifecycleModal: React.FC<StartProductLifecycleModalProp
         )}
 
         {error && <Alert variant="error">{error}</Alert>}
+        {submitAttempted && validationError && (
+          <Alert variant="warning">{validationError}</Alert>
+        )}
 
         <div>
           <p className="mb-2 text-body-medium text-brand-black">Быстрый маршрут</p>
@@ -256,6 +279,15 @@ export const StartProductLifecycleModal: React.FC<StartProductLifecycleModalProp
               <Spinner size="sm" color="brand" />
               <span>Загрузка дизайнеров...</span>
             </div>
+          ) : usersError ? (
+            <Alert variant="error">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span>{usersError}</span>
+                <Button type="button" size="sm" variant="secondary" onClick={loadUsers}>
+                  Повторить
+                </Button>
+              </div>
+            </Alert>
           ) : (
             <Select
               label="Дизайнер"
@@ -274,7 +306,7 @@ export const StartProductLifecycleModal: React.FC<StartProductLifecycleModalProp
 
         {requiresReason && (
           <Textarea
-            label="Причина запуска"
+            label={restarting ? 'Причина перезапуска' : 'Причина запуска'}
             rows={3}
             value={reason}
             onChange={(event) => setReason(event.target.value)}
@@ -294,7 +326,7 @@ export const StartProductLifecycleModal: React.FC<StartProductLifecycleModalProp
             variant="primary"
             leftIcon={Rocket}
             loading={saving}
-            disabled={saving || !canSubmit}
+            disabled={saving}
             onClick={handleSubmit}
           >
             Запустить

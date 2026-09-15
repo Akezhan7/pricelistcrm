@@ -1,5 +1,8 @@
 import type { Product } from '../types';
-import { getBulkSelectableProductIds } from './productBulkSelection';
+import {
+  getBulkSelectableProductIds,
+  getLifecycleStartValidationError,
+} from './productBulkSelection';
 
 function product(
   id: number,
@@ -30,13 +33,39 @@ test('returns every new product id for bulk designer assignment', () => {
   expect(getBulkSelectableProductIds(products, 'assign_designer')).toEqual([1, 2]);
 });
 
-test('returns catalog products without an active lifecycle for bulk lifecycle start', () => {
+test('returns every active non-archived product for lifecycle start', () => {
   const products = [
     product(1, 'in_sale'),
     { ...product(2, 'in_sale', '2026-08-20T10:00:00Z'), lifecycleCompletedAt: '2026-08-21T10:00:00Z' },
     { ...product(4, 'in_sale', '2026-08-20T10:00:00Z'), lifecycleCompletedAt: null },
     product(3, 'new'),
+    product(5, 'review'),
+    product(6, 'archived'),
+    { ...product(7, 'marketplace'), isActive: false },
   ];
 
-  expect(getBulkSelectableProductIds(products, 'start_lifecycle')).toEqual([1, 2]);
+  expect(getBulkSelectableProductIds(products, 'start_lifecycle')).toEqual([1, 2, 4, 3, 5]);
+});
+
+test('explains which lifecycle form field is missing', () => {
+  expect(getLifecycleStartValidationError({
+    stages: ['design'],
+    designerId: '',
+    reason: 'Исправить карточку',
+    requiresReason: true,
+  })).toBe('Выберите дизайнера.');
+
+  expect(getLifecycleStartValidationError({
+    stages: ['marketplace'],
+    designerId: '',
+    reason: '',
+    requiresReason: true,
+  })).toBe('Укажите причину перезапуска цикла.');
+
+  expect(getLifecycleStartValidationError({
+    stages: ['marketplace'],
+    designerId: '',
+    reason: 'Обновить размещение',
+    requiresReason: true,
+  })).toBeNull();
 });

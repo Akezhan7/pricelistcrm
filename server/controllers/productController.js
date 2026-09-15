@@ -7,6 +7,7 @@ const {
   ProductVariation,
   PriceHistory,
   Category,
+  Order,
   User,
   ProductActionHistory,
   ProductAsset,
@@ -1307,6 +1308,18 @@ const startProductLifecycle = async (req, res) => {
       });
     }
 
+    const lifecyclePurchase = await ProductLifecyclePurchase.findOne({
+      where: { productId: product.id },
+      include: [{
+        model: Order,
+        as: 'order',
+        attributes: ['id', 'orderNumber', 'status'],
+        required: false,
+      }],
+      transaction,
+    });
+    product.setDataValue('lifecyclePurchase', lifecyclePurchase);
+
     if (
       req.body.stages?.includes(LIFECYCLE_ROUTE_STAGES.DESIGN)
       && req.body.designerId
@@ -1382,7 +1395,7 @@ const startProductLifecycle = async (req, res) => {
       transactionFinished = true;
     }
 
-    if (/Only admin|in sale|active lifecycle|Unsupported|designerId|stages|reason/i.test(error.message)) {
+    if (/Only admin|active products|Archived product|незавершенная заявка|Unsupported|designerId|stages|reason/i.test(error.message)) {
       return res.status(400).json({
         success: false,
         message: error.message,
@@ -1450,6 +1463,26 @@ const bulkStartProductLifecycle = async (req, res) => {
       lock: true,
     });
 
+    const lifecyclePurchases = await ProductLifecyclePurchase.findAll({
+      where: { productId: { [Op.in]: requestedProductIds } },
+      include: [{
+        model: Order,
+        as: 'order',
+        attributes: ['id', 'orderNumber', 'status'],
+        required: false,
+      }],
+      transaction,
+    });
+    const lifecyclePurchaseByProductId = new Map(
+      lifecyclePurchases.map((purchase) => [Number(purchase.productId), purchase])
+    );
+    products.forEach((product) => {
+      product.setDataValue(
+        'lifecyclePurchase',
+        lifecyclePurchaseByProductId.get(Number(product.id)) || null
+      );
+    });
+
     const plan = buildBulkStartLifecyclePlan({
       actor: req.user,
       productIds,
@@ -1492,7 +1525,7 @@ const bulkStartProductLifecycle = async (req, res) => {
     }
 
     if (
-      /Only admin|in sale|active lifecycle|Unsupported|designerId|productIds|not all selected|stages|reason/i.test(
+      /Only admin|active products|Archived product|незавершенная заявка|Unsupported|designerId|productIds|not all selected|stages|reason/i.test(
         error.message
       )
     ) {

@@ -49,6 +49,7 @@ import { cn } from '../utils/cn';
 import {
   canStartProductLifecycle,
   getBulkSelectableProductIds,
+  isLifecycleRestart,
   type ProductBulkActionMode,
 } from '../utils/productBulkSelection';
 import { filterProductsBySearch } from '../utils/productSearch';
@@ -330,9 +331,12 @@ export const ProductList: React.FC<ProductListProps> = ({
       });
     }
     if (canAssignDesigner && canStartProductLifecycle(product)) {
+      const lifecycleActionLabel = product.lifecycleCompletedAt
+        ? 'Запустить новый цикл'
+        : isLifecycleRestart(product) ? 'Перезапустить маршрут' : 'Запустить цикл';
       overflowActions.push({
         key: 'lifecycle',
-        label: product.lifecycleStartedAt ? 'Запустить новый цикл' : 'Запустить цикл',
+        label: lifecycleActionLabel,
         icon: Rocket,
         onClick: () => setProductForLifecycleStart(product),
       });
@@ -643,7 +647,9 @@ export const ProductList: React.FC<ProductListProps> = ({
                         {canAssignDesigner && canStartProductLifecycle(product) && (
                           <IconButton
                             icon={Rocket}
-                            title={product.lifecycleStartedAt ? 'Запустить новый цикл' : 'Запустить цикл'}
+                            title={product.lifecycleCompletedAt
+                              ? 'Запустить новый цикл'
+                              : isLifecycleRestart(product) ? 'Перезапустить маршрут' : 'Запустить цикл'}
                             size="md"
                             variant="ghost"
                             className="h-8 w-8 min-h-8 min-w-8"

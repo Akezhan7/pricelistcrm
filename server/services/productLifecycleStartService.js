@@ -1,8 +1,8 @@
 const { PRODUCT_LIFECYCLE_STATUSES } = require('../constants/productLifecycle');
+const { TERMINAL_STATUSES } = require('./orderStatusPolicyService');
 const {
   LIFECYCLE_ROUTE_STAGES,
   getLifecycleStageStatus,
-  hasActiveLifecycleRoute,
   normalizeLifecycleRoute,
 } = require('./productLifecycleRouteService');
 
@@ -27,16 +27,41 @@ function assertCanStartLifecycle({ actor, product }) {
     throw new Error('Only admin can start lifecycle for catalog products');
   }
 
-  if (
-    !product
-    || product.lifecycleStatus !== PRODUCT_LIFECYCLE_STATUSES.IN_SALE
-  ) {
-    throw new Error('Only products in sale can be started in lifecycle');
+  if (!product || product.isActive === false) {
+    throw new Error('Only active products can be started in lifecycle');
   }
 
-  if (hasActiveLifecycleRoute(product)) {
-    throw new Error('Product already has an active lifecycle');
+  if (product.lifecycleStatus === PRODUCT_LIFECYCLE_STATUSES.ARCHIVED) {
+    throw new Error('Archived product cannot be started in lifecycle');
   }
+
+  const lifecyclePurchase = product.lifecyclePurchase
+    || (typeof product.get === 'function' ? product.get('lifecyclePurchase') : null);
+  const purchaseOrder = lifecyclePurchase?.order
+    || (typeof lifecyclePurchase?.get === 'function' ? lifecyclePurchase.get('order') : null);
+  const purchaseFinished = Boolean(
+    lifecyclePurchase?.arrivedAt
+    || TERMINAL_STATUSES.includes(purchaseOrder?.status)
+  );
+
+  if (lifecyclePurchase && !purchaseFinished) {
+    const orderReference = purchaseOrder?.orderNumber || `#${lifecyclePurchase.orderId}`;
+    throw new Error(
+      `У товара есть незавершенная заявка ${orderReference}. Сначала завершите или отмените ее, затем перезапустите цикл.`
+    );
+  }
+}
+
+function isRepeatedLifecycle(product) {
+  const route = Array.isArray(product?.lifecycleRoute) ? product.lifecycleRoute : [];
+
+  return Boolean(
+    Number(product?.lifecycleRunNumber) > 0
+    || product?.lifecycleCompletedAt
+    || route.length > 0
+    || (product?.lifecycleStartedAt
+      && product?.lifecycleStatus !== PRODUCT_LIFECYCLE_STATUSES.NEW)
+  );
 }
 
 function buildStartLifecyclePlan({
@@ -50,7 +75,7 @@ function buildStartLifecyclePlan({
   const route = normalizeLifecycleRoute(payload.stages);
   const firstStage = route[0];
   const targetStatus = getLifecycleStageStatus(firstStage);
-  const repeated = Boolean(product.lifecycleStartedAt);
+  const repeated = isRepeatedLifecycle(product);
   const reason = normalizeReason(payload.reason);
   if (repeated && !reason) {
     throw new Error('reason is required for repeated lifecycle');
@@ -89,10 +114,12 @@ function buildStartLifecyclePlan({
       actionType: 'lifecycle_started',
       fromStatus: product.lifecycleStatus,
       toStatus: targetStatus,
-      message: repeated ? 'Repeated lifecycle started' : 'Catalog product started in lifecycle',
+      message: repeated ? 'Lifecycle route restarted' : 'Product lifecycle started',
       metadata: {
         lifecycleRunNumber,
         route,
+        previousRoute: Array.isArray(product.lifecycleRoute) ? product.lifecycleRoute : [],
+        previousRouteIndex: product.lifecycleRouteIndex ?? null,
         reason,
         repeated,
         designerId: productUpdate.designerId,
