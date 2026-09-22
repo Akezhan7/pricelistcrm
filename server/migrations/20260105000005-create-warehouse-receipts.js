@@ -1,4 +1,4 @@
-const { DataTypes } = require('sequelize');
+const { DataTypes, QueryTypes } = require('sequelize');
 
 /**
  * Идемпотентная миграция - создание таблиц warehouse_receipts и warehouse_receipt_items
@@ -6,14 +6,15 @@ const { DataTypes } = require('sequelize');
 module.exports = {
   async up(queryInterface, Sequelize) {
     const sequelize = queryInterface.sequelize;
-    
+
     // Вспомогательная функция для проверки существования таблицы
     async function tableExists(tableName) {
-      const [tables] = await sequelize.query(`
-        SELECT table_name FROM information_schema.tables 
-        WHERE table_schema = 'public' AND table_name = '${tableName}'
-      `);
-      return tables && tables.length > 0;
+      const tables = await sequelize.query(
+        `SELECT table_name FROM information_schema.tables
+         WHERE table_schema = 'public' AND table_name = :tableName`,
+        { replacements: { tableName }, type: QueryTypes.SELECT }
+      );
+      return tables.length > 0;
     }
 
     // Вспомогательная функция для проверки существования индекса
@@ -205,11 +206,12 @@ module.exports = {
     
     // Вспомогательная функция для проверки существования таблицы
     async function tableExists(tableName) {
-      const [tables] = await sequelize.query(`
-        SELECT table_name FROM information_schema.tables 
-        WHERE table_schema = 'public' AND table_name = '${tableName}'
-      `);
-      return tables && tables.length > 0;
+      const tables = await sequelize.query(
+        `SELECT table_name FROM information_schema.tables
+         WHERE table_schema = 'public' AND table_name = :tableName`,
+        { replacements: { tableName }, type: QueryTypes.SELECT }
+      );
+      return tables.length > 0;
     }
 
     if (await tableExists('warehouse_receipt_items')) {

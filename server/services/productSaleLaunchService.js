@@ -29,6 +29,11 @@ function normalizeNotes(value) {
   return value.trim() || null;
 }
 
+function normalizeCampaignName(value) {
+  if (typeof value !== 'string') return null;
+  return value.trim() || null;
+}
+
 function requireBoolean(value, fieldName) {
   if (typeof value !== 'boolean') {
     throw new Error(`${fieldName} must be a boolean`);
@@ -84,6 +89,9 @@ function buildSaleLaunchCompletionPlan({
     completedStage: LIFECYCLE_ROUTE_STAGES.SALE_LAUNCH,
     now,
   });
+  const campaignName = Object.prototype.hasOwnProperty.call(payload, 'campaignName')
+    ? normalizeCampaignName(payload.campaignName)
+    : kaspiListing.campaignName;
 
   return {
     launchFlags,
@@ -96,6 +104,7 @@ function buildSaleLaunchCompletionPlan({
     },
     marketplaceListingUpdate: {
       status: MARKETPLACE_LISTING_STATUSES.IN_SALE,
+      campaignName,
       managedBy: actor.id,
     },
     history: {
@@ -111,12 +120,14 @@ function buildSaleLaunchCompletionPlan({
         externalAdvertisingStarted: launchFlags.externalAdvertisingStarted,
         reviewBonusEnabled: launchFlags.reviewBonusEnabled,
         sellerBonusEnabled: launchFlags.sellerBonusEnabled,
+        campaignName,
       }) : {
         marketplaceListingId: kaspiListing.id,
         internalAdvertisingStarted: launchFlags.internalAdvertisingStarted,
         externalAdvertisingStarted: launchFlags.externalAdvertisingStarted,
         reviewBonusEnabled: launchFlags.reviewBonusEnabled,
         sellerBonusEnabled: launchFlags.sellerBonusEnabled,
+        campaignName,
       },
       createdAt: now,
     },
@@ -126,6 +137,7 @@ function buildSaleLaunchCompletionPlan({
 function buildSaleLaunchUpdatePlan({
   product,
   launchFlags,
+  kaspiListing = null,
   actor,
   payload = {},
   now = new Date(),
@@ -155,11 +167,18 @@ function buildSaleLaunchUpdatePlan({
       completedBy: launchFlags?.completedBy || actor.id,
     } : {}),
   };
+  const campaignNameChanged = Object.prototype.hasOwnProperty.call(payload, 'campaignName');
+  const previousCampaignName = normalizeCampaignName(kaspiListing?.campaignName);
+  const nextCampaignName = campaignNameChanged
+    ? normalizeCampaignName(payload.campaignName)
+    : previousCampaignName;
+
   const changedFields = [
     ...SALE_FLAG_FIELDS.filter(
       (field) => Boolean(launchFlags[field]) !== launchFlagsUpdate[field]
     ),
     ...(normalizeNotes(launchFlags.notes) !== launchFlagsUpdate.notes ? ['notes'] : []),
+    ...(nextCampaignName !== previousCampaignName ? ['campaignName'] : []),
   ];
 
   return {
@@ -169,6 +188,9 @@ function buildSaleLaunchUpdatePlan({
       assignedToUserId: actor.id,
       ...(!product.lifecycleCompletedAt ? { lifecycleCompletedAt: completedAt } : {}),
     },
+    marketplaceListingUpdate: nextCampaignName !== previousCampaignName
+      ? { campaignName: nextCampaignName }
+      : null,
     changedFields,
     history: changedFields.length > 0 ? {
       productId: product.id,
@@ -183,6 +205,7 @@ function buildSaleLaunchUpdatePlan({
         externalAdvertisingStarted: launchFlagsUpdate.externalAdvertisingStarted,
         reviewBonusEnabled: launchFlagsUpdate.reviewBonusEnabled,
         sellerBonusEnabled: launchFlagsUpdate.sellerBonusEnabled,
+        campaignName: nextCampaignName,
       },
       createdAt: now,
     } : null,

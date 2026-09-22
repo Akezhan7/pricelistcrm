@@ -177,6 +177,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ searchQuery, onSearchChange })
       path: '/users',
       requiredRole: ['admin'],
     },
+    ...(user?.canViewManagerReports
+      ? [{
+          id: 'manager-activity',
+          label: 'Активность менеджеров',
+          icon: <BarChart3 className="w-5 h-5 flex-shrink-0" />,
+          path: '/reports/manager-activity',
+          requiredRole: ['admin'],
+        }]
+      : []),
   ];
 
   const handleNavigate = (path: string) => {

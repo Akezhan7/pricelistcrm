@@ -54,6 +54,12 @@ const User = sequelize.define('User', {
     defaultValue: false,
     comment: 'Allows editing, deactivating and deleting CRM users',
   },
+  canViewManagerReports: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    comment: 'Allows viewing the manager activity analytics report',
+  },
 }, {
   hooks: {
     beforeCreate: async (user) => {

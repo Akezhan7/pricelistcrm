@@ -24,7 +24,7 @@ function testBuildsMarketplaceListingData() {
       sku: ' KSP-001 ',
       productCode: ' 123456789 ',
       marketplaceName: ' Kaspi Product ',
-      marketplaceArticle: ' EXT-123 ',
+      campaignName: ' EXT-123 ',
       price: '12990',
       url: ' https://kaspi.kz/product ',
       description: ' Listing description ',
@@ -38,7 +38,7 @@ function testBuildsMarketplaceListingData() {
     sku: 'KSP-001',
     productCode: '123456789',
     marketplaceName: 'Kaspi Product',
-    marketplaceArticle: 'EXT-123',
+    campaignName: 'EXT-123',
     price: 12990,
     url: 'https://kaspi.kz/product',
     description: 'Listing description',
@@ -68,6 +68,16 @@ function testUpdatesMarketplaceProductCode() {
       payload: { productCode: ' KASPI-7788 ' },
     }),
     { productCode: 'KASPI-7788', managedBy: 7 }
+  );
+}
+
+function testUpdatesMarketplaceCampaignName() {
+  assert.deepStrictEqual(
+    buildMarketplaceListingUpdate({
+      actor: { id: 7 },
+      payload: { campaignName: ' Осенняя распродажа ' },
+    }),
+    { campaignName: 'Осенняя распродажа', managedBy: 7 }
   );
 }
 
@@ -176,6 +186,7 @@ function testBuildsPlacementReadyPlan() {
 
 testBuildsMarketplaceListingData();
 testUpdatesMarketplaceProductCode();
+testUpdatesMarketplaceCampaignName();
 testBuildsLegacyProductUpdateForKaspi();
 testMarketplaceEditClaimsCurrentMarketplaceWork();
 testPlacementRequiresPublishedKaspiListing();

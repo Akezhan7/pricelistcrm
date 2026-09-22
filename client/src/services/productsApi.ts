@@ -59,6 +59,7 @@ export interface ProductSaleLaunchDto {
   reviewBonusEnabled: boolean;
   sellerBonusEnabled: boolean;
   notes?: string;
+  campaignName?: string | null;
 }
 
 export interface LinkProductSupplierDto {

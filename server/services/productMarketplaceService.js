@@ -85,7 +85,7 @@ function buildMarketplaceListingData({ productId, actor, payload = {} }) {
     sku: normalizeNullableString(payload.sku),
     productCode: normalizeNullableString(payload.productCode),
     marketplaceName: normalizeNullableString(payload.marketplaceName),
-    marketplaceArticle: normalizeNullableString(payload.marketplaceArticle),
+    campaignName: normalizeNullableString(payload.campaignName),
     price: normalizePrice(payload.price),
     url: normalizeNullableString(payload.url),
     description: normalizeNullableString(payload.description),
@@ -108,8 +108,8 @@ function buildMarketplaceListingUpdate({ actor, payload = {} }) {
   if (Object.prototype.hasOwnProperty.call(payload, 'marketplaceName')) {
     update.marketplaceName = normalizeNullableString(payload.marketplaceName);
   }
-  if (Object.prototype.hasOwnProperty.call(payload, 'marketplaceArticle')) {
-    update.marketplaceArticle = normalizeNullableString(payload.marketplaceArticle);
+  if (Object.prototype.hasOwnProperty.call(payload, 'campaignName')) {
+    update.campaignName = normalizeNullableString(payload.campaignName);
   }
   if (Object.prototype.hasOwnProperty.call(payload, 'price')) {
     update.price = normalizePrice(payload.price);

@@ -138,3 +138,6 @@ client/.env.production.local
 
 
 .playwright-cli
+
+# Claude Code project instructions (local-only)
+CLAUDE.md

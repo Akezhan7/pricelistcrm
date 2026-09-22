@@ -3,18 +3,34 @@ import { ChevronLeft, ChevronRight, Download, Eye, FileText, Image as ImageIcon,
 import api from '../utils/api';
 import getImageUrl from '../utils/image';
 import {
+  PRODUCT_ASSET_CHUNK_MAX_ATTEMPTS,
+  PRODUCT_ASSET_CHUNK_STALL_CHECK_INTERVAL_MS,
+  buildChunkUploadConfig,
   buildProductAssetUploadConfig,
   buildChunkUploadProgress,
+  buildUploadSessionStorageKey,
   calculateProductAssetUploadProgress,
+  calculateUploadedChunkBytes,
+  clearCachedUploadSessionId,
   getDisplayAssetName,
   getChunkRetryDelayMs,
   getGalleryImageAssets,
   getProductAssetPreviewPath,
   getProductAssetThumbnailPath,
+  isChunkUploadStalled,
   isPreviewableImageAsset,
+  isResumableUploadSession,
+  loadCachedUploadSessionId,
   recommendAssetTypeForFiles,
+  saveCachedUploadSessionId,
+  selectPendingChunkIndexes,
+  shouldKeepUploadSessionForResume,
   shouldRetryChunkUpload,
   shouldUseChunkedUpload,
+} from '../utils/productAssets';
+import type {
+  ProductAssetUploadSession,
+  ProductAssetUploadSessionStatus,
 } from '../utils/productAssets';
 import type { ProductAsset, ProductAssetType } from '../types';
 import {
@@ -40,6 +56,17 @@ type ProductAssetsPanelProps = {
   showProductHeader?: boolean;
   onAssetsChanged?: (assets: ProductAsset[]) => void;
 };
+
+/** Отмена всей загрузки должна прерывать текущий чанк, но не наоборот. */
+function forwardAbort(source: AbortSignal, target: AbortController) {
+  if (source.aborted) {
+    target.abort();
+    return () => {};
+  }
+  const abort = () => target.abort();
+  source.addEventListener('abort', abort);
+  return () => source.removeEventListener('abort', abort);
+}
 
 const assetTypeOptions: Array<{
   value: ProductAssetType;
@@ -202,6 +229,7 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
         const selectedFile = files[fileIndex];
         const selectedType = recommendAssetTypeForFiles([selectedFile], assetType);
         let uploadId: string | null = null;
+        let storageKey: string | null = null;
 
         try {
           setUploadProgress({
@@ -211,68 +239,131 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
             percent: 0,
           });
           if (shouldUseChunkedUpload(selectedFile.size)) {
-            const sessionResponse = await api.post(
-              `/products/${productId}/assets/upload-sessions`,
-              {
-                assetType: selectedType,
-                originalName: selectedFile.name,
-                mimeType: selectedFile.type || 'application/octet-stream',
-                fileSize: selectedFile.size,
-                notes: notes.trim() || null,
-              },
-              { signal: abortController.signal }
-            );
-            const session = sessionResponse.data.data as {
-              uploadId: string;
-              chunkSize: number;
-              totalChunks: number;
-            };
-            uploadId = session.uploadId;
+            storageKey = buildUploadSessionStorageKey(productId, selectedFile);
+            let session: ProductAssetUploadSession | null = null;
+            let receivedChunks: number[] = [];
 
-            for (let chunkIndex = 0; chunkIndex < session.totalChunks; chunkIndex += 1) {
+            // Докачка: прерванная сессия живёт на сервере, её чанки переотправлять не нужно.
+            const cachedUploadId = loadCachedUploadSessionId(storageKey);
+            if (cachedUploadId) {
+              try {
+                const statusResponse = await api.get(
+                  `/products/${productId}/assets/upload-sessions/${cachedUploadId}`,
+                  { signal: abortController.signal }
+                );
+                const status = statusResponse.data.data as ProductAssetUploadSessionStatus;
+                if (isResumableUploadSession(status, selectedFile, selectedType)) {
+                  session = {
+                    uploadId: status.uploadId,
+                    chunkSize: status.chunkSize,
+                    totalChunks: status.totalChunks,
+                    fileSize: status.fileSize,
+                  };
+                  receivedChunks = status.receivedChunks;
+                } else {
+                  clearCachedUploadSessionId(storageKey);
+                }
+              } catch (statusError) {
+                if ((statusError as { code?: string })?.code === 'ERR_CANCELED') throw statusError;
+                clearCachedUploadSessionId(storageKey);
+              }
+            }
+
+            if (!session) {
+              const sessionResponse = await api.post(
+                `/products/${productId}/assets/upload-sessions`,
+                {
+                  assetType: selectedType,
+                  originalName: selectedFile.name,
+                  mimeType: selectedFile.type || 'application/octet-stream',
+                  fileSize: selectedFile.size,
+                  notes: notes.trim() || null,
+                },
+                { signal: abortController.signal }
+              );
+              const created = sessionResponse.data.data as {
+                uploadId: string;
+                chunkSize: number;
+                totalChunks: number;
+              };
+              session = { ...created, fileSize: selectedFile.size };
+              receivedChunks = [];
+            }
+
+            uploadId = session.uploadId;
+            saveCachedUploadSessionId(storageKey, session.uploadId);
+
+            let uploadedBytes = calculateUploadedChunkBytes(receivedChunks, session);
+            setUploadProgress({
+              fileName: selectedFile.name,
+              ...buildChunkUploadProgress(uploadedBytes, 0, selectedFile.size),
+            });
+
+            for (const chunkIndex of selectPendingChunkIndexes(session.totalChunks, receivedChunks)) {
               const chunkStart = chunkIndex * session.chunkSize;
               const chunk = selectedFile.slice(
                 chunkStart,
                 Math.min(chunkStart + session.chunkSize, selectedFile.size)
               );
-              let lastError: unknown = null;
+              const completedBytes = uploadedBytes;
 
-              for (let attempt = 0; attempt < 3; attempt += 1) {
+              for (let attempt = 0; attempt < PRODUCT_ASSET_CHUNK_MAX_ATTEMPTS; attempt += 1) {
                 const chunkData = new FormData();
                 chunkData.append('chunk', chunk, selectedFile.name);
+                const chunkController = new AbortController();
+                const releaseAbort = forwardAbort(abortController.signal, chunkController);
+                let lastProgressAt = Date.now();
+                let stalled = false;
+                const stallWatchdog = window.setInterval(() => {
+                  if (!isChunkUploadStalled(lastProgressAt, Date.now())) return;
+                  stalled = true;
+                  chunkController.abort();
+                }, PRODUCT_ASSET_CHUNK_STALL_CHECK_INTERVAL_MS);
+
+                let chunkError: unknown = null;
                 try {
                   await api.put(
                     `/products/${productId}/assets/upload-sessions/${session.uploadId}/chunks/${chunkIndex}`,
                     chunkData,
                     {
-                      ...buildProductAssetUploadConfig(),
+                      ...buildChunkUploadConfig(),
                       headers: { 'Content-Type': 'multipart/form-data' },
-                      signal: abortController.signal,
+                      signal: chunkController.signal,
                       onUploadProgress: (event) => {
+                        lastProgressAt = Date.now();
                         setUploadProgress({
                           fileName: selectedFile.name,
-                          ...buildChunkUploadProgress(chunkStart, event.loaded, selectedFile.size),
+                          ...buildChunkUploadProgress(completedBytes, event.loaded, selectedFile.size),
                         });
                       },
                     }
                   );
-                  lastError = null;
-                  break;
-                } catch (chunkError) {
-                  lastError = chunkError;
-                  if ((chunkError as { code?: string })?.code === 'ERR_CANCELED') throw chunkError;
-                  const status = (chunkError as { response?: { status?: number } })?.response?.status;
-                  if (!shouldRetryChunkUpload(status, attempt)) throw chunkError;
-                  await new Promise((resolve) => {
-                    window.setTimeout(resolve, getChunkRetryDelayMs(attempt));
-                  });
+                } catch (error) {
+                  chunkError = error;
+                } finally {
+                  window.clearInterval(stallWatchdog);
+                  releaseAbort();
                 }
+
+                if (!chunkError) break;
+                if (abortController.signal.aborted) throw chunkError;
+
+                const status = (chunkError as { response?: { status?: number } })?.response?.status;
+                const isLastAttempt = attempt >= PRODUCT_ASSET_CHUNK_MAX_ATTEMPTS - 1;
+                const canRetry = stalled
+                  ? !isLastAttempt
+                  : shouldRetryChunkUpload(status, attempt);
+                if (!canRetry) throw chunkError;
+
+                await new Promise((resolve) => {
+                  window.setTimeout(resolve, getChunkRetryDelayMs(attempt));
+                });
               }
 
-              if (lastError) throw lastError;
+              uploadedBytes = completedBytes + chunk.size;
               setUploadProgress({
                 fileName: selectedFile.name,
-                ...buildChunkUploadProgress(chunkStart, chunk.size, selectedFile.size),
+                ...buildChunkUploadProgress(uploadedBytes, 0, selectedFile.size),
               });
             }
 
@@ -282,6 +373,8 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
               { ...buildProductAssetUploadConfig(), signal: abortController.signal }
             );
             uploadId = null;
+            clearCachedUploadSessionId(storageKey);
+            storageKey = null;
           } else {
             const data = new FormData();
             data.append('assetType', selectedType);
@@ -305,14 +398,19 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
             });
           }
         } catch (err: unknown) {
-          if (uploadId) {
+          const isCancelled = (err as { code?: string })?.code === 'ERR_CANCELED';
+          const status = (err as { response?: { status?: number } })?.response?.status;
+          // Сессию сохраняем только при обрыве связи — повтор продолжит с принятых чанков.
+          const keepForResume = !isCancelled && shouldKeepUploadSessionForResume(status);
+
+          if (uploadId && !keepForResume) {
             try {
               await api.delete(`/products/${productId}/assets/upload-sessions/${uploadId}`);
             } catch {
               // Expired upload sessions are also cleaned automatically by the server.
             }
           }
-          const isCancelled = (err as { code?: string })?.code === 'ERR_CANCELED';
+          if (storageKey && !keepForResume) clearCachedUploadSessionId(storageKey);
 
           if (isCancelled) {
             failedFiles.push(...files.slice(fileIndex));
@@ -325,7 +423,11 @@ export const ProductAssetsPanel: React.FC<ProductAssetsPanelProps> = ({
             (err as { response?: { data?: { message?: string } } })?.response?.data?.message ||
             (err as Error)?.message ||
             'ошибка загрузки';
-          failedMessages.push(`${selectedFile.name}: ${message}`);
+          failedMessages.push(
+            keepForResume
+              ? `${selectedFile.name}: ${message}. Повторная загрузка продолжится с прерванного места.`
+              : `${selectedFile.name}: ${message}`
+          );
         }
       }
 

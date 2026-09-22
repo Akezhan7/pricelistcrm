@@ -1,4 +1,4 @@
-const { DataTypes } = require('sequelize');
+const { DataTypes, QueryTypes } = require('sequelize');
 
 /**
  * Идемпотентная миграция - создание таблицы order_confirmations
@@ -9,11 +9,12 @@ module.exports = {
     
     // Вспомогательная функция для проверки существования таблицы
     async function tableExists(tableName) {
-      const [tables] = await sequelize.query(`
-        SELECT table_name FROM information_schema.tables 
-        WHERE table_schema = 'public' AND table_name = '${tableName}'
-      `);
-      return tables && tables.length > 0;
+      const tables = await sequelize.query(
+        `SELECT table_name FROM information_schema.tables
+         WHERE table_schema = 'public' AND table_name = :tableName`,
+        { replacements: { tableName }, type: QueryTypes.SELECT }
+      );
+      return tables.length > 0;
     }
 
     // Вспомогательная функция для проверки существования индекса
@@ -116,13 +117,14 @@ module.exports = {
 
   async down(queryInterface, Sequelize) {
     const sequelize = queryInterface.sequelize;
-    
-    const [tables] = await sequelize.query(`
-      SELECT table_name FROM information_schema.tables 
-      WHERE table_schema = 'public' AND table_name = 'order_confirmations'
-    `);
 
-    if (tables && tables.length > 0) {
+    const tables = await sequelize.query(
+      `SELECT table_name FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name = 'order_confirmations'`,
+      { type: QueryTypes.SELECT }
+    );
+
+    if (tables.length > 0) {
       await queryInterface.dropTable('order_confirmations');
       console.log('✅ Удалена таблица order_confirmations');
     }

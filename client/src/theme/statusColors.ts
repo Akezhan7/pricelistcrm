@@ -2,7 +2,13 @@
  * Centralized status → Tailwind class mappings.
  * Registry only — migrate usages from pages/components in later phases.
  */
-import type { CollectorTaskStatus, OrderStatus, PaymentStatus, StockStatus } from '../types';
+import type {
+  CollectorTaskStatus,
+  MarketplaceListingStatus,
+  OrderStatus,
+  PaymentStatus,
+  StockStatus,
+} from '../types';
 
 /** Badge classes: bg + text (+ optional border) */
 export type StatusBadgeClasses = string;
@@ -67,6 +73,23 @@ export const collectorTaskStatusColors: Record<CollectorTaskStatus, StatusBadgeC
   in_progress: badge('bg-blue-100', 'text-blue-800'),
   completed: badge('bg-green-100', 'text-green-800'),
 };
+
+/** Marketplace listing statuses (Kaspi card, ProductMarketplacePanel / workflow queue) */
+export const marketplaceListingStatusColors: Record<MarketplaceListingStatus, StatusBadgeClasses> = {
+  not_started: badge('bg-gray-100', 'text-gray-800', 'border border-gray-200'),
+  placing: badge('bg-blue-100', 'text-blue-800', 'border border-blue-200'),
+  moderation: badge('bg-yellow-100', 'text-yellow-800', 'border border-yellow-200'),
+  published: badge('bg-green-100', 'text-green-800', 'border border-green-200'),
+  in_sale: badge('bg-teal-100', 'text-teal-800', 'border border-teal-200'),
+  blocked: badge('bg-red-100', 'text-red-700', 'border border-red-200'),
+  removed: badge('bg-gray-200', 'text-gray-600', 'border border-gray-300'),
+};
+
+export function getMarketplaceListingStatusColor(
+  status: MarketplaceListingStatus
+): StatusBadgeClasses {
+  return marketplaceListingStatusColors[status] ?? badge('bg-gray-100', 'text-gray-800', 'border border-gray-200');
+}
 
 export function getOrderStatusColor(
   status: OrderStatus,

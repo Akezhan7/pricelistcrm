@@ -3,7 +3,7 @@ import { CheckCircle2, Save } from 'lucide-react';
 import { toast } from '../context/ToastContext';
 import productsApi from '../services/productsApi';
 import type { ProductLaunchFlags, ProductWorkflowItem } from '../types';
-import { Alert, Badge, Button, Spinner, Textarea } from './ui';
+import { Alert, Badge, Button, Input, Spinner, Textarea } from './ui';
 
 type ProductSaleLaunchPanelProps = {
   product: ProductWorkflowItem;
@@ -35,6 +35,7 @@ export const ProductSaleLaunchPanel: React.FC<ProductSaleLaunchPanelProps> = ({
 }) => {
   const [flags, setFlags] = useState<ProductLaunchFlags | null>(null);
   const [notes, setNotes] = useState('');
+  const [campaignName, setCampaignName] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -46,6 +47,7 @@ export const ProductSaleLaunchPanel: React.FC<ProductSaleLaunchPanelProps> = ({
       const loadedFlags = await productsApi.getProductLaunchFlags(product.id);
       setFlags(loadedFlags);
       setNotes(loadedFlags.notes || '');
+      setCampaignName(loadedFlags.campaignName || '');
       setError('');
     } catch (loadError) {
       setError(getErrorMessage(loadError, 'Не удалось загрузить параметры продаж'));
@@ -72,6 +74,7 @@ export const ProductSaleLaunchPanel: React.FC<ProductSaleLaunchPanelProps> = ({
       reviewBonusEnabled: flags.reviewBonusEnabled,
       sellerBonusEnabled: flags.sellerBonusEnabled,
       notes: notes.trim() || undefined,
+      campaignName: campaignName.trim() || null,
     };
 
     try {
@@ -79,6 +82,7 @@ export const ProductSaleLaunchPanel: React.FC<ProductSaleLaunchPanelProps> = ({
         const updatedFlags = await productsApi.updateProductLaunchFlags(product.id, payload);
         setFlags(updatedFlags);
         setNotes(updatedFlags.notes || '');
+        setCampaignName(updatedFlags.campaignName || '');
         toast.success('Параметры продаж обновлены');
       } else {
         await productsApi.completeProductSaleLaunch(product.id, payload);
@@ -137,6 +141,14 @@ export const ProductSaleLaunchPanel: React.FC<ProductSaleLaunchPanelProps> = ({
           </label>
         ))}
       </div>
+
+      <Input
+        label="Рекламная кампания"
+        value={campaignName}
+        onChange={(event) => setCampaignName(event.target.value)}
+        disabled={!canEdit}
+        placeholder="Название кампании в Kaspi Advertising"
+      />
 
       <Textarea
         label="Примечание"

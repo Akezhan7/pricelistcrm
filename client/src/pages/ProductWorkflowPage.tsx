@@ -42,6 +42,8 @@ import {
   PRODUCT_LIFECYCLE_ALL_FILTERS,
   getProductLifecycleLabel,
 } from '../constants/productLifecycle';
+import { getMarketplaceListingStatusLabel } from '../constants/marketplaceListing';
+import { getMarketplaceListingStatusColor } from '../theme/statusColors';
 import { useProductEditor } from '../hooks/useProductEditor';
 
 type WorkflowMeta = {
@@ -255,6 +257,11 @@ export const ProductWorkflowPage: React.FC = () => {
     await fetchProducts();
   };
 
+  /** Обновляет карточку в очереди без закрытия модалки — для простого "Сохранить" внутри неё. */
+  const handleWorkflowSaved = async () => {
+    await fetchProducts();
+  };
+
   return (
     <Layout fullHeight>
       <div className="flex h-full min-h-0 flex-col gap-4">
@@ -406,11 +413,23 @@ export const ProductWorkflowPage: React.FC = () => {
                               {product.article}
                             </p>
                           </div>
-                          {product.lifecycleStatus && (
-                            <Badge variant="outline">
-                              {getProductLifecycleLabel(product.lifecycleStatus)}
-                            </Badge>
-                          )}
+                          <div className="flex flex-wrap items-center justify-end gap-1.5">
+                            {product.lifecycleStatus && (
+                              <Badge variant="outline">
+                                {getProductLifecycleLabel(product.lifecycleStatus)}
+                              </Badge>
+                            )}
+                            {(() => {
+                              const kaspiListing = product.marketplaceListings?.find(
+                                (listing) => listing.marketplace === 'kaspi'
+                              );
+                              return kaspiListing ? (
+                                <Badge statusClass={getMarketplaceListingStatusColor(kaspiListing.status)}>
+                                  {getMarketplaceListingStatusLabel(kaspiListing.status)}
+                                </Badge>
+                              ) : null;
+                            })()}
+                          </div>
                         </div>
 
                         <div className="mt-3 grid grid-cols-1 gap-2 text-caption text-text-muted sm:grid-cols-2">
@@ -580,6 +599,7 @@ export const ProductWorkflowPage: React.FC = () => {
             <ProductMarketplacePanel
               product={marketplaceProduct}
               onChanged={handleWorkflowChanged}
+              onSaved={handleWorkflowSaved}
               showMaterials
             />
           )}

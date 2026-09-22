@@ -58,6 +58,7 @@ const {
 const {
   assembleUploadSession,
   createUploadSession,
+  getUploadSessionStatus,
   removeUploadSession,
   saveUploadChunk,
 } = require('../services/productAssetChunkUploadService');
@@ -548,6 +549,12 @@ const getProductWorkflowQueue = async (req, res) => {
           as: 'launchFlags',
           required: false,
         },
+        {
+          model: ProductMarketplaceListing,
+          as: 'marketplaceListings',
+          attributes: ['id', 'marketplace', 'status'],
+          required: false,
+        },
         ...productUserInclude,
       ],
       distinct: true,
@@ -836,6 +843,22 @@ const createProductAssetUploadSession = async (req, res) => {
         totalChunks: session.totalChunks,
       },
     });
+  } catch (error) {
+    return sendChunkUploadError(res, error);
+  }
+};
+
+const getProductAssetUploadSessionStatus = async (req, res) => {
+  try {
+    const product = await findManageableProductAssetTarget(req.params.id, req.user);
+    const status = await getUploadSessionStatus({
+      rootDir: uploadsDir,
+      uploadId: req.params.uploadId,
+      productId: product.id,
+      uploadedBy: req.user.id,
+    });
+
+    return res.json({ success: true, data: status });
   } catch (error) {
     return sendChunkUploadError(res, error);
   }
@@ -4100,6 +4123,7 @@ module.exports = {
   getProductAssets,
   createProductAsset,
   createProductAssetUploadSession,
+  getProductAssetUploadSessionStatus,
   uploadProductAssetChunk,
   completeProductAssetUpload,
   cancelProductAssetUpload,

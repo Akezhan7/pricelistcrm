@@ -4,6 +4,7 @@ import type {
   PurchaseSuggestions,
   ApiResponse,
   DesignerKpiReport,
+  ManagerActivityReport,
 } from '../types';
 
 class AnalyticsApi {
@@ -114,6 +115,28 @@ class AnalyticsApi {
 
     if (!response.data.success || !response.data.data) {
       throw new Error(response.data.message || 'Ошибка получения KPI дизайнеров');
+    }
+
+    return response.data.data;
+  }
+
+  async getManagerActivityReport(params?: {
+    from?: string;
+    to?: string;
+  }): Promise<ManagerActivityReport> {
+    const queryParams = new URLSearchParams();
+
+    if (params?.from) queryParams.append('from', params.from);
+    if (params?.to) queryParams.append('to', params.to);
+
+    const url = queryParams.toString()
+      ? `${this.baseUrl}/manager-activity?${queryParams}`
+      : `${this.baseUrl}/manager-activity`;
+
+    const response = await api.get<ApiResponse<ManagerActivityReport>>(url);
+
+    if (!response.data.success || !response.data.data) {
+      throw new Error(response.data.message || 'Ошибка получения отчёта по менеджерам');
     }
 
     return response.data.data;

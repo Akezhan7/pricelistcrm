@@ -15,6 +15,7 @@ const {
   getProductAssets,
   createProductAsset,
   createProductAssetUploadSession,
+  getProductAssetUploadSessionStatus,
   uploadProductAssetChunk,
   completeProductAssetUpload,
   cancelProductAssetUpload,
@@ -344,6 +345,7 @@ const saleLaunchValidation = [
   body('reviewBonusEnabled').isBoolean(),
   body('sellerBonusEnabled').isBoolean(),
   body('notes').optional({ nullable: true }).isLength({ max: 2000 }),
+  body('campaignName').optional({ nullable: true }).isLength({ max: 120 }),
 ];
 
 router.post('/:id/lifecycle/complete-sale-launch',
@@ -419,6 +421,12 @@ router.post('/:id/assets/upload-sessions',
   createProductAssetUploadSession
 );
 
+router.get('/:id/assets/upload-sessions/:uploadId',
+  auth,
+  requireRole('admin', 'designer'),
+  getProductAssetUploadSessionStatus
+);
+
 router.put('/:id/assets/upload-sessions/:uploadId/chunks/:chunkIndex',
   auth,
   requireRole('admin', 'designer'),
@@ -454,7 +462,7 @@ router.post('/:id/marketplaces',
     body('sku').optional({ nullable: true }).isLength({ max: 120 }),
     body('productCode').optional({ nullable: true }).isLength({ max: 120 }),
     body('marketplaceName').optional({ nullable: true }).isLength({ max: 255 }),
-    body('marketplaceArticle').optional({ nullable: true }).isLength({ max: 120 }),
+    body('campaignName').optional({ nullable: true }).isLength({ max: 120 }),
     body('price').optional({ nullable: true, values: 'falsy' }).isFloat({ min: 0 }),
     body('url').optional({ nullable: true }).isLength({ max: 500 }),
     body('description').optional({ nullable: true }).isLength({ max: 4000 }),
@@ -470,7 +478,7 @@ router.put('/:id/marketplaces/:listingId',
     body('sku').optional({ nullable: true }).isLength({ max: 120 }),
     body('productCode').optional({ nullable: true }).isLength({ max: 120 }),
     body('marketplaceName').optional({ nullable: true }).isLength({ max: 255 }),
-    body('marketplaceArticle').optional({ nullable: true }).isLength({ max: 120 }),
+    body('campaignName').optional({ nullable: true }).isLength({ max: 120 }),
     body('price').optional({ nullable: true, values: 'falsy' }).isFloat({ min: 0 }),
     body('url').optional({ nullable: true }).isLength({ max: 500 }),
     body('description').optional({ nullable: true }).isLength({ max: 4000 }),

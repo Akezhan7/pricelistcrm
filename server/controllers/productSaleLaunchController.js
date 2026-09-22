@@ -41,11 +41,16 @@ async function getProductLaunchFlags(req, res) {
     const product = await Product.findOne({ where: { id: req.params.id, isActive: true } });
     if (!product) throw requestError(404, 'Товар не найден');
 
-    const launchFlags = await ProductLaunchFlags.findOne({ where: { productId: product.id } });
-    return res.json({
-      success: true,
-      data: {
-        launchFlags: launchFlags || {
+    const [launchFlags, kaspiListing] = await Promise.all([
+      ProductLaunchFlags.findOne({ where: { productId: product.id } }),
+      ProductMarketplaceListing.findOne({
+        where: { productId: product.id, marketplace: MARKETPLACE_KEYS.KASPI },
+      }),
+    ]);
+    const campaignName = kaspiListing?.campaignName ?? null;
+    const flagsData = launchFlags
+      ? { ...launchFlags.toJSON(), campaignName }
+      : {
           productId: product.id,
           internalAdvertisingStarted: false,
           externalAdvertisingStarted: false,
@@ -53,8 +58,12 @@ async function getProductLaunchFlags(req, res) {
           sellerBonusEnabled: false,
           notes: null,
           completedAt: product.lifecycleCompletedAt,
-        },
-      },
+          campaignName,
+        };
+
+    return res.json({
+      success: true,
+      data: { launchFlags: flagsData },
     });
   } catch (error) {
     return sendError(res, error, 'Error loading product launch flags:');
@@ -110,7 +119,11 @@ async function completeProductSaleLaunch(req, res) {
     return res.json({
       success: true,
       message: 'Запуск продаж завершен',
-      data: { product, launchFlags, marketplaceListing: kaspiListing },
+      data: {
+        product,
+        launchFlags: { ...launchFlags.toJSON(), campaignName: kaspiListing.campaignName },
+        marketplaceListing: kaspiListing,
+      },
     });
   } catch (error) {
     if (!transactionFinished) await transaction.rollback();
@@ -131,11 +144,18 @@ async function updateProductLaunchFlags(req, res) {
     });
     if (!product) throw requestError(404, 'Товар не найден');
 
-    const launchFlags = await ProductLaunchFlags.findOne({
-      where: { productId: product.id },
-      transaction,
-      lock: true,
-    });
+    const [launchFlags, kaspiListing] = await Promise.all([
+      ProductLaunchFlags.findOne({
+        where: { productId: product.id },
+        transaction,
+        lock: true,
+      }),
+      ProductMarketplaceListing.findOne({
+        where: { productId: product.id, marketplace: MARKETPLACE_KEYS.KASPI },
+        transaction,
+        lock: true,
+      }),
+    ]);
     if (!launchFlags?.completedAt && !product.lifecycleCompletedAt) {
       throw requestError(409, 'Сначала завершите запуск продаж');
     }
@@ -151,6 +171,7 @@ async function updateProductLaunchFlags(req, res) {
         completedAt: null,
         completedBy: null,
       },
+      kaspiListing,
       actor: req.user,
       payload: req.body,
       now: new Date(),
@@ -162,6 +183,9 @@ async function updateProductLaunchFlags(req, res) {
         ...plan.launchFlagsUpdate,
       }, { transaction });
     await product.update(plan.productUpdate, { transaction });
+    if (plan.marketplaceListingUpdate && kaspiListing) {
+      await kaspiListing.update(plan.marketplaceListingUpdate, { transaction });
+    }
     if (plan.history) await ProductActionHistory.create(plan.history, { transaction });
 
     await transaction.commit();
@@ -169,7 +193,12 @@ async function updateProductLaunchFlags(req, res) {
     return res.json({
       success: true,
       message: plan.history ? 'Параметры продаж обновлены' : 'Изменений нет',
-      data: { launchFlags: savedLaunchFlags },
+      data: {
+        launchFlags: {
+          ...savedLaunchFlags.toJSON(),
+          campaignName: plan.marketplaceListingUpdate?.campaignName ?? kaspiListing?.campaignName ?? null,
+        },
+      },
     });
   } catch (error) {
     if (!transactionFinished) await transaction.rollback();

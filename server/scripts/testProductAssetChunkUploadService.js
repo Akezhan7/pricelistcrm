@@ -1,4 +1,5 @@
 const assert = require('assert');
+const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -7,6 +8,7 @@ const express = require('express');
 const {
   DEFAULT_CHUNK_SIZE,
   createUploadSession,
+  getUploadSessionStatus,
   saveUploadChunk,
   assembleUploadSession,
   removeUploadSession,
@@ -45,6 +47,80 @@ async function testChunkMiddlewareAcceptsCompleteChunk() {
   }
 }
 
+async function testUploadSessionStatusTracksReceivedChunks() {
+  const rootDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'crm-asset-resume-'));
+  const content = Buffer.from('interrupted upload that must resume from received chunks');
+  const chunkSize = 12;
+
+  try {
+    const session = await createUploadSession({
+      rootDir,
+      productId: 21,
+      uploadedBy: 9,
+      assetType: 'psd_source',
+      originalName: 'resume.psd',
+      mimeType: 'application/octet-stream',
+      fileSize: content.length,
+      chunkSize,
+    });
+
+    const emptyStatus = await getUploadSessionStatus({
+      rootDir,
+      uploadId: session.uploadId,
+      productId: 21,
+      uploadedBy: 9,
+    });
+    assert.deepStrictEqual(emptyStatus.receivedChunks, []);
+    assert.strictEqual(emptyStatus.uploadId, session.uploadId);
+    assert.strictEqual(emptyStatus.totalChunks, session.totalChunks);
+    assert.strictEqual(emptyStatus.chunkSize, chunkSize);
+    assert.strictEqual(emptyStatus.fileSize, content.length);
+
+    // Повторяем инцидент: сервер принял только первые два чанка.
+    for (const index of [0, 1]) {
+      const start = index * chunkSize;
+      await saveUploadChunk({
+        rootDir,
+        uploadId: session.uploadId,
+        productId: 21,
+        uploadedBy: 9,
+        chunkIndex: index,
+        buffer: content.subarray(start, Math.min(start + chunkSize, content.length)),
+      });
+    }
+
+    const partialStatus = await getUploadSessionStatus({
+      rootDir,
+      uploadId: session.uploadId,
+      productId: 21,
+      uploadedBy: 9,
+    });
+    assert.deepStrictEqual(partialStatus.receivedChunks, [0, 1]);
+
+    await assert.rejects(
+      () => getUploadSessionStatus({
+        rootDir,
+        uploadId: session.uploadId,
+        productId: 21,
+        uploadedBy: 999,
+      }),
+      (error) => error.statusCode === 403
+    );
+
+    await assert.rejects(
+      () => getUploadSessionStatus({
+        rootDir,
+        uploadId: crypto.randomUUID(),
+        productId: 21,
+        uploadedBy: 9,
+      }),
+      (error) => error.statusCode === 404
+    );
+  } finally {
+    await fs.promises.rm(rootDir, { recursive: true, force: true });
+  }
+}
+
 async function run() {
   assert.strictEqual(DEFAULT_CHUNK_SIZE, 2 * 1024 * 1024);
   assert.ok(
@@ -52,6 +128,7 @@ async function run() {
     'Multer file limit must be larger than a complete upload chunk'
   );
   await testChunkMiddlewareAcceptsCompleteChunk();
+  await testUploadSessionStatusTracksReceivedChunks();
 
   const rootDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'crm-asset-upload-'));
   const content = Buffer.from('large psd content split into several chunks');

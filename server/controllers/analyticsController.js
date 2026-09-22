@@ -10,11 +10,13 @@ const {
   User,
   ProductDesignerKpiEntry,
   ProductMarketplaceListing,
+  ProductActionHistory,
 } = require('../models');
 const { Op } = require('sequelize');
 const { getStockStatus } = require('./productController');
 const { formatStockAnalyticsMessage, formatStockSummary } = require('../utils/whatsappFormatter');
 const { buildDesignerKpiReport } = require('../services/productDesignerKpiService');
+const { buildManagerActivityReport } = require('../services/managerActivityReportService');
 
 function parseDateFilter(value, fallback) {
   if (!value) return fallback;
@@ -790,6 +792,99 @@ const getDesignerKpiReport = async (req, res) => {
   }
 };
 
+/**
+ * Активность администраторов-менеджеров: разбивка действий с товарами
+ * и количество оформленных заявок за период.
+ * GET /api/analytics/manager-activity
+ */
+const getManagerActivityReport = async (req, res) => {
+  try {
+    if (req.user.role !== 'admin' || req.user.canViewManagerReports !== true) {
+      return res.status(403).json({
+        success: false,
+        message: 'Недостаточно прав для просмотра отчёта по менеджерам',
+      });
+    }
+
+    const defaults = getDefaultKpiPeriod();
+    const from = parseDateFilter(req.query.from, defaults.from);
+    const toInput = parseDateFilter(req.query.to, addUtcDays(defaults.toExclusive, -1));
+    const toExclusive = addUtcDays(toInput, 1);
+
+    if (from >= toExclusive) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid report period',
+      });
+    }
+
+    const dateRange = { [Op.gte]: from, [Op.lt]: toExclusive };
+
+    const [historyRows, orderRows] = await Promise.all([
+      ProductActionHistory.findAll({
+        where: { createdAt: dateRange },
+        include: [
+          {
+            model: User,
+            as: 'actor',
+            attributes: ['id', 'name', 'email'],
+            where: { role: 'admin' },
+            required: true,
+          },
+        ],
+        order: [['createdAt', 'DESC']],
+      }),
+      Order.findAll({
+        attributes: [
+          'createdBy',
+          [sequelize.fn('COUNT', sequelize.col('Order.id')), 'count'],
+        ],
+        where: { createdAt: dateRange },
+        include: [
+          {
+            model: User,
+            as: 'creator',
+            attributes: [],
+            where: { role: 'admin' },
+            required: true,
+          },
+        ],
+        group: ['Order.created_by'],
+        raw: true,
+      }),
+    ]);
+
+    const orderCountByUser = orderRows.reduce((acc, row) => {
+      acc[row.createdBy] = Number(row.count) || 0;
+      return acc;
+    }, {});
+
+    return res.json({
+      success: true,
+      data: {
+        period: {
+          from: from.toISOString().slice(0, 10),
+          to: addUtcDays(toExclusive, -1).toISOString().slice(0, 10),
+        },
+        ...buildManagerActivityReport({ historyRows, orderCountByUser }),
+      },
+    });
+  } catch (error) {
+    if (error.status === 400) {
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+      });
+    }
+
+    console.error('Error loading manager activity report:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while loading manager activity report',
+    });
+  }
+};
+
 module.exports = {
   getStockOverview,
   getStockByCategory,
@@ -800,4 +895,5 @@ module.exports = {
   getPurchaseSuggestions,
   getLowStockProducts,
   getDesignerKpiReport,
+  getManagerActivityReport,
 };

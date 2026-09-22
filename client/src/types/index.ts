@@ -113,7 +113,7 @@ export interface Product {
   suppliers?: SupplierWithPrice[];
   marketplaceListings?: Array<Pick<
     ProductMarketplaceListing,
-    'id' | 'marketplace' | 'productCode'
+    'id' | 'marketplace' | 'productCode' | 'status'
   >>;
   variations?: ProductVariation[];
   createdAt: string;
@@ -176,6 +176,35 @@ export interface DesignerKpiReport {
     designerCount: number;
   };
   designers: DesignerKpiRow[];
+}
+
+export interface ManagerActivityActionBreakdownEntry {
+  actionType: string;
+  count: number;
+}
+
+export interface ManagerActivityRow {
+  manager: {
+    id: number;
+    name: string;
+    email: string | null;
+  };
+  totalActions: number;
+  ordersCreated: number;
+  actionBreakdown: ManagerActivityActionBreakdownEntry[];
+}
+
+export interface ManagerActivityReport {
+  period: {
+    from: string;
+    to: string;
+  };
+  summary: {
+    totalActions: number;
+    totalOrders: number;
+    managerCount: number;
+  };
+  managers: ManagerActivityRow[];
 }
 
 export type EmployeeTaskStatus =
@@ -372,7 +401,7 @@ export interface ProductMarketplaceListing {
   status: MarketplaceListingStatus;
   sku?: string | null;
   productCode?: string | null;
-  marketplaceArticle?: string | null;
+  campaignName?: string | null;
   marketplaceName?: string | null;
   price?: string | number | null;
   url?: string | null;
@@ -427,6 +456,8 @@ export interface ProductLaunchFlags {
   externalAdvertisingStarted: boolean;
   reviewBonusEnabled: boolean;
   sellerBonusEnabled: boolean;
+  /** Название рекламной кампании Kaspi; хранится на маркетплейс-листинге, отдаётся здесь для удобства. */
+  campaignName?: string | null;
   notes?: string | null;
   updatedBy?: number | null;
   completedBy?: number | null;

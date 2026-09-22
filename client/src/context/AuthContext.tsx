@@ -9,6 +9,9 @@ export type User = {
   name: string;
   email: string;
   role: UserRole;
+  canManageUsers?: boolean;
+  canManageKpiWeights?: boolean;
+  canViewManagerReports?: boolean;
 };
 
 type AuthContextType = {

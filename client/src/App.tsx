@@ -21,6 +21,7 @@ import { ProductsPage } from './pages/ProductsPage';
 import { ProductWorkflowPage } from './pages/ProductWorkflowPage';
 import { TasksPage } from './pages/TasksPage';
 import { DesignerKpiReport } from './pages/DesignerKpiReport';
+import { ManagerActivityReport } from './pages/ManagerActivityReport';
 import { SuppliersPage } from './pages/SuppliersPage';
 import { SupplierDetailsPage } from './pages/SupplierDetailsPage';
 import { PriceListPage } from './pages/PriceListPage';
@@ -125,6 +126,15 @@ const AppRoutes: React.FC = () => {
         element={
           <ProtectedRoute>
             <DesignerKpiReport />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route
+        path="/reports/manager-activity"
+        element={
+          <ProtectedRoute>
+            <ManagerActivityReport />
           </ProtectedRoute>
         }
       />

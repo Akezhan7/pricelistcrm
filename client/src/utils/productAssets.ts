@@ -8,7 +8,12 @@ const CP1251_HIGH_CHARS =
 
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
 const PRODUCT_ASSET_UPLOAD_TIMEOUT_MS = 10 * 60 * 1000;
+const UPLOAD_SESSION_STORAGE_PREFIX = 'crm_product_asset_upload_v1:';
 export const PRODUCT_ASSET_CHUNK_SIZE = 10 * 1024 * 1024;
+export const PRODUCT_ASSET_CHUNK_TIMEOUT_MS = 2 * 60 * 1000;
+export const PRODUCT_ASSET_CHUNK_MAX_ATTEMPTS = 5;
+export const PRODUCT_ASSET_CHUNK_STALL_TIMEOUT_MS = 30 * 1000;
+export const PRODUCT_ASSET_CHUNK_STALL_CHECK_INTERVAL_MS = 5 * 1000;
 
 export type ProductAssetUploadProgress = {
   loaded: number;
@@ -16,8 +21,31 @@ export type ProductAssetUploadProgress = {
   percent: number;
 };
 
+export type ProductAssetUploadSession = {
+  uploadId: string;
+  chunkSize: number;
+  totalChunks: number;
+  fileSize: number;
+};
+
+export type ProductAssetUploadSessionStatus = ProductAssetUploadSession & {
+  assetType: ProductAssetType;
+  receivedChunks: number[];
+};
+
+/** Достаточно для идентификации файла в кэше сессий; File подходит структурно. */
+export type UploadFileIdentity = {
+  name: string;
+  size: number;
+  lastModified: number;
+};
+
 export function buildProductAssetUploadConfig() {
   return { timeout: PRODUCT_ASSET_UPLOAD_TIMEOUT_MS };
+}
+
+export function buildChunkUploadConfig() {
+  return { timeout: PRODUCT_ASSET_CHUNK_TIMEOUT_MS };
 }
 
 export function calculateProductAssetUploadProgress(
@@ -37,12 +65,94 @@ export function shouldUseChunkedUpload(fileSize: number) {
 }
 
 export function shouldRetryChunkUpload(status: number | undefined, attempt: number) {
-  if (attempt >= 2) return false;
+  if (attempt >= PRODUCT_ASSET_CHUNK_MAX_ATTEMPTS - 1) return false;
   return status === undefined || status === 408 || status === 429 || status >= 500;
 }
 
 export function getChunkRetryDelayMs(attempt: number) {
-  return (attempt + 1) * 1000;
+  return Math.min(1000 * 2 ** attempt, 8000);
+}
+
+/**
+ * Обрыв соединения через туннель не закрывает запрос — байты просто перестают
+ * идти. Ждать абсолютный timeout значит держать интерфейс минутами, поэтому
+ * залипание определяем по остановке прогресса.
+ */
+export function isChunkUploadStalled(lastProgressAt: number, now: number) {
+  return now - lastProgressAt >= PRODUCT_ASSET_CHUNK_STALL_TIMEOUT_MS;
+}
+
+export function selectPendingChunkIndexes(totalChunks: number, receivedChunks: number[]) {
+  const received = new Set(receivedChunks);
+  const pending: number[] = [];
+  for (let index = 0; index < totalChunks; index += 1) {
+    if (!received.has(index)) pending.push(index);
+  }
+  return pending;
+}
+
+function getChunkByteSize(index: number, session: ProductAssetUploadSession) {
+  return index === session.totalChunks - 1
+    ? session.fileSize - index * session.chunkSize
+    : session.chunkSize;
+}
+
+export function calculateUploadedChunkBytes(
+  receivedChunks: number[],
+  session: ProductAssetUploadSession
+) {
+  return receivedChunks.reduce((sum, index) => sum + getChunkByteSize(index, session), 0);
+}
+
+/** Сессию стоит сохранить для докачки, если сервер не отверг её по существу. */
+export function shouldKeepUploadSessionForResume(status: number | undefined) {
+  if (status === undefined) return true;
+  if (status === 408 || status === 429) return true;
+  return status >= 500;
+}
+
+export function isResumableUploadSession(
+  status: ProductAssetUploadSessionStatus,
+  file: UploadFileIdentity,
+  assetType: ProductAssetType
+) {
+  return Boolean(status.uploadId)
+    && status.assetType === assetType
+    && status.fileSize === file.size
+    && status.totalChunks > 0
+    && status.chunkSize > 0
+    && Array.isArray(status.receivedChunks);
+}
+
+export function buildUploadSessionStorageKey(productId: number, file: UploadFileIdentity) {
+  return `${UPLOAD_SESSION_STORAGE_PREFIX}${productId}:${file.size}:${file.lastModified}:${file.name}`;
+}
+
+export function loadCachedUploadSessionId(key: string): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+export function saveCachedUploadSessionId(key: string, uploadId: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(key, uploadId);
+  } catch {
+    // ignore quota errors
+  }
+}
+
+export function clearCachedUploadSessionId(key: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // ignore quota errors
+  }
 }
 
 export function buildChunkUploadProgress(

@@ -48,6 +48,12 @@ function assertSessionOwner(manifest, productId, uploadedBy) {
   }
 }
 
+function getExpectedChunkSize(manifest, index) {
+  return index === manifest.totalChunks - 1
+    ? manifest.fileSize - index * manifest.chunkSize
+    : manifest.chunkSize;
+}
+
 async function cleanupExpiredUploadSessions(rootDir, now = Date.now()) {
   const sessionsRoot = getSessionsRoot(rootDir);
   let entries = [];
@@ -123,6 +129,32 @@ async function createUploadSession({
   return { ...manifest, sessionDir };
 }
 
+async function getUploadSessionStatus({ rootDir, uploadId, productId, uploadedBy }) {
+  const manifest = await readManifest(rootDir, uploadId);
+  assertSessionOwner(manifest, productId, uploadedBy);
+
+  const sessionDir = getSessionDir(rootDir, uploadId);
+  const receivedChunks = [];
+  for (let index = 0; index < manifest.totalChunks; index += 1) {
+    try {
+      const stats = await fs.promises.stat(path.join(sessionDir, `chunk-${index}`));
+      if (stats.size === getExpectedChunkSize(manifest, index)) receivedChunks.push(index);
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+  }
+
+  return {
+    uploadId: manifest.uploadId,
+    assetType: manifest.assetType,
+    originalName: manifest.originalName,
+    fileSize: manifest.fileSize,
+    chunkSize: manifest.chunkSize,
+    totalChunks: manifest.totalChunks,
+    receivedChunks,
+  };
+}
+
 async function saveUploadChunk({ rootDir, uploadId, productId, uploadedBy, chunkIndex, buffer }) {
   const manifest = await readManifest(rootDir, uploadId);
   assertSessionOwner(manifest, productId, uploadedBy);
@@ -133,10 +165,9 @@ async function saveUploadChunk({ rootDir, uploadId, productId, uploadedBy, chunk
   }
   if (!Buffer.isBuffer(buffer)) throw createUploadError('chunk is required');
 
-  const expectedSize = index === manifest.totalChunks - 1
-    ? manifest.fileSize - index * manifest.chunkSize
-    : manifest.chunkSize;
-  if (buffer.length !== expectedSize) throw createUploadError('invalid chunk size');
+  if (buffer.length !== getExpectedChunkSize(manifest, index)) {
+    throw createUploadError('invalid chunk size');
+  }
 
   const chunkPath = path.join(getSessionDir(rootDir, uploadId), `chunk-${index}`);
   const tempPath = `${chunkPath}.tmp`;
@@ -163,10 +194,9 @@ async function assembleUploadSession({ rootDir, uploadId, productId, uploadedBy 
   for (let index = 0; index < manifest.totalChunks; index += 1) {
     try {
       const stats = await fs.promises.stat(path.join(sessionDir, `chunk-${index}`));
-      const expectedSize = index === manifest.totalChunks - 1
-        ? manifest.fileSize - index * manifest.chunkSize
-        : manifest.chunkSize;
-      if (stats.size !== expectedSize) throw createUploadError(`chunk ${index} is incomplete`, 409);
+      if (stats.size !== getExpectedChunkSize(manifest, index)) {
+        throw createUploadError(`chunk ${index} is incomplete`, 409);
+      }
     } catch (error) {
       if (error.code === 'ENOENT') throw createUploadError(`chunk ${index} is missing`, 409);
       throw error;
@@ -214,6 +244,7 @@ module.exports = {
   assembleUploadSession,
   cleanupExpiredUploadSessions,
   createUploadSession,
+  getUploadSessionStatus,
   removeUploadSession,
   saveUploadChunk,
 };

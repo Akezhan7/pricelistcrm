@@ -20,6 +20,7 @@ function testCompletesSaleLaunchWithOptionalFlagsDisabled() {
       id: 31,
       marketplace: 'kaspi',
       status: 'published',
+      campaignName: null,
     },
     actor: { id: 7, role: 'marketplace_manager' },
     payload: {
@@ -28,6 +29,7 @@ function testCompletesSaleLaunchWithOptionalFlagsDisabled() {
       reviewBonusEnabled: false,
       sellerBonusEnabled: true,
       notes: ' Реклама нужна, остальное позже ',
+      campaignName: ' Осенняя распродажа ',
     },
     now,
   });
@@ -51,8 +53,10 @@ function testCompletesSaleLaunchWithOptionalFlagsDisabled() {
   });
   assert.deepStrictEqual(plan.marketplaceListingUpdate, {
     status: 'in_sale',
+    campaignName: 'Осенняя распродажа',
     managedBy: 7,
   });
+  assert.strictEqual(plan.history.metadata.campaignName, 'Осенняя распродажа');
   assert.strictEqual(plan.history.actionType, 'sale_launch_completed');
 }
 
@@ -124,6 +128,71 @@ function testBuildsPostCompletionFlagUpdate() {
   assert.strictEqual(plan.history.toStatus, PRODUCT_LIFECYCLE_STATUSES.IN_SALE);
 }
 
+function testUpdatesCampaignNameOnPostCompletionUpdate() {
+  const completedAt = new Date('2026-07-10T14:00:00Z');
+  const plan = buildSaleLaunchUpdatePlan({
+    product: {
+      id: 15,
+      lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
+      lifecycleCompletedAt: completedAt,
+    },
+    launchFlags: {
+      internalAdvertisingStarted: true,
+      externalAdvertisingStarted: false,
+      reviewBonusEnabled: false,
+      sellerBonusEnabled: true,
+      notes: null,
+      completedAt,
+      completedBy: 7,
+    },
+    kaspiListing: { id: 31, marketplace: 'kaspi', campaignName: 'Летняя акция' },
+    actor: { id: 8, role: 'admin' },
+    payload: {
+      internalAdvertisingStarted: true,
+      externalAdvertisingStarted: false,
+      reviewBonusEnabled: false,
+      sellerBonusEnabled: true,
+      campaignName: ' Осенняя распродажа ',
+    },
+  });
+
+  assert.deepStrictEqual(plan.marketplaceListingUpdate, { campaignName: 'Осенняя распродажа' });
+  assert.deepStrictEqual(plan.changedFields, ['campaignName']);
+  assert.strictEqual(plan.history.metadata.campaignName, 'Осенняя распродажа');
+}
+
+function testSkipsMarketplaceListingUpdateWhenCampaignNameUnchanged() {
+  const completedAt = new Date('2026-07-10T14:00:00Z');
+  const plan = buildSaleLaunchUpdatePlan({
+    product: {
+      id: 15,
+      lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
+      lifecycleCompletedAt: completedAt,
+    },
+    launchFlags: {
+      internalAdvertisingStarted: true,
+      externalAdvertisingStarted: false,
+      reviewBonusEnabled: false,
+      sellerBonusEnabled: true,
+      notes: null,
+      completedAt,
+      completedBy: 7,
+    },
+    kaspiListing: { id: 31, marketplace: 'kaspi', campaignName: 'Летняя акция' },
+    actor: { id: 8, role: 'admin' },
+    payload: {
+      internalAdvertisingStarted: true,
+      externalAdvertisingStarted: false,
+      reviewBonusEnabled: false,
+      sellerBonusEnabled: true,
+      campaignName: 'Летняя акция',
+    },
+  });
+
+  assert.strictEqual(plan.marketplaceListingUpdate, null);
+  assert.deepStrictEqual(plan.changedFields, []);
+}
+
 function testRepairsMissingFlagsCompletionDateDuringUpdate() {
   const completedAt = new Date('2026-07-10T14:00:00Z');
   const plan = buildSaleLaunchUpdatePlan({
@@ -157,6 +226,8 @@ function testRepairsMissingFlagsCompletionDateDuringUpdate() {
 testCompletesSaleLaunchWithOptionalFlagsDisabled();
 testRejectsRepeatedSaleLaunchCompletion();
 testBuildsPostCompletionFlagUpdate();
+testUpdatesCampaignNameOnPostCompletionUpdate();
+testSkipsMarketplaceListingUpdateWhenCampaignNameUnchanged();
 testRepairsMissingFlagsCompletionDateDuringUpdate();
 
 console.log('Product sale launch service test passed');

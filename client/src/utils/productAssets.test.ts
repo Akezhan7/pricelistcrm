@@ -1,14 +1,26 @@
 import type { ProductAsset } from '../types';
 import {
+  PRODUCT_ASSET_CHUNK_MAX_ATTEMPTS,
+  PRODUCT_ASSET_CHUNK_STALL_TIMEOUT_MS,
+  buildChunkUploadConfig,
   buildProductAssetUploadConfig,
   buildChunkUploadProgress,
+  buildUploadSessionStorageKey,
   calculateProductAssetUploadProgress,
+  calculateUploadedChunkBytes,
+  clearCachedUploadSessionId,
   getDisplayAssetName,
   getProductAssetPreviewPath,
   getProductAssetThumbnailPath,
   getGalleryImageAssets,
+  isChunkUploadStalled,
+  isResumableUploadSession,
+  loadCachedUploadSessionId,
   recommendAssetTypeForFiles,
   getChunkRetryDelayMs,
+  saveCachedUploadSessionId,
+  selectPendingChunkIndexes,
+  shouldKeepUploadSessionForResume,
   shouldUseChunkedUpload,
   shouldRetryChunkUpload,
 } from './productAssets';
@@ -87,12 +99,86 @@ describe('productAssets helpers', () => {
     expect(shouldRetryChunkUpload(503, 1)).toBe(true);
     expect(shouldRetryChunkUpload(429, 1)).toBe(true);
     expect(shouldRetryChunkUpload(400, 0)).toBe(false);
-    expect(shouldRetryChunkUpload(503, 2)).toBe(false);
+    expect(shouldRetryChunkUpload(503, PRODUCT_ASSET_CHUNK_MAX_ATTEMPTS - 1)).toBe(false);
   });
 
-  it('adds a short delay before retrying a failed chunk', () => {
+  it('adds an exponential capped delay before retrying a failed chunk', () => {
     expect(getChunkRetryDelayMs(0)).toBe(1000);
     expect(getChunkRetryDelayMs(1)).toBe(2000);
+    expect(getChunkRetryDelayMs(2)).toBe(4000);
+    expect(getChunkRetryDelayMs(9)).toBe(8000);
+  });
+
+  it('caps a single chunk attempt far below the whole-file upload timeout', () => {
+    expect(buildChunkUploadConfig().timeout).toBeLessThan(
+      buildProductAssetUploadConfig().timeout
+    );
+  });
+
+  it('detects a chunk that stopped transferring bytes', () => {
+    const startedAt = 1_000_000;
+
+    expect(isChunkUploadStalled(startedAt, startedAt + 5_000)).toBe(false);
+    expect(
+      isChunkUploadStalled(startedAt, startedAt + PRODUCT_ASSET_CHUNK_STALL_TIMEOUT_MS - 1)
+    ).toBe(false);
+    expect(
+      isChunkUploadStalled(startedAt, startedAt + PRODUCT_ASSET_CHUNK_STALL_TIMEOUT_MS)
+    ).toBe(true);
+  });
+
+  it('skips chunks the server already received', () => {
+    expect(selectPendingChunkIndexes(5, [0, 1])).toEqual([2, 3, 4]);
+    expect(selectPendingChunkIndexes(3, [])).toEqual([0, 1, 2]);
+    expect(selectPendingChunkIndexes(3, [0, 1, 2])).toEqual([]);
+  });
+
+  it('counts already uploaded bytes including a shorter final chunk', () => {
+    const session = { uploadId: 'u', chunkSize: 10, totalChunks: 3, fileSize: 25 };
+
+    expect(calculateUploadedChunkBytes([0, 1], session)).toBe(20);
+    expect(calculateUploadedChunkBytes([2], session)).toBe(5);
+    expect(calculateUploadedChunkBytes([0, 1, 2], session)).toBe(25);
+  });
+
+  it('keeps an upload session for resume only when the failure was transient', () => {
+    expect(shouldKeepUploadSessionForResume(undefined)).toBe(true);
+    expect(shouldKeepUploadSessionForResume(502)).toBe(true);
+    expect(shouldKeepUploadSessionForResume(429)).toBe(true);
+    expect(shouldKeepUploadSessionForResume(400)).toBe(false);
+    expect(shouldKeepUploadSessionForResume(403)).toBe(false);
+    expect(shouldKeepUploadSessionForResume(404)).toBe(false);
+  });
+
+  it('resumes a cached session only when it still matches the selected file', () => {
+    const file = { name: 'source.psd', size: 25, lastModified: 42 };
+    const status = {
+      uploadId: 'session-1',
+      assetType: 'psd_source' as const,
+      fileSize: 25,
+      chunkSize: 10,
+      totalChunks: 3,
+      receivedChunks: [0],
+    };
+
+    expect(isResumableUploadSession(status, file, 'psd_source')).toBe(true);
+    expect(isResumableUploadSession({ ...status, fileSize: 26 }, file, 'psd_source')).toBe(false);
+    expect(isResumableUploadSession({ ...status, uploadId: '' }, file, 'psd_source')).toBe(false);
+    expect(isResumableUploadSession(status, file, 'slide_jpg')).toBe(false);
+  });
+
+  it('caches the upload session id per product and selected file', () => {
+    const file = { name: 'source.psd', size: 25, lastModified: 42 };
+    const key = buildUploadSessionStorageKey(7, file);
+
+    expect(key).not.toBe(buildUploadSessionStorageKey(8, file));
+    expect(key).not.toBe(buildUploadSessionStorageKey(7, { ...file, size: 26 }));
+
+    expect(loadCachedUploadSessionId(key)).toBeNull();
+    saveCachedUploadSessionId(key, 'session-1');
+    expect(loadCachedUploadSessionId(key)).toBe('session-1');
+    clearCachedUploadSessionId(key);
+    expect(loadCachedUploadSessionId(key)).toBeNull();
   });
 
   it('selects optimized image paths with an original fallback', () => {

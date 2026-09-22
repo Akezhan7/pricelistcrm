@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import ReactSelect from 'react-select';
 import { ExternalLink, Save, Send } from 'lucide-react';
 import api from '../utils/api';
 import { toast } from '../context/ToastContext';
@@ -7,7 +8,9 @@ import type {
   Product,
   ProductMarketplaceListing,
 } from '../types';
-import { Alert, Badge, Button, Input, Select, Spinner, Textarea } from './ui';
+import { getMarketplaceListingStatusColor } from '../theme/statusColors';
+import { MARKETPLACE_LISTING_STATUS_OPTIONS } from '../constants/marketplaceListing';
+import { Alert, Badge, Button, Input, Spinner, Textarea } from './ui';
 import { RequirementsChecklist, type RequirementItem } from './RequirementsChecklist';
 import { ProductAssetsPanel } from './ProductAssetsPanel';
 
@@ -22,7 +25,7 @@ type MarketplaceFormState = {
   status: MarketplaceListingStatus;
   sku: string;
   productCode: string;
-  marketplaceArticle: string;
+  campaignName: string;
   marketplaceName: string;
   price: string;
   url: string;
@@ -30,25 +33,17 @@ type MarketplaceFormState = {
 };
 
 const initialFormState: MarketplaceFormState = {
-  status: 'placing',
+  status: 'not_started',
   sku: '',
   productCode: '',
-  marketplaceArticle: '',
+  campaignName: '',
   marketplaceName: '',
   price: '',
   url: '',
   description: '',
 };
 
-const statusOptions: Array<{ value: MarketplaceListingStatus; label: string }> = [
-  { value: 'not_started', label: 'Не начато' },
-  { value: 'placing', label: 'В процессе размещения' },
-  { value: 'moderation', label: 'Модерация' },
-  { value: 'published', label: 'Опубликовано' },
-  { value: 'in_sale', label: 'В продаже' },
-  { value: 'blocked', label: 'Заблокировано' },
-  { value: 'removed', label: 'Снято' },
-];
+const statusOptions = MARKETPLACE_LISTING_STATUS_OPTIONS;
 
 function getErrorMessage(err: unknown, fallback: string) {
   return (
@@ -81,10 +76,10 @@ function buildFormState(
   }
 
   return {
-    status: listing.status || 'placing',
+    status: listing.status || 'not_started',
     sku: listing.sku || '',
     productCode: listing.productCode || '',
-    marketplaceArticle: listing.marketplaceArticle || '',
+    campaignName: listing.campaignName || '',
     marketplaceName: listing.marketplaceName || '',
     price: listing.price === null || listing.price === undefined ? '' : String(listing.price),
     url: listing.url || '',
@@ -146,7 +141,7 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
       met: form.status === 'published',
     },
     {
-      label: 'SKU Kaspi заполнен',
+      label: 'Артикул Каспи заполнен',
       met: form.sku.trim().length > 0,
     },
     {
@@ -199,7 +194,7 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
       status: source.status,
       sku: source.sku.trim() || null,
       productCode: source.productCode.trim() || null,
-      marketplaceArticle: source.marketplaceArticle.trim() || null,
+      campaignName: source.campaignName.trim() || null,
       marketplaceName: source.marketplaceName.trim() || null,
       price: source.price.trim() ? Number(source.price) : null,
       url: source.url.trim() || null,
@@ -307,23 +302,39 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
 
       <div className="rounded-xl border border-border-subtle bg-surface-muted p-3 space-y-3">
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <Select
-            label="Статус карточки Kaspi"
-            value={form.status}
-            onChange={(event) =>
-              updateField('status', event.target.value as MarketplaceListingStatus)
-            }
-            disabled={!canEdit}
-          >
-            {statusOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
+          <div>
+            <label className="mb-1.5 block text-caption font-medium text-brand-black">
+              Статус карточки Kaspi
+            </label>
+            <ReactSelect<{ value: MarketplaceListingStatus; label: string }>
+              options={statusOptions}
+              value={statusOptions.find((option) => option.value === form.status) ?? null}
+              onChange={(option) => option && updateField('status', option.value)}
+              isDisabled={!canEdit}
+              isSearchable={false}
+              formatOptionLabel={(option) => (
+                <Badge statusClass={getMarketplaceListingStatusColor(option.value)}>
+                  {option.label}
+                </Badge>
+              )}
+              styles={{
+                control: (base, state) => ({
+                  ...base,
+                  minHeight: '44px',
+                  borderRadius: '8px',
+                  borderColor: state.isFocused ? '#f4bd00' : '#d1d5db',
+                  boxShadow: state.isFocused ? '0 0 0 2px rgba(244, 189, 0, 0.2)' : 'none',
+                  ':hover': { borderColor: '#9ca3af' },
+                }),
+                menuPortal: (base) => ({ ...base, zIndex: 70 }),
+              }}
+              menuPosition="fixed"
+              menuPortalTarget={document.body}
+            />
+          </div>
 
           <Input
-            label="SKU Kaspi"
+            label="Артикул Каспи"
             value={form.sku}
             onChange={(event) => updateField('sku', event.target.value)}
             disabled={!canEdit}
@@ -360,8 +371,8 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
           />
           <Input
             label="Рекламная кампания"
-            value={form.marketplaceArticle}
-            onChange={(event) => updateField('marketplaceArticle', event.target.value)}
+            value={form.campaignName}
+            onChange={(event) => updateField('campaignName', event.target.value)}
             disabled={!canEdit}
             placeholder="Название рекламной кампании"
           />

@@ -38,9 +38,10 @@ const ProductMarketplaceListing = sequelize.define('ProductMarketplaceListing', 
     type: DataTypes.STRING(120),
     allowNull: true,
   },
-  marketplaceArticle: {
+  campaignName: {
     type: DataTypes.STRING(120),
     allowNull: true,
+    comment: 'Название рекламной кампании внутри площадки (например, Kaspi Advertising)',
   },
   marketplaceName: {
     type: DataTypes.STRING(255),
