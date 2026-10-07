@@ -31,6 +31,7 @@ const EVENT_LABELS: Record<string, string> = {
   product_updated: 'Карточка обновлена',
   product_archived: 'Товар архивирован',
   designer_assigned: 'Назначен дизайнер',
+  designer_transferred: 'Карточка передана другому дизайнеру',
   content_uploaded: 'Материал загружен',
   content_asset_deleted: 'Материал удалён',
   content_created: 'Контент подготовлен',
@@ -132,6 +133,14 @@ function EventDetails({ event }: { event: ProductHistoryEvent }) {
               ))}
             </div>
           )}
+        </div>
+      )}
+      {event.actionType === 'designer_transferred' && (
+        <div className="space-y-1">
+          <p className="text-body text-brand-black">
+            {String(metadata.fromDesignerName || 'Дизайнер')} → {String(metadata.toDesignerName || 'Дизайнер')}
+          </p>
+          {metadata.comment ? <p>{String(metadata.comment)}</p> : null}
         </div>
       )}
       {event.source === 'price' && (

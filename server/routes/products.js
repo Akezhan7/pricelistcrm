@@ -6,6 +6,7 @@ const {
   uploadProductAsset,
   uploadProductAssetChunk: productAssetChunkMiddleware,
   handleUploadError,
+  logInterruptedUpload,
 } = require('../middleware/upload');
 const {
   getAllProducts,
@@ -24,6 +25,7 @@ const {
   createProduct,
   assignDesignerToProduct,
   bulkAssignDesignerToProducts,
+  transferProductsToDesigner,
   bulkStartProductLifecycle,
   startProductLifecycle,
   updateProductKpiWeight,
@@ -377,6 +379,22 @@ router.post('/bulk/assign-designer',
   bulkAssignDesignerToProducts
 );
 
+router.post('/bulk/transfer-designer',
+  auth,
+  requireRole('admin', 'designer'),
+  [
+    body('productIds')
+      .isArray({ min: 1, max: 200 })
+      .withMessage('productIds must contain from 1 to 200 products'),
+    body('productIds.*')
+      .isInt({ min: 1 })
+      .withMessage('productIds must contain positive integer ids'),
+    body('designerId').isInt({ min: 1 }).withMessage('designerId must be a positive integer'),
+    body('comment').optional({ nullable: true }).isString().isLength({ max: 1000 }),
+  ],
+  transferProductsToDesigner
+);
+
 router.post('/lifecycle/bulk-start',
   auth,
   requireRole('admin'),
@@ -430,6 +448,7 @@ router.get('/:id/assets/upload-sessions/:uploadId',
 router.put('/:id/assets/upload-sessions/:uploadId/chunks/:chunkIndex',
   auth,
   requireRole('admin', 'designer'),
+  logInterruptedUpload,
   productAssetChunkMiddleware.single('chunk'),
   handleUploadError,
   uploadProductAssetChunk
@@ -438,6 +457,7 @@ router.put('/:id/assets/upload-sessions/:uploadId/chunks/:chunkIndex',
 router.post('/:id/assets/upload-sessions/:uploadId/complete',
   auth,
   requireRole('admin', 'designer'),
+  logInterruptedUpload,
   completeProductAssetUpload
 );
 

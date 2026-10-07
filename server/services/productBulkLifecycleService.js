@@ -107,6 +107,8 @@ function buildBulkAssignDesignerPlan({
 }
 
 module.exports = {
+  assertActiveDesigner,
+  normalizeProductIds,
   buildBulkAssignDesignerPlan,
   buildDesignerAssignedHistoryEntry,
 };

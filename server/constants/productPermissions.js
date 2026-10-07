@@ -1,4 +1,5 @@
 const {
+  DESIGNER_TRANSFERABLE_STATUSES,
   PRODUCT_LIFECYCLE_ACTIONS,
   PRODUCT_LIFECYCLE_STATUSES,
   canPerformLifecycleAction,
@@ -17,6 +18,7 @@ const PRODUCT_PERMISSION_ACTIONS = Object.freeze({
   MANAGE_KPI_WEIGHT: 'manage_kpi_weight',
   DELETE_PRODUCT: 'delete_product',
   VIEW_HISTORY: 'view_product_history',
+  TRANSFER_DESIGNER: 'transfer_designer',
 });
 
 const ADMIN_PRODUCT_FIELDS = Object.freeze([
@@ -83,6 +85,14 @@ function getSupportingActions({ user, product }) {
 
   if (isAdmin || isAssignedDesigner(user, product)) {
     actions.push(PRODUCT_PERMISSION_ACTIONS.MANAGE_ASSETS);
+  }
+
+  if (
+    product?.designerId
+    && DESIGNER_TRANSFERABLE_STATUSES.includes(status)
+    && (isAdmin || isAssignedDesigner(user, product))
+  ) {
+    actions.push(PRODUCT_PERMISSION_ACTIONS.TRANSFER_DESIGNER);
   }
 
   if (

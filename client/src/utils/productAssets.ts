@@ -9,7 +9,6 @@ const CP1251_HIGH_CHARS =
 const IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
 const PRODUCT_ASSET_UPLOAD_TIMEOUT_MS = 10 * 60 * 1000;
 const UPLOAD_SESSION_STORAGE_PREFIX = 'crm_product_asset_upload_v1:';
-export const PRODUCT_ASSET_CHUNK_SIZE = 10 * 1024 * 1024;
 export const PRODUCT_ASSET_CHUNK_TIMEOUT_MS = 2 * 60 * 1000;
 export const PRODUCT_ASSET_CHUNK_MAX_ATTEMPTS = 5;
 export const PRODUCT_ASSET_CHUNK_STALL_TIMEOUT_MS = 30 * 1000;
@@ -58,10 +57,6 @@ export function calculateProductAssetUploadProgress(
   const percent = total > 0 ? Math.round((safeLoaded / total) * 100) : 0;
 
   return { loaded: safeLoaded, total, percent };
-}
-
-export function shouldUseChunkedUpload(fileSize: number) {
-  return fileSize > PRODUCT_ASSET_CHUNK_SIZE;
 }
 
 export function shouldRetryChunkUpload(status: number | undefined, attempt: number) {

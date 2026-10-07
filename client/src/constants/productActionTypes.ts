@@ -3,6 +3,7 @@ export const PRODUCT_ACTION_TYPE_LABELS: Record<string, string> = {
   product_updated: 'Обновил карточку',
   product_archived: 'Архивировал товар',
   designer_assigned: 'Назначил дизайнера',
+  designer_transferred: 'Передал карточку другому дизайнеру',
   content_uploaded: 'Загрузил материалы',
   content_asset_deleted: 'Удалил материал',
   content_created: 'Отметил карточку готовой',

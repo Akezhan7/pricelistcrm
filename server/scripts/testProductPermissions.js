@@ -207,6 +207,43 @@ function testAuthenticatedUsersCanViewImmutableHistory() {
   assert(permissions.allowedActions.includes(PRODUCT_PERMISSION_ACTIONS.VIEW_HISTORY));
 }
 
+function testDesignerCardsCanBeTransferredOnlyByOwnerOrAdminAtDesignerStages() {
+  const designerStages = [
+    PRODUCT_LIFECYCLE_STATUSES.ASSIGNED_TO_DESIGNER,
+    PRODUCT_LIFECYCLE_STATUSES.CONTENT_CREATED,
+    PRODUCT_LIFECYCLE_STATUSES.REVISION,
+  ];
+
+  designerStages.forEach((lifecycleStatus) => {
+    const owner = permissionsFor('designer', { lifecycleStatus }, 10);
+    const foreign = permissionsFor('designer', { lifecycleStatus }, 11);
+    const admin = permissionsFor('admin', { lifecycleStatus }, 1);
+
+    assert(owner.allowedActions.includes(PRODUCT_PERMISSION_ACTIONS.TRANSFER_DESIGNER));
+    assert(!foreign.allowedActions.includes(PRODUCT_PERMISSION_ACTIONS.TRANSFER_DESIGNER));
+    assert(admin.allowedActions.includes(PRODUCT_PERMISSION_ACTIONS.TRANSFER_DESIGNER));
+  });
+
+  [
+    PRODUCT_LIFECYCLE_STATUSES.NEW,
+    PRODUCT_LIFECYCLE_STATUSES.REVIEW,
+    PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE,
+    PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
+  ].forEach((lifecycleStatus) => {
+    const owner = permissionsFor('designer', { lifecycleStatus }, 10);
+    const admin = permissionsFor('admin', { lifecycleStatus }, 1);
+
+    assert(!owner.allowedActions.includes(PRODUCT_PERMISSION_ACTIONS.TRANSFER_DESIGNER));
+    assert(!admin.allowedActions.includes(PRODUCT_PERMISSION_ACTIONS.TRANSFER_DESIGNER));
+  });
+
+  const unassigned = permissionsFor('admin', {
+    lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.ASSIGNED_TO_DESIGNER,
+    designerId: null,
+  }, 1);
+  assert(!unassigned.allowedActions.includes(PRODUCT_PERMISSION_ACTIONS.TRANSFER_DESIGNER));
+}
+
 function run() {
   testAdminHasFullProductAccess();
   testOnlyPrivilegedAdminCanManageKpiWeight();
@@ -219,6 +256,7 @@ function run() {
   testForbiddenProductFieldsAreRejected();
   testForbiddenActionsExposeHttp403();
   testAuthenticatedUsersCanViewImmutableHistory();
+  testDesignerCardsCanBeTransferredOnlyByOwnerOrAdminAtDesignerStages();
 }
 
 run();

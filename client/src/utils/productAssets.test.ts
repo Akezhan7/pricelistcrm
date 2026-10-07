@@ -21,7 +21,6 @@ import {
   saveCachedUploadSessionId,
   selectPendingChunkIndexes,
   shouldKeepUploadSessionForResume,
-  shouldUseChunkedUpload,
   shouldRetryChunkUpload,
 } from './productAssets';
 
@@ -78,11 +77,6 @@ describe('productAssets helpers', () => {
       percent: 50,
     });
     expect(calculateProductAssetUploadProgress(150, 100, 100).percent).toBe(100);
-  });
-
-  it('uses chunked transport for files larger than one upload chunk', () => {
-    expect(shouldUseChunkedUpload(10 * 1024 * 1024)).toBe(false);
-    expect(shouldUseChunkedUpload(10 * 1024 * 1024 + 1)).toBe(true);
   });
 
   it('calculates aggregate progress across uploaded chunks', () => {

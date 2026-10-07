@@ -41,6 +41,9 @@ const {
   buildDesignerAssignedHistoryEntry,
 } = require('../services/productBulkLifecycleService');
 const {
+  buildDesignerTransferPlan,
+} = require('../services/productDesignerTransferService');
+const {
   buildNewProductLifecycleData,
   buildProductDraftData,
 } = require('../services/productDraftService');
@@ -1295,6 +1298,113 @@ const bulkAssignDesignerToProducts = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Server error while assigning designer in bulk',
+    });
+  }
+};
+
+const transferProductsToDesigner = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(400).json({
+        success: false,
+        message: 'Validation errors',
+        errors: errors.array(),
+      });
+    }
+
+    const { productIds, designerId, comment } = req.body;
+
+    const designer = await User.findOne({
+      where: { id: designerId, role: 'designer', isActive: true },
+      transaction,
+    });
+
+    const requestedProductIds = Array.from(new Set(productIds.map((id) => Number(id))));
+    const products = await Product.findAll({
+      where: { id: { [Op.in]: requestedProductIds }, isActive: true },
+      transaction,
+      lock: true,
+    });
+
+    const previousDesignerIds = Array.from(new Set(
+      products.map((product) => product.designerId).filter(Boolean)
+    ));
+    const previousDesigners = previousDesignerIds.length > 0
+      ? await User.findAll({
+          where: { id: { [Op.in]: previousDesignerIds } },
+          attributes: ['id', 'name'],
+          transaction,
+        })
+      : [];
+    const designerNames = Object.fromEntries(
+      previousDesigners.map((previous) => [previous.id, previous.name])
+    );
+
+    const plan = buildDesignerTransferPlan({
+      actor: req.user,
+      designer,
+      productIds,
+      products,
+      designerNames,
+      comment,
+      now: new Date(),
+    });
+
+    const productsById = new Map(products.map((product) => [Number(product.id), product]));
+    for (const item of plan.updates) {
+      await productsById.get(item.productId).update(item.update, { transaction });
+    }
+
+    if (plan.openRevisionProductIds.length > 0) {
+      await ProductRevisionRequest.update(
+        { assignedDesignerId: designer.id },
+        {
+          where: {
+            productId: { [Op.in]: plan.openRevisionProductIds },
+            status: PRODUCT_REVISION_STATUSES.OPEN,
+          },
+          transaction,
+        }
+      );
+    }
+
+    await ProductActionHistory.bulkCreate(plan.historyEntries, { transaction });
+
+    await transaction.commit();
+    transactionFinished = true;
+
+    return res.json({
+      success: true,
+      message: 'Products transferred to designer',
+      data: { transferredCount: plan.productIds.length },
+    });
+  } catch (error) {
+    if (!transactionFinished) {
+      await transaction.rollback();
+      transactionFinished = true;
+    }
+
+    if (/not permitted/i.test(error.message)) {
+      return res.status(403).json({ success: false, message: error.message });
+    }
+
+    if (
+      /productIds|designer|not all selected|only (active )?products|already assigned|comment must/i
+        .test(error.message)
+    ) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    console.error('Error transferring products to designer:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server error while transferring products to designer',
     });
   }
 };
@@ -4132,6 +4242,7 @@ module.exports = {
   createProduct,
   assignDesignerToProduct,
   bulkAssignDesignerToProducts,
+  transferProductsToDesigner,
   bulkStartProductLifecycle,
   startProductLifecycle,
   updateProductKpiWeight,

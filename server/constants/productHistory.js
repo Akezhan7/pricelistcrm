@@ -3,6 +3,7 @@ const PRODUCT_ACTION_TYPES = Object.freeze({
   PRODUCT_UPDATED: 'product_updated',
   PRODUCT_ARCHIVED: 'product_archived',
   DESIGNER_ASSIGNED: 'designer_assigned',
+  DESIGNER_TRANSFERRED: 'designer_transferred',
   CONTENT_UPLOADED: 'content_uploaded',
   CONTENT_ASSET_DELETED: 'content_asset_deleted',
   CONTENT_CREATED: 'content_created',

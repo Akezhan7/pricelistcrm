@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowRight,
+  ArrowRightLeft,
   BriefcaseBusiness,
   CheckCircle2,
   Image as ImageIcon,
@@ -33,6 +34,7 @@ import { ProductWarehousePanel } from '../components/ProductWarehousePanel';
 import { ProductSaleLaunchPanel } from '../components/ProductSaleLaunchPanel';
 import { ProductHistoryModal } from '../components/ProductHistoryModal';
 import { AssignDesignerModal } from '../components/AssignDesignerModal';
+import { TransferDesignerModal } from '../components/TransferDesignerModal';
 import { useAuth } from '../context/AuthContext';
 import api from '../utils/api';
 import getImageUrl from '../utils/image';
@@ -44,6 +46,13 @@ import {
 } from '../constants/productLifecycle';
 import { getMarketplaceListingStatusLabel } from '../constants/marketplaceListing';
 import { getMarketplaceListingStatusColor } from '../theme/statusColors';
+import {
+  canTransferDesigner,
+  getCommonDesignerId,
+  getTransferableProductIds,
+  pruneTransferSelection,
+  toggleTransferSelection,
+} from '../utils/designerTransfer';
 import { useProductEditor } from '../hooks/useProductEditor';
 
 type WorkflowMeta = {
@@ -115,6 +124,8 @@ export const ProductWorkflowPage: React.FC = () => {
   const [saleProduct, setSaleProduct] = useState<ProductWorkflowItem | null>(null);
   const [historyProduct, setHistoryProduct] = useState<ProductWorkflowItem | null>(null);
   const [assignDesignerProduct, setAssignDesignerProduct] = useState<ProductWorkflowItem | null>(null);
+  const [selectedTransferIds, setSelectedTransferIds] = useState<number[]>([]);
+  const [transferProductIds, setTransferProductIds] = useState<number[]>([]);
 
   const canUseExtendedFilters = user?.role === 'admin' || workflow.canUseExtendedFilters;
   const searchQuery = searchParams.get('search') || '';
@@ -226,6 +237,21 @@ export const ProductWorkflowPage: React.FC = () => {
     [users]
   );
 
+  useEffect(() => {
+    setSelectedTransferIds((current) => {
+      const pruned = pruneTransferSelection(current, products);
+      return pruned.length === current.length ? current : pruned;
+    });
+  }, [products]);
+
+  const transferableIds = useMemo(() => getTransferableProductIds(products), [products]);
+  const allTransferSelected =
+    transferableIds.length > 0 && selectedTransferIds.length === transferableIds.length;
+  const transferModalExcludedDesignerId = useMemo(
+    () => getCommonDesignerId(products.filter((item) => transferProductIds.includes(item.id))),
+    [products, transferProductIds]
+  );
+
   const queueStats = useMemo(() => {
     return Object.entries(statusCounts)
       .filter((entry): entry is [ProductLifecycleStatus, number] => Number(entry[1]) > 0);
@@ -254,6 +280,12 @@ export const ProductWorkflowPage: React.FC = () => {
     setPurchaseProduct(null);
     setWarehouseProduct(null);
     setSaleProduct(null);
+    await fetchProducts();
+  };
+
+  const handleDesignerTransferred = async () => {
+    setSelectedTransferIds([]);
+    setTransferProductIds([]);
     await fetchProducts();
   };
 
@@ -381,14 +413,60 @@ export const ProductWorkflowPage: React.FC = () => {
                 }
               />
             ) : (
+              <>
+              {transferableIds.length > 0 && (
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border-subtle bg-surface-muted px-3 py-2">
+                  <label className="flex cursor-pointer items-center gap-2 text-body text-brand-black">
+                    <input
+                      type="checkbox"
+                      checked={allTransferSelected}
+                      onChange={() =>
+                        setSelectedTransferIds(allTransferSelected ? [] : transferableIds)
+                      }
+                      className="h-5 w-5 shrink-0 rounded border-border-input text-brand-yellow focus:ring-brand-yellow/30"
+                    />
+                    Выбрать все карточки дизайнера на странице ({transferableIds.length})
+                  </label>
+                  {selectedTransferIds.length > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-caption text-text-muted tabular-nums">
+                        Выбрано: {selectedTransferIds.length}
+                      </span>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="primary"
+                        leftIcon={ArrowRightLeft}
+                        onClick={() => setTransferProductIds(selectedTransferIds)}
+                      >
+                        Передать другому дизайнеру
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
               <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
                 {products.map((product) => {
+                  const transferable = canTransferDesigner(product);
                   return (
                     <article
                       key={product.id}
                       className="rounded-xl border border-border-subtle bg-brand-white p-3 shadow-sm transition-shadow hover:shadow-card-hover"
                     >
                       <div className="flex gap-3">
+                        {transferable && (
+                          <input
+                            type="checkbox"
+                            checked={selectedTransferIds.includes(product.id)}
+                            onChange={() =>
+                              setSelectedTransferIds((current) =>
+                                toggleTransferSelection(current, product.id)
+                              )
+                            }
+                            aria-label={`Выбрать карточку ${product.name}`}
+                            className="mt-1 h-5 w-5 shrink-0 rounded border-border-input text-brand-yellow focus:ring-brand-yellow/30"
+                          />
+                        )}
                         <div className="h-16 w-16 shrink-0 overflow-hidden rounded-lg border border-border-subtle bg-surface-inset">
                           {product.image ? (
                             <img
@@ -470,6 +548,15 @@ export const ProductWorkflowPage: React.FC = () => {
                                 onClick={() => setHistoryProduct(product)}
                               />
                             )}
+                            {transferable && (
+                              <IconButton
+                                icon={ArrowRightLeft}
+                                title="Передать другому дизайнеру"
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setTransferProductIds([product.id])}
+                              />
+                            )}
                             {product.permissions?.canEditCard && (
                               <IconButton
                                 icon={Pencil}
@@ -532,6 +619,7 @@ export const ProductWorkflowPage: React.FC = () => {
                   );
                 })}
               </div>
+              </>
             )}
           </div>
           <Pagination
@@ -568,6 +656,14 @@ export const ProductWorkflowPage: React.FC = () => {
           productIds={assignDesignerProduct ? [assignDesignerProduct.id] : []}
           selectedCount={assignDesignerProduct ? 1 : 0}
           onSuccess={handleWorkflowChanged}
+        />
+
+        <TransferDesignerModal
+          isOpen={transferProductIds.length > 0}
+          onClose={() => setTransferProductIds([])}
+          productIds={transferProductIds}
+          excludeDesignerId={transferModalExcludedDesignerId}
+          onSuccess={handleDesignerTransferred}
         />
 
         <ProductHistoryModal

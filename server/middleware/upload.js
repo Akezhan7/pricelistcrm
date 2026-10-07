@@ -227,7 +227,21 @@ const removeUploadedFile = (file) => {
   }
 };
 
+// Пишет в лог загрузки, которые оборвались до отправки ответа (обрыв соединения/туннеля).
+const logInterruptedUpload = (req, res, next) => {
+  const startedAt = Date.now();
+  res.on('close', () => {
+    if (res.writableFinished) return;
+    console.warn(
+      `[upload] запрос оборван: ${req.method} ${req.originalUrl}, `
+      + `размер тела ${req.headers['content-length'] || '?'} Б, через ${Date.now() - startedAt} мс`
+    );
+  });
+  next();
+};
+
 module.exports = {
+  logInterruptedUpload,
   PRODUCT_ASSET_CHUNK_FILE_LIMIT,
   uploadsDir,
   taskAttachmentsDir,
