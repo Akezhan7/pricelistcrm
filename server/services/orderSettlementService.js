@@ -45,7 +45,7 @@ function calculateOrderDebtContribution(order = {}) {
   return Math.max(0, totalAmount - paidAmount);
 }
 
-function calculateSupplierBalance({ orders = [], payments = [] } = {}) {
+function calculateSupplierBalance({ orders = [], payments = [], adjustments = [] } = {}) {
   const orderBalance = orders.reduce((sum, order) => {
     if (order.isActive === false || !DEBT_STATUSES.includes(order.status)) return sum;
     const totalAmount = Number(order.totalAmount);
@@ -63,7 +63,65 @@ function calculateSupplierBalance({ orders = [], payments = [] } = {}) {
     return sum + amount;
   }, 0);
 
-  return Number((orderBalance - paymentBalance).toFixed(2));
+  const adjustmentBalance = adjustments.reduce((sum, adjustment) => {
+    const amount = Number(adjustment.amount);
+    if (!Number.isFinite(amount)) {
+      throw inputError('Adjustment amount is invalid');
+    }
+    return sum + amount;
+  }, 0);
+
+  return Number((orderBalance - paymentBalance + adjustmentBalance).toFixed(2));
+}
+
+const MAX_ADJUSTMENT_COMMENT_LENGTH = 1000;
+
+/**
+ * Ручная поправка баланса поставщика: пользователь задаёт итоговую сумму,
+ * а в журнал пишется разница. Положительный баланс — мы должны поставщику,
+ * отрицательный — аванс у поставщика.
+ */
+function buildBalanceAdjustmentPlan({
+  actor,
+  supplierId,
+  currentBalance,
+  targetBalance,
+  comment,
+} = {}) {
+  if (actor?.role !== 'admin' || actor?.canAdjustSupplierBalance !== true) {
+    throw inputError('Balance adjustment is not permitted for this user', 403);
+  }
+
+  const target = typeof targetBalance === 'string' && targetBalance.trim() === ''
+    ? NaN
+    : Number(targetBalance);
+  if (!Number.isFinite(target)) {
+    throw inputError('Target balance is invalid');
+  }
+
+  const normalizedComment = typeof comment === 'string' ? comment.trim() : '';
+  if (!normalizedComment) {
+    throw inputError('Comment is required');
+  }
+  if (normalizedComment.length > MAX_ADJUSTMENT_COMMENT_LENGTH) {
+    throw inputError(`Comment must not exceed ${MAX_ADJUSTMENT_COMMENT_LENGTH} characters`);
+  }
+
+  const balanceBefore = Number(Number(currentBalance).toFixed(2));
+  const balanceAfter = Number(target.toFixed(2));
+  const amount = Number((balanceAfter - balanceBefore).toFixed(2));
+  if (amount === 0) {
+    throw inputError('Supplier balance already equals this amount');
+  }
+
+  return {
+    supplierId: Number(supplierId),
+    amount,
+    balanceBefore,
+    balanceAfter,
+    comment: normalizedComment,
+    createdBy: Number(actor.id),
+  };
 }
 
 function buildSettlementChange({
@@ -99,6 +157,7 @@ function buildSettlementChange({
 
 module.exports = {
   ORDER_SETTLEMENT_TYPES,
+  buildBalanceAdjustmentPlan,
   SETTLEMENT_MANAGEMENT_ROLES,
   buildSettlementChange,
   calculateOrderDebtContribution,

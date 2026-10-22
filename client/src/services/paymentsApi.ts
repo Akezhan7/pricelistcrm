@@ -70,6 +70,19 @@ export interface UnpaidOrder {
   createdAt: string;
 }
 
+export interface SupplierBalanceAdjustment {
+  id: number;
+  supplierId: number;
+  /** Поправка со знаком: плюс — больше должны поставщику, минус — меньше. */
+  amount: string;
+  balanceBefore: string;
+  balanceAfter: string;
+  comment: string;
+  createdBy: number | null;
+  createdAt: string;
+  creator?: { id: number; name: string } | null;
+}
+
 export interface SupplierPaymentData {
   supplier: {
     id: number;
@@ -78,6 +91,7 @@ export interface SupplierPaymentData {
   };
   payments: Payment[];
   unpaidOrders: UnpaidOrder[];
+  balanceAdjustments: SupplierBalanceAdjustment[];
   stats: PaymentStats;
 }
 
@@ -99,6 +113,15 @@ export const getPayments = async (filters?: PaymentFilters) => {
 export const getPaymentsBySupplier = async (supplierId: number): Promise<SupplierPaymentData> => {
   const response = await api.get(`/payments/supplier/${supplierId}`);
   return response.data.data;
+};
+
+/** Задаёт итоговую сумму расчётов: плюс — должны поставщику, минус — аванс у поставщика. */
+export const adjustSupplierBalance = async (
+  supplierId: number,
+  data: { targetBalance: number; comment: string }
+): Promise<SupplierBalanceAdjustment> => {
+  const response = await api.post(`/payments/supplier/${supplierId}/balance-adjustments`, data);
+  return response.data.data.adjustment;
 };
 
 export const getPaymentById = async (id: number): Promise<Payment> => {

@@ -54,6 +54,12 @@ const User = sequelize.define('User', {
     defaultValue: false,
     comment: 'Allows editing, deactivating and deleting CRM users',
   },
+  canAdjustSupplierBalance: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+    comment: 'Allows manually correcting the mutual settlement balance with a supplier',
+  },
   canViewManagerReports: {
     type: DataTypes.BOOLEAN,
     allowNull: false,

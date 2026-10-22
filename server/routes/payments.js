@@ -135,6 +135,30 @@ router.get('/supplier/:supplierId',
 );
 
 /**
+ * @route POST /api/payments/supplier/:supplierId/balance-adjustments
+ * @desc Вручную задать итоговую сумму расчётов с поставщиком (с записью в журнал)
+ * @access Только admin с флагом canAdjustSupplierBalance
+ * @body
+ *   - targetBalance: итоговая сумма (плюс — должны поставщику, минус — аванс у поставщика)
+ *   - comment: причина (обязательно)
+ */
+router.post('/supplier/:supplierId/balance-adjustments',
+  auth,
+  checkRole(['admin']),
+  ...validateSupplierId,
+  body('targetBalance')
+    .isFloat({ min: -100000000, max: 100000000 })
+    .withMessage('Укажите корректную итоговую сумму'),
+  body('comment')
+    .isString()
+    .trim()
+    .isLength({ min: 1, max: 1000 })
+    .withMessage('Комментарий обязателен и не должен превышать 1000 символов'),
+  handleValidationErrors,
+  paymentController.adjustSupplierBalance
+);
+
+/**
  * @route GET /api/payments/:id
  * @desc Получить информацию о конкретном платеже
  * @access Требует аутентификации

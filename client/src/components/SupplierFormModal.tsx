@@ -55,7 +55,6 @@ function supplierToFormData(supplier: Supplier): SupplierFormData {
     cityAddress,
     notes: supplier.notes || '',
     containerImage: null,
-    debt: supplier.debt !== undefined ? supplier.debt.toString() : '0',
   };
 }
 
@@ -199,7 +198,6 @@ export const SupplierFormModal: React.FC<SupplierFormModalProps> = ({
         data.append('phone', formData.phone);
         data.append('whatsapp', formData.whatsapp || formData.phone);
         data.append('notes', formData.notes);
-        data.append('debt', formData.debt);
 
         if (formData.containerImage) {
           data.append('containerImage', formData.containerImage);

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, CreditCard, MessageSquare, Paperclip, FileText, X } from 'lucide-react';
-import { createPayment, getPaymentsBySupplier, formatPaymentAmount, formatPaymentDate, getPaymentMethodIcon, getPaymentMethodColor, type CreatePaymentData, type SupplierPaymentData } from '../services/paymentsApi';
+import { Plus, CreditCard, MessageSquare, Paperclip, FileText, X, Scale } from 'lucide-react';
+import { adjustSupplierBalance, createPayment, getPaymentsBySupplier, formatPaymentAmount, formatPaymentDate, getPaymentMethodIcon, getPaymentMethodColor, type CreatePaymentData, type SupplierPaymentData } from '../services/paymentsApi';
+import { useAuth } from '../context/AuthContext';
 import getImageUrl from '../utils/image';
 import { Modal } from './ui/Modal';
 import { FormFooter } from './ui/FormFooter';
@@ -23,6 +24,15 @@ interface SupplierFinanceModalProps {
   onSuccess?: () => void;
 }
 
+type BalanceDirection = 'owe' | 'advance';
+
+function describeBalance(value: number | string) {
+  const presentation = getSupplierBalancePresentation(value);
+  return presentation.amount === 0
+    ? presentation.label
+    : `${presentation.label}: ${formatPaymentAmount(presentation.amount)}`;
+}
+
 export const SupplierFinanceModal: React.FC<SupplierFinanceModalProps> = ({
   isOpen,
   onClose,
@@ -30,6 +40,13 @@ export const SupplierFinanceModal: React.FC<SupplierFinanceModalProps> = ({
   supplierName,
   onSuccess,
 }) => {
+  const { user } = useAuth();
+  const canAdjustBalance = user?.role === 'admin' && user?.canAdjustSupplierBalance === true;
+  const [showAdjustBalance, setShowAdjustBalance] = useState(false);
+  const [adjustDirection, setAdjustDirection] = useState<BalanceDirection>('owe');
+  const [adjustAmount, setAdjustAmount] = useState('');
+  const [adjustComment, setAdjustComment] = useState('');
+  const [adjusting, setAdjusting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [supplierData, setSupplierData] = useState<SupplierPaymentData | null>(null);
   const [showAddPayment, setShowAddPayment] = useState(false);
@@ -65,7 +82,52 @@ export const SupplierFinanceModal: React.FC<SupplierFinanceModalProps> = ({
     }
   };
 
+  const openAdjustBalance = () => {
+    const balance = Number(supplierData?.stats.balance || 0);
+    setAdjustDirection(balance < 0 ? 'advance' : 'owe');
+    setAdjustAmount(String(Math.abs(balance)));
+    setAdjustComment('');
+    setShowAddPayment(false);
+    setShowAdjustBalance(true);
+  };
+
+  const adjustTargetBalance = () => {
+    const amount = Number(adjustAmount);
+    return adjustDirection === 'advance' ? -amount : amount;
+  };
+
+  const handleSubmitAdjustment = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const amount = Number(adjustAmount);
+    if (adjustAmount.trim() === '' || !Number.isFinite(amount) || amount < 0) {
+      toast.warning('Введите сумму (0 или больше)');
+      return;
+    }
+    if (!adjustComment.trim()) {
+      toast.warning('Укажите причину изменения суммы');
+      return;
+    }
+
+    setAdjusting(true);
+    try {
+      await adjustSupplierBalance(supplierId, {
+        targetBalance: adjustTargetBalance(),
+        comment: adjustComment.trim(),
+      });
+      toast.success('Сумма расчётов с поставщиком изменена');
+      setShowAdjustBalance(false);
+      await loadSupplierData();
+      onSuccess?.();
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || error.message || 'Не удалось изменить сумму');
+    } finally {
+      setAdjusting(false);
+    }
+  };
+
   const handleClose = () => {
+    setShowAdjustBalance(false);
     setShowAddPayment(false);
     setPaymentForm({
       supplierId,
@@ -191,10 +253,72 @@ export const SupplierFinanceModal: React.FC<SupplierFinanceModalProps> = ({
 
               <div className="flex justify-between items-center gap-3">
                 <h3 className="text-section-title text-brand-black">Неоплаченные заявки</h3>
-                <Button type="button" onClick={() => setShowAddPayment(true)} leftIcon={Plus}>
-                  Зарегистрировать платеж
-                </Button>
+                <div className="flex flex-wrap justify-end gap-2">
+                  {canAdjustBalance && (
+                    <Button type="button" variant="secondary" onClick={openAdjustBalance} leftIcon={Scale}>
+                      Изменить сумму
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setShowAdjustBalance(false);
+                      setShowAddPayment(true);
+                    }}
+                    leftIcon={Plus}
+                  >
+                    Зарегистрировать платеж
+                  </Button>
+                </div>
               </div>
+
+              {showAdjustBalance && (
+                <FormSection title="Изменить сумму расчётов">
+                  <form onSubmit={handleSubmitAdjustment} className="space-y-4">
+                    <p className="text-caption text-text-muted">
+                      Укажите, сколько на самом деле сейчас между вами. Платежи и заявки продолжат учитываться
+                      поверх этой суммы, а изменение сохранится в журнале.
+                    </p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <Select
+                        label="Кто кому должен"
+                        value={adjustDirection}
+                        onChange={(e) => setAdjustDirection(e.target.value as BalanceDirection)}
+                      >
+                        <option value="owe">Мы должны поставщику</option>
+                        <option value="advance">Поставщик должен нам (аванс)</option>
+                      </Select>
+                      <Input
+                        label="Сумма"
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        value={adjustAmount}
+                        onChange={(e) => setAdjustAmount(e.target.value)}
+                        required
+                        helperText={`Сейчас: ${describeBalance(supplierData.stats.balance)}`}
+                      />
+                    </div>
+                    <Textarea
+                      label="Причина изменения (обязательно)"
+                      value={adjustComment}
+                      onChange={(e) => setAdjustComment(e.target.value)}
+                      rows={3}
+                      maxLength={1000}
+                      placeholder="Например: долг за старые поставки до внедрения CRM"
+                      className="resize-none"
+                    />
+                    <FormFooter
+                      onCancel={() => setShowAdjustBalance(false)}
+                      submitLabel={adjusting ? 'Сохранение...' : 'Сохранить'}
+                      submitLoading={adjusting}
+                      submitDisabled={adjusting}
+                      showBorder={false}
+                      className="px-0 py-0"
+                    />
+                  </form>
+                </FormSection>
+              )}
 
               {showAddPayment && (
                 <FormSection title="Новый платеж">
@@ -350,6 +474,30 @@ export const SupplierFinanceModal: React.FC<SupplierFinanceModalProps> = ({
                 <div className="text-center py-8 text-text-muted">
                   <CreditCard className="h-12 w-12 mx-auto mb-3 text-text-muted/40" />
                   <p>Все заявки оплачены</p>
+                </div>
+              )}
+
+              {supplierData.balanceAdjustments.length > 0 && (
+                <div className="border-t pt-6">
+                  <h3 className="text-section-title text-brand-black mb-4">Изменения суммы расчётов</h3>
+                  <div className="space-y-3">
+                    {supplierData.balanceAdjustments.map((adjustment) => (
+                      <div key={adjustment.id} className="border border-border-subtle rounded-xl p-4 bg-surface-base">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div className="font-medium text-brand-black">
+                            {describeBalance(adjustment.balanceBefore)} → {describeBalance(adjustment.balanceAfter)}
+                          </div>
+                          <div className="text-sm text-text-muted">
+                            {formatPaymentDate(adjustment.createdAt)}
+                            {adjustment.creator ? ` · ${adjustment.creator.name}` : ''}
+                          </div>
+                        </div>
+                        <div className="mt-2 text-sm text-text-muted bg-surface-inset p-2 rounded-lg">
+                          {adjustment.comment}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 

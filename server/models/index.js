@@ -13,6 +13,7 @@ const OrderStatusHistory = require('./OrderStatusHistory');
 const OrderSettlementHistory = require('./OrderSettlementHistory');
 const OrderCorrection = require('./OrderCorrection');
 const Payment = require('./Payment');
+const SupplierBalanceAdjustment = require('./SupplierBalanceAdjustment');
 const PriceHistory = require('./PriceHistory');
 
 // Новые модели для системы закупок и склада
@@ -57,6 +58,7 @@ module.exports = {
   OrderSettlementHistory,
   OrderCorrection,
   Payment,
+  SupplierBalanceAdjustment,
   PriceHistory,
   // Новые модели
   Category,

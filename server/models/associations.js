@@ -13,6 +13,7 @@ const OrderStatusHistory = require('./OrderStatusHistory');
 const OrderSettlementHistory = require('./OrderSettlementHistory');
 const OrderCorrection = require('./OrderCorrection');
 const Payment = require('./Payment');
+const SupplierBalanceAdjustment = require('./SupplierBalanceAdjustment');
 const PriceHistory = require('./PriceHistory');
 const Category = require('./Category');
 const OrderConfirmation = require('./OrderConfirmation');
@@ -295,6 +296,26 @@ Payment.belongsTo(User, {
 User.hasMany(Payment, {
   foreignKey: 'createdBy',
   as: 'createdPayments',
+});
+
+// Связи для ручных корректировок баланса поставщика
+SupplierBalanceAdjustment.belongsTo(Supplier, {
+  foreignKey: 'supplierId',
+  as: 'supplier',
+  onDelete: 'RESTRICT',
+  onUpdate: 'CASCADE',
+});
+
+Supplier.hasMany(SupplierBalanceAdjustment, {
+  foreignKey: 'supplierId',
+  as: 'balanceAdjustments',
+});
+
+SupplierBalanceAdjustment.belongsTo(User, {
+  foreignKey: 'createdBy',
+  as: 'creator',
+  onDelete: 'SET NULL',
+  onUpdate: 'CASCADE',
 });
 
 // Связи для истории цен
@@ -926,6 +947,7 @@ module.exports = {
   OrderStatusHistory,
   OrderCorrection,
   Payment,
+  SupplierBalanceAdjustment,
   PriceHistory,
   Category,
   OrderConfirmation,

@@ -46,8 +46,6 @@ export type SupplierFormData = {
 
   containerImage: File | null;
 
-  debt: string;
-
 };
 
 
@@ -85,8 +83,6 @@ export const emptySupplierFormData = (): SupplierFormData => ({
   notes: '',
 
   containerImage: null,
-
-  debt: '0',
 
 });
 
@@ -406,29 +402,7 @@ export const SupplierFormFields: React.FC<SupplierFormFieldsProps> = ({
 
 
 
-      {mode === 'edit' && (
 
-        <Input
-
-          label="Задолженность (₸)"
-
-          type="number"
-
-          min={0}
-
-          step="0.01"
-
-          value={data.debt}
-
-          onChange={(e) => set({ debt: e.target.value })}
-
-          placeholder="0"
-
-          helperText="Сумма, которую вы должны поставщику"
-
-        />
-
-      )}
 
 
 

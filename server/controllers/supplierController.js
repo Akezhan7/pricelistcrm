@@ -202,7 +202,6 @@ const createSupplier = async (req, res) => {
       sector, 
       mapPosition, 
       notes,
-      debt,
       row,
       container
     } = req.body;
@@ -225,8 +224,6 @@ const createSupplier = async (req, res) => {
       sector,
       mapPosition: mapPosition ? JSON.parse(mapPosition) : null,
       notes,
-      // Если debt передан (в FormData приходит строкой), приводим к числу
-      debt: debt !== undefined && debt !== '' ? parseFloat(debt) : undefined,
       containerImage: req.file ? `/uploads/${req.file.filename}` : null,
       row: row || null,
       container: container || null,
@@ -296,7 +293,6 @@ const updateSupplier = async (req, res) => {
       sector, 
       mapPosition, 
       notes,
-      debt,
       row,
       container
     } = req.body;
@@ -329,13 +325,6 @@ const updateSupplier = async (req, res) => {
     if (notes !== undefined) updateData.notes = notes;
     if (row !== undefined) updateData.row = row || null;
     if (container !== undefined) updateData.container = container || null;
-    // Обработка задолженности (debt)
-    if (debt !== undefined && debt !== '') {
-      const parsedDebt = parseFloat(debt);
-      if (!Number.isNaN(parsedDebt)) {
-        updateData.debt = parsedDebt;
-      }
-    }
 
     // Обработка загрузки нового изображения контейнера
     if (req.file) {

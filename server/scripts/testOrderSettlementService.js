@@ -2,6 +2,7 @@ const assert = require('assert');
 
 const {
   ORDER_SETTLEMENT_TYPES,
+  buildBalanceAdjustmentPlan,
   buildSettlementChange,
   calculateOrderDebtContribution,
   calculateSupplierBalance,
@@ -81,6 +82,63 @@ function testSignedSupplierBalanceIncludesUnallocatedAdvance() {
   }), 100000);
 }
 
+function testBalanceAdjustmentsSurviveRecalculation() {
+  const orders = [{ type: 'purchase', status: 'Закрыта', totalAmount: 1000, isActive: true }];
+  const payments = [{ amount: 400 }];
+
+  assert.strictEqual(calculateSupplierBalance({ orders, payments }), 600);
+  assert.strictEqual(calculateSupplierBalance({
+    orders,
+    payments,
+    adjustments: [{ amount: 150000 }, { amount: -20000.5 }],
+  }), 130599.5);
+  assert.strictEqual(calculateSupplierBalance({ adjustments: [{ amount: -5000 }] }), -5000);
+  assert.throws(
+    () => calculateSupplierBalance({ adjustments: [{ amount: 'abc' }] }),
+    /Adjustment amount is invalid/
+  );
+}
+
+function testBalanceAdjustmentPlan() {
+  const privileged = { id: 7, role: 'admin', canAdjustSupplierBalance: true };
+
+  assert.deepStrictEqual(
+    buildBalanceAdjustmentPlan({
+      actor: privileged,
+      supplierId: 3,
+      currentBalance: 600,
+      targetBalance: 150000,
+      comment: '  Старый долг до CRM  ',
+    }),
+    {
+      supplierId: 3,
+      amount: 149400,
+      balanceBefore: 600,
+      balanceAfter: 150000,
+      comment: 'Старый долг до CRM',
+      createdBy: 7,
+    }
+  );
+
+  // Аванс: итоговая сумма отрицательная
+  assert.strictEqual(buildBalanceAdjustmentPlan({
+    actor: privileged, supplierId: 3, currentBalance: 600, targetBalance: -2500.5, comment: 'Аванс',
+  }).amount, -3100.5);
+
+  const base = { supplierId: 3, currentBalance: 600, targetBalance: 100, comment: 'ok' };
+  assert.throws(
+    () => buildBalanceAdjustmentPlan({ ...base, actor: { id: 8, role: 'admin', canAdjustSupplierBalance: false } }),
+    (error) => error.statusCode === 403
+  );
+  assert.throws(
+    () => buildBalanceAdjustmentPlan({ ...base, actor: { id: 8, role: 'accountant', canAdjustSupplierBalance: true } }),
+    (error) => error.statusCode === 403
+  );
+  assert.throws(() => buildBalanceAdjustmentPlan({ ...base, actor: privileged, comment: '   ' }), /Comment is required/);
+  assert.throws(() => buildBalanceAdjustmentPlan({ ...base, actor: privileged, targetBalance: 'x' }), /Target balance is invalid/);
+  assert.throws(() => buildBalanceAdjustmentPlan({ ...base, actor: privileged, targetBalance: 600 }), /already equals/);
+}
+
 function testSettlementValidation() {
   assert.strictEqual(
     normalizeSettlementType('purchase', 'consignment'),
@@ -122,5 +180,7 @@ function testSettlementValidation() {
 
 testDebtContribution();
 testSignedSupplierBalanceIncludesUnallocatedAdvance();
+testBalanceAdjustmentsSurviveRecalculation();
+testBalanceAdjustmentPlan();
 testSettlementValidation();
 console.log('Order settlement service test passed');

@@ -1,8 +1,11 @@
 const { Op } = require('sequelize');
 const sequelize = require('../config/database');
-const { Payment, Order, Supplier, User } = require('../models');
+const { Payment, Order, Supplier, User, SupplierBalanceAdjustment } = require('../models');
 const { DEBT_STATUSES } = require('../services/orderStatusPolicyService');
-const { calculateSupplierBalance } = require('../services/orderSettlementService');
+const {
+  buildBalanceAdjustmentPlan,
+  calculateSupplierBalance,
+} = require('../services/orderSettlementService');
 const { removeUploadedFile } = require('../middleware/upload');
 
 /**
@@ -31,7 +34,7 @@ const calculatePaymentStatus = (order) => {
 const recalculateSupplierDebt = async (supplierId, options = {}) => {
   if (!supplierId) return 0;
 
-  const [orders, payments] = await Promise.all([
+  const [orders, payments, adjustments] = await Promise.all([
     Order.findAll({
       where: {
         supplierId,
@@ -46,9 +49,14 @@ const recalculateSupplierDebt = async (supplierId, options = {}) => {
       attributes: ['amount'],
       transaction: options.transaction,
     }),
+    SupplierBalanceAdjustment.findAll({
+      where: { supplierId },
+      attributes: ['amount'],
+      transaction: options.transaction,
+    }),
   ]);
 
-  const totalDebt = calculateSupplierBalance({ orders, payments });
+  const totalDebt = calculateSupplierBalance({ orders, payments, adjustments });
 
   // Обновляем поле debt в таблице поставщиков
   await Supplier.update(
@@ -172,6 +180,12 @@ const getPaymentsBySupplier = async (req, res) => {
       ]
     });
 
+    const balanceAdjustments = await SupplierBalanceAdjustment.findAll({
+      where: { supplierId },
+      order: [['createdAt', 'DESC'], ['id', 'DESC']],
+      include: [{ model: User, as: 'creator', attributes: ['id', 'name'] }],
+    });
+
     // Получение неоплаченных и частично оплаченных заявок
     const unpaidOrders = await Order.findAll({
       where: {
@@ -197,6 +211,7 @@ const getPaymentsBySupplier = async (req, res) => {
         supplier,
         payments,
         unpaidOrders,
+        balanceAdjustments,
         stats: {
           totalPaid: totalPaid.toFixed(2),
           balance: balance.toFixed(2),
@@ -729,9 +744,64 @@ const deletePayment = async (req, res) => {
   }
 };
 
+/**
+ * Ручная корректировка баланса поставщика (задаётся итоговая сумма)
+ * POST /api/payments/supplier/:supplierId/balance-adjustments
+ */
+const adjustSupplierBalance = async (req, res) => {
+  const transaction = await sequelize.transaction();
+  let transactionFinished = false;
+
+  try {
+    const supplier = await Supplier.findByPk(req.params.supplierId, {
+      transaction,
+      lock: transaction.LOCK.UPDATE,
+    });
+    if (!supplier) {
+      await transaction.rollback();
+      transactionFinished = true;
+      return res.status(404).json({ success: false, message: 'Поставщик не найден' });
+    }
+
+    const currentBalance = await recalculateSupplierDebt(supplier.id, { transaction });
+    const plan = buildBalanceAdjustmentPlan({
+      actor: req.user,
+      supplierId: supplier.id,
+      currentBalance,
+      targetBalance: req.body.targetBalance,
+      comment: req.body.comment,
+    });
+
+    const adjustment = await SupplierBalanceAdjustment.create(plan, { transaction });
+    const balance = await recalculateSupplierDebt(supplier.id, { transaction });
+
+    await transaction.commit();
+    transactionFinished = true;
+
+    return res.status(201).json({
+      success: true,
+      message: 'Сумма расчётов с поставщиком изменена',
+      data: { adjustment, balance },
+    });
+  } catch (error) {
+    if (!transactionFinished) await transaction.rollback();
+
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({ success: false, message: error.message });
+    }
+
+    console.error('Ошибка корректировки баланса поставщика:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Ошибка корректировки баланса поставщика',
+    });
+  }
+};
+
 module.exports = {
   getPayments,
   getPaymentsBySupplier,
+  adjustSupplierBalance,
   createPayment,
   getPaymentById,
   updatePayment,

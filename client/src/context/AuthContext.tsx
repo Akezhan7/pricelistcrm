@@ -12,6 +12,7 @@ export type User = {
   canManageUsers?: boolean;
   canManageKpiWeights?: boolean;
   canViewManagerReports?: boolean;
+  canAdjustSupplierBalance?: boolean;
 };
 
 type AuthContextType = {
