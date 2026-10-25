@@ -30,8 +30,9 @@ const ProcurementListItem = sequelize.define('ProcurementListItem', {
   indexes: [
     {
       fields: ['procurement_list_id', 'product_id'],
-      name: 'uniq_procurement_list_items_product',
+      name: 'uniq_procurement_list_items_pending_product',
       unique: true,
+      where: { order_item_id: null },
     },
     {
       fields: ['procurement_list_id', 'created_at'],

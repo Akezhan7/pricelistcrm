@@ -984,17 +984,27 @@ const releaseOrderItemLinks = async ({ order, orderItemIds, actorId, transaction
   }
 
   for (const item of linkedProcurementItems) {
-    if (!targetList || Number(item.procurementListId) === Number(targetList.id)) {
+    if (!targetList) {
       await item.update({ orderItemId: null }, { transaction });
       continue;
     }
+    // Товар могли добавить в лист заново после оформления — тогда ждущая позиция уже есть.
     const duplicate = await ProcurementListItem.findOne({
-      where: { procurementListId: targetList.id, productId: item.productId },
+      where: {
+        procurementListId: targetList.id,
+        productId: item.productId,
+        orderItemId: null,
+        id: { [Op.ne]: item.id },
+      },
       transaction,
       lock: true,
     });
     if (duplicate) await item.destroy({ transaction });
-    else await item.update({ procurementListId: targetList.id, orderItemId: null }, { transaction });
+    else if (Number(item.procurementListId) === Number(targetList.id)) {
+      await item.update({ orderItemId: null }, { transaction });
+    } else {
+      await item.update({ procurementListId: targetList.id, orderItemId: null }, { transaction });
+    }
   }
 
   for (const purchase of lifecyclePurchases) {

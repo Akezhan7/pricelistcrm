@@ -9,6 +9,7 @@ const {
   Product,
   ProductActionHistory,
   ProductLifecyclePurchase,
+  ProductSupplier,
   Supplier,
   User,
   sequelize,
@@ -22,6 +23,7 @@ const {
 } = require('../services/procurementListService');
 const { generateOrderNumber } = require('../services/orderNumberService');
 const { PRODUCT_LIFECYCLE_STATUSES } = require('../constants/productLifecycle');
+const { PRODUCT_ACTION_TYPES } = require('../constants/productHistory');
 
 const USER_ATTRIBUTES = ['id', 'name', 'email', 'role'];
 const PRODUCT_ATTRIBUTES = [
@@ -270,17 +272,13 @@ async function addCurrentListItem(req, res) {
         where: {
           procurementListId: list.id,
           productId: product.id,
+          orderItemId: null,
         },
         transaction,
         lock: true,
       });
 
       if (existingItem) {
-        if (existingItem.orderItemId) {
-          const error = new Error('Этот товар уже оформлен из текущего закупочного листа');
-          error.statusCode = 409;
-          throw error;
-        }
         const updateInput = existingItem.selectedSupplierId
           ? req.body
           : {
@@ -554,6 +552,46 @@ async function createOrdersFromCurrentList(req, res) {
         }
 
         const product = productsById.get(plannedItem.productId);
+
+        // Подтверждённая закупка фиксируется в каталоге поставщика: товар появляется у него с ценой закупа.
+        const [supplierLink, linkCreated] = await ProductSupplier.findOrCreate({
+          where: { productId: plannedItem.productId, supplierId: group.supplierId },
+          defaults: {
+            supplierPrice: plannedItem.purchasePrice,
+            quantity: 0,
+            isAvailable: true,
+            isPreferred: false,
+          },
+          transaction,
+        });
+        const previousSupplierPrice = Number(supplierLink.supplierPrice);
+        const supplierPriceChanged = !linkCreated && previousSupplierPrice !== plannedItem.purchasePrice;
+        if (supplierPriceChanged) {
+          await supplierLink.update({ supplierPrice: plannedItem.purchasePrice }, { transaction });
+        }
+        if (linkCreated || supplierPriceChanged) {
+          await ProductActionHistory.create({
+            productId: plannedItem.productId,
+            actorId: req.user.id,
+            actionType: linkCreated
+              ? PRODUCT_ACTION_TYPES.SUPPLIER_LINKED
+              : PRODUCT_ACTION_TYPES.SUPPLIER_UPDATED,
+            fromStatus: product.lifecycleStatus,
+            toStatus: product.lifecycleStatus,
+            message: linkCreated
+              ? 'Supplier linked from procurement list'
+              : 'Supplier price updated from procurement list',
+            metadata: {
+              supplierId: group.supplierId,
+              supplierPrice: plannedItem.purchasePrice,
+              ...(supplierPriceChanged ? { previousSupplierPrice } : {}),
+              orderNumber,
+              procurementListId: list.id,
+            },
+            createdAt: now,
+          }, { transaction });
+        }
+
         if (
           product.lifecycleStatus === PRODUCT_LIFECYCLE_STATUSES.PURCHASE
           && !lifecyclePurchaseByProductId.has(plannedItem.productId)
