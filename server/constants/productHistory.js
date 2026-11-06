@@ -24,6 +24,8 @@ const PRODUCT_ACTION_TYPES = Object.freeze({
   STOCK_UPDATED: 'stock_updated',
   SALE_LAUNCH_COMPLETED: 'sale_launch_completed',
   SALE_FLAGS_UPDATED: 'sale_flags_updated',
+  DUMPING_UPDATED: 'dumping_updated',
+  DUMPING_CONNECTED: 'dumping_connected',
 });
 
 const PRODUCT_ACTION_MESSAGES = Object.freeze({

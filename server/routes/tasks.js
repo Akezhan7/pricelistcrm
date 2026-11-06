@@ -18,7 +18,7 @@ router.use(auth);
 router.get(
   '/',
   query('scope').optional().isIn(['all', 'assigned', 'created']),
-  query('status').optional().isIn(statusValues),
+  query('status').optional().isIn([...statusValues, 'active']),
   query('priority').optional().isIn(priorityValues),
   query('assignedToUserId').optional().isInt({ min: 1 }),
   query('createdByUserId').optional().isInt({ min: 1 }),
@@ -111,6 +111,14 @@ router.patch(
   param('id').isInt({ min: 1 }),
   body('comment').optional({ nullable: true }).isString().trim(),
   employeeTaskController.approveTask
+);
+
+router.patch(
+  '/:id/complete',
+  requireRole('admin'),
+  param('id').isInt({ min: 1 }),
+  body('comment').optional({ nullable: true }).isString().trim(),
+  employeeTaskController.completeTask
 );
 
 router.patch(

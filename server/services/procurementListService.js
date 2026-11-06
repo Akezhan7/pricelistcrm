@@ -68,6 +68,13 @@ function optionalNonNegativeNumber(value, fieldName) {
   return parsed;
 }
 
+function requiredBoolean(value, fieldName) {
+  if (typeof value !== 'boolean') {
+    throw createInputError(fieldName + ' must be a boolean');
+  }
+  return value;
+}
+
 function optionalNotes(value) {
   if (value === undefined) return undefined;
   const normalized = String(value || '').trim();
@@ -107,6 +114,9 @@ function buildProcurementListItemUpdate(input = {}) {
   }
   if (Object.prototype.hasOwnProperty.call(input, 'purchasePrice')) {
     update.purchasePrice = optionalNonNegativeNumber(input.purchasePrice, 'purchasePrice');
+  }
+  if (Object.prototype.hasOwnProperty.call(input, 'rememberSupplierPrice')) {
+    update.rememberSupplierPrice = requiredBoolean(input.rememberSupplierPrice, 'rememberSupplierPrice');
   }
 
   if (Object.keys(update).length === 0) {
@@ -150,6 +160,10 @@ function buildProcurementListItemData({
       supplierRecommendation.purchasePrice,
       'purchasePrice'
     ) ?? null;
+  }
+
+  if (Object.prototype.hasOwnProperty.call(input, 'rememberSupplierPrice')) {
+    data.rememberSupplierPrice = requiredBoolean(input.rememberSupplierPrice, 'rememberSupplierPrice');
   }
 
   return data;
@@ -241,6 +255,7 @@ function buildProcurementOrderGroups({ items = [], actor } = {}) {
       productId: requiredPositiveInteger(item.productId, 'productId'),
       quantity,
       purchasePrice,
+      rememberSupplierPrice: item.rememberSupplierPrice !== false,
       notes: optionalNotes(item.notes) ?? null,
     };
 
@@ -279,12 +294,76 @@ function buildProcurementOrderGroups({ items = [], actor } = {}) {
   return { groups, blocked };
 }
 
+/**
+ * Выбор «добавить в существующую заявку» по поставщикам: [{ supplierId, orderId }] → Map(supplierId → orderId).
+ */
+function normalizeOrderTargets(targets) {
+  const targetsBySupplier = new Map();
+  if (targets === undefined || targets === null) return targetsBySupplier;
+  if (!Array.isArray(targets)) throw createInputError('targets must be an array');
+
+  targets.forEach((target) => {
+    const supplierId = requiredPositiveInteger(target?.supplierId, 'targets.supplierId');
+    const orderId = requiredPositiveInteger(target?.orderId, 'targets.orderId');
+    if (targetsBySupplier.has(supplierId)) {
+      throw createInputError('Для поставщика выбрано несколько заявок');
+    }
+    targetsBySupplier.set(supplierId, orderId);
+  });
+  return targetsBySupplier;
+}
+
+/**
+ * Позиции заявки после добавления позиций закупочного листа: товар, который уже есть в заявке,
+ * увеличивает количество существующей строки (цена — новая), остальные добавляются новыми строками.
+ */
+function buildOrderMergeItems({ existingItems = [], plannedItems = [] }) {
+  const incomingItems = existingItems.map((item) => ({
+    id: Number(item.id),
+    productId: Number(item.productId),
+    productVariationId: item.productVariationId ? Number(item.productVariationId) : null,
+    quantity: Number(item.quantity),
+    priceAtPurchase: Number(item.priceAtPurchase),
+    notes: item.notes || null,
+  }));
+  const mergedPlannedItems = [];
+  const appendedPlannedItems = [];
+
+  plannedItems.forEach((planned) => {
+    const target = incomingItems.find(
+      (item) => item.id && !item.productVariationId && item.productId === planned.productId
+    );
+    if (target) {
+      target.quantity += planned.quantity;
+      target.priceAtPurchase = planned.purchasePrice;
+      target.notes = [target.notes, planned.notes]
+        .filter((note, index, notes) => note && notes.indexOf(note) === index)
+        .join('; ') || null;
+      mergedPlannedItems.push(planned);
+      return;
+    }
+
+    incomingItems.push({
+      productId: planned.productId,
+      productVariationId: null,
+      quantity: planned.quantity,
+      priceAtPurchase: planned.purchasePrice,
+      notes: planned.notes,
+    });
+    appendedPlannedItems.push(planned);
+  });
+
+  return { incomingItems, mergedPlannedItems, appendedPlannedItems };
+}
+
 module.exports = {
   PROCUREMENT_LIST_ROLES,
   PROCUREMENT_LIST_STATUSES,
   assertCanManageProcurementList,
+  buildOrderMergeItems,
   buildProcurementListItemData,
   buildProcurementListItemUpdate,
   buildProcurementOrderGroups,
   buildSupplierRecommendation,
+  normalizeOrderTargets,
 };

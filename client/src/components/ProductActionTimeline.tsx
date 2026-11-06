@@ -53,6 +53,8 @@ const EVENT_LABELS: Record<string, string> = {
   selling_price_changed: 'Цена продажи изменена',
   sale_launch_completed: 'Запуск продаж завершён',
   sale_flags_updated: 'Параметры продаж обновлены',
+  dumping_updated: 'Параметры демпинга обновлены',
+  dumping_connected: 'Демпинг подключён и проверен',
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -67,6 +69,8 @@ const FIELD_LABELS: Record<string, string> = {
   quantity: 'Количество',
   isAvailable: 'Доступность',
   notes: 'Примечание',
+  minPrice: 'Мин. цена',
+  maxPrice: 'Макс. цена',
 };
 
 const categoryIcons = {
@@ -116,6 +120,7 @@ function EventDetails({ event }: { event: ProductHistoryEvent }) {
     purchase: 'Закуп',
     warehouse: 'Склад',
     sale_launch: 'Запуск продаж и реклама',
+    dumping: 'Демпинг',
   };
 
   return (
@@ -146,6 +151,14 @@ function EventDetails({ event }: { event: ProductHistoryEvent }) {
       {event.source === 'price' && (
         <p>
           {formatPriceKZT(metadata.oldPrice as number)} → {formatPriceKZT(metadata.newPrice as number)}
+        </p>
+      )}
+      {event.actionType.startsWith('dumping_') && (
+        <p>
+          Мин. {formatPriceKZT(metadata.minPrice as number)} · Макс. {formatPriceKZT(metadata.maxPrice as number)}
+          {event.actionType === 'dumping_updated' && metadata.previousMinPrice != null
+            ? ` (было ${formatPriceKZT(metadata.previousMinPrice as number)} – ${formatPriceKZT(metadata.previousMaxPrice as number)})`
+            : ''}
         </p>
       )}
       {event.source === 'stock' && (

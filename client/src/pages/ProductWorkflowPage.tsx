@@ -32,6 +32,7 @@ import { ProductReviewActions } from '../components/ProductReviewActions';
 import { ProductPurchaseActions } from '../components/ProductPurchaseActions';
 import { ProductWarehousePanel } from '../components/ProductWarehousePanel';
 import { ProductSaleLaunchPanel } from '../components/ProductSaleLaunchPanel';
+import { ProductDumpingPanel } from '../components/ProductDumpingPanel';
 import { ProductHistoryModal } from '../components/ProductHistoryModal';
 import { AssignDesignerModal } from '../components/AssignDesignerModal';
 import { TransferDesignerModal } from '../components/TransferDesignerModal';
@@ -122,6 +123,7 @@ export const ProductWorkflowPage: React.FC = () => {
   const [purchaseProduct, setPurchaseProduct] = useState<ProductWorkflowItem | null>(null);
   const [warehouseProduct, setWarehouseProduct] = useState<ProductWorkflowItem | null>(null);
   const [saleProduct, setSaleProduct] = useState<ProductWorkflowItem | null>(null);
+  const [dumpingProduct, setDumpingProduct] = useState<ProductWorkflowItem | null>(null);
   const [historyProduct, setHistoryProduct] = useState<ProductWorkflowItem | null>(null);
   const [assignDesignerProduct, setAssignDesignerProduct] = useState<ProductWorkflowItem | null>(null);
   const [selectedTransferIds, setSelectedTransferIds] = useState<number[]>([]);
@@ -280,6 +282,7 @@ export const ProductWorkflowPage: React.FC = () => {
     setPurchaseProduct(null);
     setWarehouseProduct(null);
     setSaleProduct(null);
+    setDumpingProduct(null);
     await fetchProducts();
   };
 
@@ -604,6 +607,8 @@ export const ProductWorkflowPage: React.FC = () => {
                                 || product.workflow.nextActionKey === 'manage_sale_launch'
                               ) {
                                 setSaleProduct(product);
+                              } else if (product.workflow.nextActionKey === 'complete_dumping') {
+                                setDumpingProduct(product);
                               } else {
                                 navigate('/products');
                               }
@@ -739,6 +744,21 @@ export const ProductWorkflowPage: React.FC = () => {
             <ProductSaleLaunchPanel
               product={saleProduct}
               onChanged={handleWorkflowChanged}
+            />
+          )}
+        </Modal>
+
+        <Modal
+          isOpen={!!dumpingProduct}
+          onClose={() => setDumpingProduct(null)}
+          title="Демпинг"
+          size="lg"
+        >
+          {dumpingProduct && (
+            <ProductDumpingPanel
+              product={dumpingProduct}
+              onChanged={handleWorkflowChanged}
+              showProductHeader
             />
           )}
         </Modal>

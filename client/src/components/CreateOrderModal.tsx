@@ -7,6 +7,7 @@ import {
   type OrderLineForm,
   buildMainOrderLine,
   getMainOrderLineQuantities,
+  getRememberPriceFlag,
   getSupplierListPrice,
   getSupplierSuggestions,
   updateMainOrderLineQuantity,
@@ -239,6 +240,14 @@ const CreateOrderModal: React.FC = () => {
     });
   };
 
+  const handleToggleRememberPrice = (index: number, remember: boolean) => {
+    setItems((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], rememberSupplierPrice: remember };
+      return next;
+    });
+  };
+
   const handleUpdateNotes = (index: number, note: string) => {
     setItems((prev) => {
       const next = [...prev];
@@ -307,6 +316,7 @@ const CreateOrderModal: React.FC = () => {
           productVariationId: item.productVariationId || undefined,
           quantity: item.quantity,
           priceAtPurchase: item.priceAtPurchase,
+          rememberSupplierPrice: isReturn ? undefined : getRememberPriceFlag(item, supplierId),
           notes: item.notes || undefined,
         })),
       };
@@ -476,6 +486,8 @@ const CreateOrderModal: React.FC = () => {
                     mode="create"
                     onUpdateQuantity={handleUpdateQuantity}
                     onUpdatePrice={handleUpdatePrice}
+                    supplierId={isReturn ? null : supplierId}
+                    onToggleRememberPrice={handleToggleRememberPrice}
                     onUpdateNotes={handleUpdateNotes}
                     onRemoveItem={handleRemoveItem}
                     onAddVariation={handleAddVariationAsNewItem}

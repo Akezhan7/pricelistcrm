@@ -58,6 +58,7 @@ function testRoleWorkflowQueries() {
   assert.strictEqual(marketplaceTasks.scope, 'marketplace_manager');
   assert.deepStrictEqual(marketplaceTasks.where[Op.or], [
     { lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE },
+    { lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.DUMPING },
     {
       lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
       lifecycleStartedAt: { [Op.ne]: null },

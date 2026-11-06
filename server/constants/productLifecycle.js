@@ -7,6 +7,7 @@ const PRODUCT_LIFECYCLE_STATUSES = Object.freeze({
   MARKETPLACE: 'marketplace',
   PURCHASE: 'purchase',
   WAREHOUSE: 'warehouse',
+  DUMPING: 'dumping',
   IN_SALE: 'in_sale',
   ARCHIVED: 'archived',
 });
@@ -22,6 +23,7 @@ const PRODUCT_LIFECYCLE_STATUS_LABELS = Object.freeze({
   [PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE]: 'Marketplace placement',
   [PRODUCT_LIFECYCLE_STATUSES.PURCHASE]: 'Purchase',
   [PRODUCT_LIFECYCLE_STATUSES.WAREHOUSE]: 'Warehouse',
+  [PRODUCT_LIFECYCLE_STATUSES.DUMPING]: 'Dumping',
   [PRODUCT_LIFECYCLE_STATUSES.IN_SALE]: 'In sale',
   [PRODUCT_LIFECYCLE_STATUSES.ARCHIVED]: 'Archived',
 });
@@ -44,6 +46,7 @@ const PRODUCT_LIFECYCLE_ACTIONS = Object.freeze({
   MARK_ARRIVED: 'mark_arrived',
   COMPLETE_WAREHOUSE: 'complete_warehouse',
   COMPLETE_SALE_LAUNCH: 'complete_sale_launch',
+  COMPLETE_DUMPING: 'complete_dumping',
   ARCHIVE: 'archive',
 });
 
@@ -103,6 +106,11 @@ const PRODUCT_LIFECYCLE_ACTION_CONFIG = Object.freeze({
   }),
   [PRODUCT_LIFECYCLE_ACTIONS.COMPLETE_SALE_LAUNCH]: Object.freeze({
     from: [PRODUCT_LIFECYCLE_STATUSES.IN_SALE],
+    to: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
+    roles: ['admin', 'marketplace_manager'],
+  }),
+  [PRODUCT_LIFECYCLE_ACTIONS.COMPLETE_DUMPING]: Object.freeze({
+    from: [PRODUCT_LIFECYCLE_STATUSES.DUMPING],
     to: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
     roles: ['admin', 'marketplace_manager'],
   }),

@@ -22,6 +22,7 @@ const ProcurementListItem = sequelize.define('ProcurementListItem', {
     allowNull: true,
     validate: { min: 0 },
   },
+  rememberSupplierPrice: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
   orderItemId: { type: DataTypes.INTEGER, allowNull: true, unique: true },
   addedByUserId: { type: DataTypes.INTEGER, allowNull: false },
 }, {

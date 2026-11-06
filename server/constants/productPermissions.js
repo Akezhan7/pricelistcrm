@@ -13,6 +13,7 @@ const PRODUCT_PERMISSION_ACTIONS = Object.freeze({
   MANAGE_WAREHOUSE: 'manage_warehouse',
   EDIT_WAREHOUSE_LOCATION: 'edit_warehouse_location',
   MANAGE_SALE_LAUNCH: 'manage_sale_launch',
+  MANAGE_DUMPING: 'manage_dumping',
   MANAGE_SUPPLIERS: 'manage_product_suppliers',
   MANAGE_VARIATIONS: 'manage_product_variations',
   MANAGE_KPI_WEIGHT: 'manage_kpi_weight',
@@ -44,6 +45,7 @@ const RESPONSIBLE_ROLE_LABELS = Object.freeze({
   [PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE]: 'Менеджер маркетплейсов',
   [PRODUCT_LIFECYCLE_STATUSES.PURCHASE]: 'Менеджер по закупкам',
   [PRODUCT_LIFECYCLE_STATUSES.WAREHOUSE]: 'Оператор склада',
+  [PRODUCT_LIFECYCLE_STATUSES.DUMPING]: 'Менеджер маркетплейсов',
   [PRODUCT_LIFECYCLE_STATUSES.IN_SALE]: 'Менеджер маркетплейсов',
   [PRODUCT_LIFECYCLE_STATUSES.ARCHIVED]: 'Администратор',
 });
@@ -124,10 +126,17 @@ function getSupportingActions({ user, product }) {
   }
 
   if (
-    status === PRODUCT_LIFECYCLE_STATUSES.IN_SALE
+    [PRODUCT_LIFECYCLE_STATUSES.IN_SALE, PRODUCT_LIFECYCLE_STATUSES.DUMPING].includes(status)
     && hasRole(user, 'admin', 'marketplace_manager')
   ) {
     actions.push(PRODUCT_PERMISSION_ACTIONS.MANAGE_SALE_LAUNCH);
+  }
+
+  if (
+    status !== PRODUCT_LIFECYCLE_STATUSES.ARCHIVED
+    && hasRole(user, 'admin', 'marketplace_manager')
+  ) {
+    actions.push(PRODUCT_PERMISSION_ACTIONS.MANAGE_DUMPING);
   }
 
   return actions;
@@ -163,6 +172,7 @@ function getProductResponsibility(product) {
   const status = product?.lifecycleStatus;
   const marketplaceOwned = [
     PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE,
+    PRODUCT_LIFECYCLE_STATUSES.DUMPING,
     PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
   ].includes(status);
   const user = product?.assignedTo || (marketplaceOwned ? product?.marketplaceManager : null) || null;

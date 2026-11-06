@@ -9,6 +9,7 @@ import { FormFooter } from './ui/FormFooter';
 import { Alert } from './ui/Alert';
 import { Button } from './ui/Button';
 import { ProductFormFields, emptyProductFormData } from './forms/ProductFormFields';
+import { isCostPriceAutomatic } from '../utils/productCostPrice';
 import { toast } from '../context/ToastContext';
 
 type EditProductModalProps = {
@@ -153,6 +154,7 @@ export const EditProductModal: React.FC<EditProductModalProps> = ({
             onImageChange={setImage}
             currentImageUrl={currentImage}
             mode="edit"
+            costPriceLocked={isCostPriceAutomatic(product)}
           />
         </form>
       </Modal>

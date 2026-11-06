@@ -10,6 +10,7 @@ const {
   buildTaskUpdatePayload,
   buildTaskWhere,
   getAllowedTaskActions,
+  getTaskStatusAfterAction,
   normalizeTaskDueDate,
 } = require('../services/employeeTaskService');
 
@@ -68,6 +69,41 @@ function testAdminCanReviewCancelAndCreate() {
       action: EMPLOYEE_TASK_ACTIONS.APPROVE,
     })
   );
+}
+
+function testAdminCanCompleteOpenTaskWithoutReview() {
+  const admin = user({ id: 1, role: 'admin' });
+  const assignedUser = user({ id: 2, role: 'designer' });
+
+  [
+    EMPLOYEE_TASK_STATUSES.NEW,
+    EMPLOYEE_TASK_STATUSES.IN_PROGRESS,
+    EMPLOYEE_TASK_STATUSES.RETURNED,
+  ].forEach((status) => {
+    assert(
+      getAllowedTaskActions({ user: admin, task: task({ status }) })
+        .includes(EMPLOYEE_TASK_ACTIONS.COMPLETE),
+      `admin must be able to complete a ${status} task`
+    );
+    assert(
+      !getAllowedTaskActions({ user: assignedUser, task: task({ status }) })
+        .includes(EMPLOYEE_TASK_ACTIONS.COMPLETE),
+      `assignee must not skip the review of a ${status} task`
+    );
+  });
+
+  [
+    EMPLOYEE_TASK_STATUSES.REVIEW,
+    EMPLOYEE_TASK_STATUSES.DONE,
+    EMPLOYEE_TASK_STATUSES.CANCELLED,
+  ].forEach((status) => {
+    assert(
+      !getAllowedTaskActions({ user: admin, task: task({ status }) })
+        .includes(EMPLOYEE_TASK_ACTIONS.COMPLETE)
+    );
+  });
+
+  assert.strictEqual(getTaskStatusAfterAction(EMPLOYEE_TASK_ACTIONS.COMPLETE), EMPLOYEE_TASK_STATUSES.DONE);
 }
 
 function testForeignUserCannotMoveTask() {
@@ -151,6 +187,16 @@ function testOverdueFilterComposesWithSelectedStatus() {
   );
 }
 
+function testActiveStatusFilterExcludesClosedTasks() {
+  const where = buildTaskWhere(user({ id: 1, role: 'admin' }), { status: 'active' });
+  const statusCondition = where[Op.and].find((condition) => condition.status);
+
+  assert.deepStrictEqual(
+    statusCondition.status[Op.notIn],
+    [EMPLOYEE_TASK_STATUSES.DONE, EMPLOYEE_TASK_STATUSES.CANCELLED]
+  );
+}
+
 function testSearchFilterMatchesTitleAndDescription() {
   const where = buildTaskWhere(
     user({ id: 1, role: 'admin' }),
@@ -212,11 +258,13 @@ function testBuildTaskCommentEntryTrimsTextAndCapturesAuthor() {
 function run() {
   testAssigneeCanStartAndSubmitOwnTask();
   testAdminCanReviewCancelAndCreate();
+  testAdminCanCompleteOpenTaskWithoutReview();
   testForeignUserCannotMoveTask();
   testCompletedAndCancelledTasksAreClosed();
   testHistoryEntryCapturesActorStatusAndComment();
   testAdminAssignedScopeCannotBeOverwrittenByAssigneeFilter();
   testOverdueFilterComposesWithSelectedStatus();
+  testActiveStatusFilterExcludesClosedTasks();
   testSearchFilterMatchesTitleAndDescription();
   testBuildTaskUpdatePayloadAllowsAdminEditableFieldsOnly();
   testDeadlineEndsAtEndOfSelectedCrmDay();

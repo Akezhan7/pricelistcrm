@@ -6,6 +6,8 @@ import type { Product, ProductVariation } from '../../types';
 
 import { formatPriceKZT } from '../../utils/format';
 
+import { shouldOfferRememberPrice } from '../../utils/orderItems';
+
 import { cn } from '../../utils/cn';
 
 import { Input } from '../ui/Input';
@@ -33,6 +35,10 @@ export type OrderLineItemBase = {
   quantity: number;
 
   priceAtPurchase: number;
+
+  initialPrice?: number;
+
+  rememberSupplierPrice?: boolean;
 
   notes?: string;
 
@@ -74,6 +80,11 @@ export interface OrderLineItemsEditorProps<T extends OrderLineItemBase> {
 
   isVariationTaken?: (productId: number, variationId: number) => boolean;
 
+  /** Поставщик заявки: нужен, чтобы предлагать сохранить изменённую цену у поставщика */
+  supplierId?: number | null;
+
+  onToggleRememberPrice?: (index: number, remember: boolean) => void;
+
 }
 
 
@@ -99,6 +110,10 @@ export function OrderLineItemsEditor<T extends OrderLineItemBase>({
   onRestoreItem,
 
   isVariationTaken,
+
+  supplierId,
+
+  onToggleRememberPrice,
 
 }: OrderLineItemsEditorProps<T>) {
 
@@ -441,6 +456,40 @@ export function OrderLineItemsEditor<T extends OrderLineItemBase>({
                   />
 
                 </div>
+
+
+
+                {onToggleRememberPrice && shouldOfferRememberPrice(item, supplierId) && (
+
+                  <div className="md:col-span-4">
+
+                    <label className="flex items-center gap-2 cursor-pointer">
+
+                      <input
+
+                        type="checkbox"
+
+                        checked={item.rememberSupplierPrice !== false}
+
+                        onChange={(e) => onToggleRememberPrice(index, e.target.checked)}
+
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+
+                      />
+
+                      <span className="text-sm text-brand-black">Запомнить цену у поставщика</span>
+
+                    </label>
+
+                    <p className="text-caption text-text-muted mt-0.5">
+
+                      Снимите галочку, если цена разовая — у поставщика она не изменится
+
+                    </p>
+
+                  </div>
+
+                )}
 
 
 

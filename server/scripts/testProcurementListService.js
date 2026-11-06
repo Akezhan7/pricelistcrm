@@ -2,10 +2,12 @@ const assert = require('assert');
 
 const {
   assertCanManageProcurementList,
+  buildOrderMergeItems,
   buildProcurementListItemData,
   buildProcurementListItemUpdate,
   buildProcurementOrderGroups,
   buildSupplierRecommendation,
+  normalizeOrderTargets,
 } = require('../services/procurementListService');
 
 function testAllowedRoles() {
@@ -291,6 +293,36 @@ function testProcurementOrderGroups() {
   ]);
 }
 
+function testRememberSupplierPriceFlag() {
+  assert.deepStrictEqual(
+    buildProcurementListItemUpdate({ rememberSupplierPrice: false }),
+    { rememberSupplierPrice: false }
+  );
+  assert.strictEqual(
+    buildProcurementListItemData({
+      listId: 7, productId: 15, actorId: 4,
+      input: { requestedQuantity: 1, rememberSupplierPrice: false },
+    }).rememberSupplierPrice,
+    false
+  );
+  assert.throws(
+    () => buildProcurementListItemUpdate({ rememberSupplierPrice: 'yes' }),
+    /rememberSupplierPrice must be a boolean/
+  );
+
+  const { groups } = buildProcurementOrderGroups({
+    actor: { id: 4, role: 'purchase_manager' },
+    items: [
+      { id: 21, productId: 201, requestedQuantity: 1, selectedSupplierId: 7, purchasePrice: 10 },
+      { id: 22, productId: 202, requestedQuantity: 1, selectedSupplierId: 7, purchasePrice: 20, rememberSupplierPrice: false },
+    ],
+  });
+  assert.deepStrictEqual(
+    groups[0].items.map((item) => item.rememberSupplierPrice),
+    [true, false]
+  );
+}
+
 function testIncompleteSupplierGroupDoesNotBlockOtherGroups() {
   const result = buildProcurementOrderGroups({
     actor: { id: 1, role: 'admin' },
@@ -334,6 +366,39 @@ function testIncompleteSupplierGroupDoesNotBlockOtherGroups() {
   );
 }
 
+function testMergeIntoExistingOrder() {
+  const existingItems = [
+    { id: 1, productId: 100, productVariationId: null, quantity: 2, priceAtPurchase: 50, notes: 'старая' },
+    { id: 2, productId: 101, productVariationId: 7, quantity: 1, priceAtPurchase: 70, notes: null },
+  ];
+  const result = buildOrderMergeItems({
+    existingItems,
+    plannedItems: [
+      { productId: 100, quantity: 3, purchasePrice: 60, notes: 'новая' },
+      { productId: 101, quantity: 4, purchasePrice: 80, notes: null },
+      { productId: 102, quantity: 1, purchasePrice: 10, notes: null },
+    ],
+  });
+
+  assert.deepStrictEqual(result.incomingItems[0], {
+    id: 1, productId: 100, productVariationId: null, quantity: 5, priceAtPurchase: 60, notes: 'старая; новая',
+  });
+  assert.strictEqual(result.incomingItems[1].quantity, 1, 'строка вариации не меняется');
+  assert.strictEqual(result.incomingItems.length, 4);
+  assert.deepStrictEqual(result.mergedPlannedItems.map((item) => item.productId), [100]);
+  assert.deepStrictEqual(result.appendedPlannedItems.map((item) => item.productId), [101, 102]);
+  assert.strictEqual(existingItems[0].quantity, 2, 'исходные строки не изменяются');
+
+  const targets = normalizeOrderTargets([{ supplierId: 3, orderId: '9' }]);
+  assert.strictEqual(targets.get(3), 9);
+  assert.strictEqual(normalizeOrderTargets(undefined).size, 0);
+  assert.throws(() => normalizeOrderTargets([{ supplierId: 3, orderId: 0 }]), /positive integer/);
+  assert.throws(
+    () => normalizeOrderTargets([{ supplierId: 3, orderId: 1 }, { supplierId: 3, orderId: 2 }]),
+    /несколько заявок/
+  );
+}
+
 testAllowedRoles();
 testCreateItemData();
 testUpdateItemData();
@@ -341,4 +406,6 @@ testSupplierRecommendation();
 testRecommendationBecomesItemDefault();
 testProcurementOrderGroups();
 testIncompleteSupplierGroupDoesNotBlockOtherGroups();
+testRememberSupplierPriceFlag();
+testMergeIntoExistingOrder();
 console.log('Procurement list service test passed');

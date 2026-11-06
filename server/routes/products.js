@@ -71,6 +71,11 @@ const {
   getProductLaunchFlags,
   updateProductLaunchFlags,
 } = require('../controllers/productSaleLaunchController');
+const {
+  connectProductDumping,
+  getProductDumping,
+  saveProductDumping,
+} = require('../controllers/productDumpingController');
 
 const router = express.Router();
 
@@ -364,6 +369,28 @@ router.put('/:id/launch-flags',
   updateProductLaunchFlags
 );
 
+const dumpingValidation = [
+  body('minPrice').optional({ nullable: true }).isFloat({ gt: 0 }),
+  body('maxPrice').optional({ nullable: true }).isFloat({ gt: 0 }),
+  body('notes').optional({ nullable: true }).isString().isLength({ max: 2000 }),
+];
+
+router.get('/:id/dumping', auth, getProductDumping);
+
+router.put('/:id/dumping',
+  auth,
+  requireRole('admin', 'marketplace_manager'),
+  dumpingValidation,
+  saveProductDumping
+);
+
+router.post('/:id/dumping/connect',
+  auth,
+  requireRole('admin', 'marketplace_manager'),
+  dumpingValidation,
+  connectProductDumping
+);
+
 router.post('/bulk/assign-designer',
   auth,
   requireRole('admin'),
@@ -405,8 +432,8 @@ router.post('/lifecycle/bulk-start',
     body('productIds.*')
       .isInt({ min: 1 })
       .withMessage('productIds must contain positive integer ids'),
-    body('stages').isArray({ min: 1, max: 5 }),
-    body('stages.*').isIn(['design', 'marketplace', 'purchase', 'warehouse', 'sale_launch']),
+    body('stages').isArray({ min: 1, max: 6 }),
+    body('stages.*').isIn(['design', 'marketplace', 'purchase', 'warehouse', 'sale_launch', 'dumping']),
     body('designerId').optional({ values: 'falsy' }).isInt({ min: 1 }),
     body('reason').optional({ nullable: true }).isString().trim().isLength({ max: 1000 }),
   ],
@@ -417,8 +444,8 @@ router.post('/:id/lifecycle/start',
   auth,
   requireRole('admin'),
   [
-    body('stages').isArray({ min: 1, max: 5 }),
-    body('stages.*').isIn(['design', 'marketplace', 'purchase', 'warehouse', 'sale_launch']),
+    body('stages').isArray({ min: 1, max: 6 }),
+    body('stages.*').isIn(['design', 'marketplace', 'purchase', 'warehouse', 'sale_launch', 'dumping']),
     body('designerId').optional({ values: 'falsy' }).isInt({ min: 1 }),
     body('reason').optional({ nullable: true }).isString().trim().isLength({ max: 1000 }),
   ],

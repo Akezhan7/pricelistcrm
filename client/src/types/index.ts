@@ -7,6 +7,7 @@ export type ProductLifecycleStatus =
   | 'marketplace'
   | 'purchase'
   | 'warehouse'
+  | 'dumping'
   | 'in_sale'
   | 'archived';
 
@@ -101,6 +102,7 @@ export interface Product {
   lifecyclePurchase?: ProductLifecyclePurchase | null;
   warehouseDetails?: ProductWarehouseDetails | null;
   launchFlags?: ProductLaunchFlags | null;
+  dumping?: ProductDumping | null;
   createdByUserId?: number | null;
   createdByUser?: LifecycleUserRef;
   reviewedByUserId?: number | null;
@@ -125,7 +127,8 @@ export type ProductLifecycleRouteStage =
   | 'marketplace'
   | 'purchase'
   | 'warehouse'
-  | 'sale_launch';
+  | 'sale_launch'
+  | 'dumping';
 
 export interface ProductWorkflowAction {
   nextActionKey: string;
@@ -222,7 +225,8 @@ export type EmployeeTaskAction =
   | 'submit_review'
   | 'approve'
   | 'return'
-  | 'cancel';
+  | 'cancel'
+  | 'complete';
 
 export interface EmployeeTaskUser {
   id: number;
@@ -323,7 +327,7 @@ export interface UpdateEmployeeTaskDto {
 export interface EmployeeTaskFilters {
   scope?: 'all' | 'assigned' | 'created';
   search?: string;
-  status?: EmployeeTaskStatus | '';
+  status?: EmployeeTaskStatus | 'active' | '';
   priority?: EmployeeTaskPriority | '';
   assignedToUserId?: number | '';
   createdByUserId?: number | '';
@@ -462,6 +466,21 @@ export interface ProductLaunchFlags {
   updatedBy?: number | null;
   completedBy?: number | null;
   completedAt?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ProductDumping {
+  id?: number;
+  productId?: number;
+  minPrice: string | number | null;
+  maxPrice: string | number | null;
+  notes?: string | null;
+  updatedBy?: number | null;
+  connectedBy?: number | null;
+  /** Заполнено, когда демпинг подключён и проверен. */
+  connectedAt?: string | null;
+  connector?: { id: number; name: string } | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -792,6 +811,7 @@ export interface CreateOrderDto {
     productVariationId?: number;
     quantity: number;
     priceAtPurchase: number;
+    rememberSupplierPrice?: boolean;
     notes?: string;
   }>;
 }
@@ -809,6 +829,7 @@ export interface UpdateOrderDto {
     productVariationId?: number;
     quantity: number;
     priceAtPurchase: number;
+    rememberSupplierPrice?: boolean;
     notes?: string;
   }>;
 }

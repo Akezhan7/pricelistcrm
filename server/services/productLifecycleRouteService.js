@@ -6,6 +6,7 @@ const LIFECYCLE_ROUTE_STAGES = Object.freeze({
   PURCHASE: 'purchase',
   WAREHOUSE: 'warehouse',
   SALE_LAUNCH: 'sale_launch',
+  DUMPING: 'dumping',
 });
 
 const LIFECYCLE_ROUTE_ORDER = Object.freeze(Object.values(LIFECYCLE_ROUTE_STAGES));
@@ -16,6 +17,7 @@ const STATUS_BY_ROUTE_STAGE = Object.freeze({
   [LIFECYCLE_ROUTE_STAGES.PURCHASE]: PRODUCT_LIFECYCLE_STATUSES.PURCHASE,
   [LIFECYCLE_ROUTE_STAGES.WAREHOUSE]: PRODUCT_LIFECYCLE_STATUSES.WAREHOUSE,
   [LIFECYCLE_ROUTE_STAGES.SALE_LAUNCH]: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
+  [LIFECYCLE_ROUTE_STAGES.DUMPING]: PRODUCT_LIFECYCLE_STATUSES.DUMPING,
 });
 
 function normalizeLifecycleRoute(stages) {
@@ -58,7 +60,8 @@ function hasActiveLifecycleRoute(product) {
 function assignmentForStage(product, stage) {
   if (stage === LIFECYCLE_ROUTE_STAGES.DESIGN) return product.designerId || null;
   if (stage === LIFECYCLE_ROUTE_STAGES.MARKETPLACE
-    || stage === LIFECYCLE_ROUTE_STAGES.SALE_LAUNCH) {
+    || stage === LIFECYCLE_ROUTE_STAGES.SALE_LAUNCH
+    || stage === LIFECYCLE_ROUTE_STAGES.DUMPING) {
     return product.marketplaceManagerId || null;
   }
   return null;

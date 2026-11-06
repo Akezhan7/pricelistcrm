@@ -8,9 +8,38 @@ export type OrderLineForm = {
   selectedVariation?: ProductVariation | null;
   quantity: number;
   priceAtPurchase: number;
+  /** Цена строки при открытии заявки на правку — для сравнения, если список поставщиков товара не загружен */
+  initialPrice?: number;
+  /** Сохранить цену строки у поставщика (по умолчанию да) */
+  rememberSupplierPrice?: boolean;
   notes?: string;
   uniqueKey?: string;
 };
+
+type RememberPriceLine = Pick<
+  OrderLineForm,
+  'product' | 'productVariationId' | 'priceAtPurchase' | 'initialPrice' | 'rememberSupplierPrice'
+>;
+
+/**
+ * Предлагать ли сохранить цену строки у поставщика: цена отличается от записанной у поставщика
+ * либо поставщик к товару ещё не привязан. Вариации и возвраты цену поставщика не меняют.
+ */
+export function shouldOfferRememberPrice(line: RememberPriceLine, supplierId: number | null | undefined): boolean {
+  if (!supplierId || line.productVariationId || !(line.priceAtPurchase > 0)) return false;
+
+  const suppliers = line.product?.suppliers;
+  if (suppliers) {
+    const link = suppliers.find((supplier) => supplier.id === supplierId);
+    return !link || Number(link.ProductSupplier.supplierPrice) !== line.priceAtPurchase;
+  }
+  return line.initialPrice !== undefined && line.initialPrice !== line.priceAtPurchase;
+}
+
+/** Значение флага для отправки на сервер: true только если галочка была показана и стоит */
+export function getRememberPriceFlag(line: RememberPriceLine, supplierId: number | null | undefined): boolean {
+  return shouldOfferRememberPrice(line, supplierId) && line.rememberSupplierPrice !== false;
+}
 
 /** Предзаполнение из панели поставщика — с полным объектом товара */
 export interface CreateOrderInitialItem {

@@ -68,6 +68,12 @@ const WORKFLOW_ACTION_BY_STATUS = Object.freeze({
     nextActionEnabled: true,
     ownerLabel: 'Склад',
   }),
+  [PRODUCT_LIFECYCLE_STATUSES.DUMPING]: Object.freeze({
+    nextActionKey: 'complete_dumping',
+    nextActionLabel: 'Подключить демпинг',
+    nextActionEnabled: true,
+    ownerLabel: 'Маркетплейс',
+  }),
   [PRODUCT_LIFECYCLE_STATUSES.IN_SALE]: Object.freeze({
     nextActionKey: 'in_sale',
     nextActionLabel: 'В продаже',
@@ -94,6 +100,7 @@ const WORKFLOW_PERMISSION_ACTIONS = Object.freeze({
   complete_warehouse: Object.freeze(['manage_warehouse']),
   complete_sale_launch: Object.freeze(['manage_sale_launch']),
   manage_sale_launch: Object.freeze(['manage_sale_launch']),
+  complete_dumping: Object.freeze(['manage_dumping']),
 });
 
 const ACTIVE_LIFECYCLE_CATALOG_FILTER = Object.freeze({
@@ -191,6 +198,7 @@ function buildProductWorkflowQuery({ user, filters = {} }) {
             ...baseWhere,
             [Op.or]: [
               { lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE },
+              { lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.DUMPING },
               {
                 lifecycleStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
                 lifecycleStartedAt: { [Op.ne]: null },

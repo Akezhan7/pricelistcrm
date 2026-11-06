@@ -1,6 +1,8 @@
 import {
   getMainOrderLineQuantities,
+  getRememberPriceFlag,
   getSupplierSuggestions,
+  shouldOfferRememberPrice,
   updateMainOrderLineQuantity,
   type OrderLineForm,
 } from './orderItems';
@@ -95,4 +97,28 @@ test('finds marketplace product codes with the same normalized token rules', () 
 
   expect(filterProductsBySearch([codeMatch], 'kaspi-77')).toEqual([codeMatch]);
   expect(filterProductsBySearch([codeMatch], 'ИНСТРУМЕНТ аккумуляторный')).toEqual([codeMatch]);
+});
+
+test('offers to remember a supplier price only when it differs or the supplier is not linked', () => {
+  const linked = product(1, [10]); // у поставщика 10 записана цена 90
+
+  expect(shouldOfferRememberPrice({ product: linked, priceAtPurchase: 90 }, 10)).toBe(false);
+  expect(shouldOfferRememberPrice({ product: linked, priceAtPurchase: 80 }, 10)).toBe(true);
+  expect(shouldOfferRememberPrice({ product: linked, priceAtPurchase: 80 }, 20)).toBe(true);
+  expect(shouldOfferRememberPrice({ product: linked, priceAtPurchase: 80, productVariationId: 5 }, 10)).toBe(false);
+  expect(shouldOfferRememberPrice({ product: linked, priceAtPurchase: 80 }, null)).toBe(false);
+});
+
+test('compares with the opening price when the product has no loaded suppliers', () => {
+  expect(shouldOfferRememberPrice({ priceAtPurchase: 120, initialPrice: 100 }, 10)).toBe(true);
+  expect(shouldOfferRememberPrice({ priceAtPurchase: 100, initialPrice: 100 }, 10)).toBe(false);
+  expect(shouldOfferRememberPrice({ priceAtPurchase: 120 }, 10)).toBe(false);
+});
+
+test('sends the remember flag only when the checkbox was offered and left on', () => {
+  const linked = product(1, [10]);
+
+  expect(getRememberPriceFlag({ product: linked, priceAtPurchase: 80 }, 10)).toBe(true);
+  expect(getRememberPriceFlag({ product: linked, priceAtPurchase: 80, rememberSupplierPrice: false }, 10)).toBe(false);
+  expect(getRememberPriceFlag({ product: linked, priceAtPurchase: 90 }, 10)).toBe(false);
 });

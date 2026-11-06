@@ -51,6 +51,7 @@ router.post('/',
   body('items.*.productId').notEmpty().isInt(),
   body('items.*.quantity').notEmpty().isInt({ min: 1 }),
   body('items.*.priceAtPurchase').notEmpty().isFloat({ min: 0 }),
+  body('items.*.rememberSupplierPrice').optional().isBoolean(),
   body('items.*.notes').optional({ nullable: true }).isString().trim(),
   handleValidationErrors,
   orderController.createOrder
@@ -115,6 +116,7 @@ router.put('/:id',
   body('items.*.productId').if(body('items').exists()).notEmpty().isInt(),
   body('items.*.quantity').if(body('items').exists()).notEmpty().isInt({ min: 1 }),
   body('items.*.priceAtPurchase').if(body('items').exists()).notEmpty().isFloat({ min: 0 }),
+  body('items.*.rememberSupplierPrice').optional().isBoolean(),
   handleValidationErrors,
   orderController.updateOrder
 );

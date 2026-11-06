@@ -46,7 +46,7 @@ function resolveActionCategory(actionType) {
   if (/marketplace/.test(actionType)) return 'marketplace';
   if (/purchase/.test(actionType)) return 'purchase';
   if (/warehouse|stock/.test(actionType)) return 'warehouse';
-  if (/sale/.test(actionType)) return 'sale';
+  if (/sale|dumping/.test(actionType)) return 'sale';
   if (/supplier/.test(actionType)) return 'supplier';
   return 'product';
 }

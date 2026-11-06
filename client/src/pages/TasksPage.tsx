@@ -23,6 +23,7 @@ import {
   Badge,
   Button,
   EmptyState,
+  FilterChip,
   IconButton,
   Input,
   Modal,
@@ -73,6 +74,7 @@ const ACTION_LABELS: Record<EmployeeTaskAction, string> = {
   approve: 'Принять',
   return: 'Вернуть',
   cancel: 'Отменить',
+  complete: 'Выполнено',
 };
 
 const HISTORY_ACTION_LABELS: Record<string, string> = {
@@ -84,6 +86,7 @@ const HISTORY_ACTION_LABELS: Record<string, string> = {
   approve: 'Принятие задачи',
   return: 'Возврат на доработку',
   cancel: 'Отмена задачи',
+  complete: 'Задача выполнена',
 };
 
 const ACTION_ICONS: Record<EmployeeTaskAction, typeof PlayCircle> = {
@@ -92,6 +95,7 @@ const ACTION_ICONS: Record<EmployeeTaskAction, typeof PlayCircle> = {
   approve: CheckCircle2,
   return: RotateCcw,
   cancel: XCircle,
+  complete: CheckCircle2,
 };
 
 const ACTION_VARIANTS: Record<EmployeeTaskAction, 'primary' | 'secondary' | 'destructive'> = {
@@ -100,6 +104,7 @@ const ACTION_VARIANTS: Record<EmployeeTaskAction, 'primary' | 'secondary' | 'des
   approve: 'primary',
   return: 'secondary',
   cancel: 'destructive',
+  complete: 'primary',
 };
 
 const EMPTY_FORM: CreateEmployeeTaskDto = {
@@ -299,7 +304,7 @@ export const TasksPage: React.FC = () => {
   const [filters, setFilters] = useState<{
     scope: 'all' | 'assigned' | 'created';
     search: string;
-    status: EmployeeTaskStatus | '';
+    status: EmployeeTaskStatus | 'active' | '';
     priority: EmployeeTaskPriority | '';
     assignedToUserId: number | '';
     overdue: boolean;
@@ -307,7 +312,7 @@ export const TasksPage: React.FC = () => {
   }>({
     scope: isAdmin ? 'all' : 'assigned',
     search: '',
-    status: '',
+    status: 'active',
     priority: '',
     assignedToUserId: '',
     overdue: false,
@@ -606,6 +611,7 @@ export const TasksPage: React.FC = () => {
       if (action === 'start') updated = await tasksApi.startTask(task.id);
       else if (action === 'submit_review') updated = await tasksApi.submitForReview(task.id, actionComment.trim() || undefined);
       else if (action === 'approve') updated = await tasksApi.approveTask(task.id, actionComment.trim() || undefined);
+      else if (action === 'complete') updated = await tasksApi.completeTask(task.id, actionComment.trim() || undefined);
       else if (action === 'return') updated = await tasksApi.returnTask(task.id, actionComment.trim());
       else updated = await tasksApi.cancelTask(task.id, actionComment.trim() || undefined);
 
@@ -645,6 +651,17 @@ export const TasksPage: React.FC = () => {
 
         <div className="rounded-xl border border-border-subtle bg-brand-white shadow-sm overflow-hidden flex min-h-0 flex-1 flex-col">
           <div className="border-b border-border-subtle bg-surface-muted px-4 py-3">
+            <div className="mb-3 flex flex-wrap gap-2">
+              <FilterChip active={filters.status === 'active'} onClick={() => updateFilters({ status: 'active' })}>
+                Активные ({totalActiveTasks})
+              </FilterChip>
+              <FilterChip active={filters.status === 'done'} onClick={() => updateFilters({ status: 'done' })}>
+                Выполненные ({stats.done || 0})
+              </FilterChip>
+              <FilterChip active={filters.status === ''} onClick={() => updateFilters({ status: '' })}>
+                Все
+              </FilterChip>
+            </div>
             {isAdmin && (
               <div className="mb-3 flex flex-wrap gap-2">
                 {[
@@ -682,9 +699,10 @@ export const TasksPage: React.FC = () => {
               <Select
                 label="Статус"
                 value={filters.status}
-                onChange={(event) => updateFilters({ status: event.target.value as EmployeeTaskStatus | '' })}
+                onChange={(event) => updateFilters({ status: event.target.value as EmployeeTaskStatus | 'active' | '' })}
               >
                 <option value="">Все статусы</option>
+                <option value="active">Активные ({totalActiveTasks})</option>
                 {TASK_STATUSES.map((status) => (
                   <option key={status.value} value={status.value}>
                     {status.label} ({stats[status.value] || 0})

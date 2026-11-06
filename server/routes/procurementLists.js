@@ -25,6 +25,7 @@ router.post(
   body('notes').optional({ nullable: true }).isString().trim().isLength({ max: 2000 }),
   body('selectedSupplierId').optional({ nullable: true, checkFalsy: true }).isInt({ min: 1 }),
   body('purchasePrice').optional({ nullable: true, checkFalsy: true }).isFloat({ min: 0 }),
+  body('rememberSupplierPrice').optional().isBoolean(),
   procurementListController.addCurrentListItem
 );
 
@@ -36,6 +37,7 @@ router.patch(
   body('notes').optional({ nullable: true }).isString().trim().isLength({ max: 2000 }),
   body('selectedSupplierId').optional({ nullable: true, checkFalsy: true }).isInt({ min: 1 }),
   body('purchasePrice').optional({ nullable: true, checkFalsy: true }).isFloat({ min: 0 }),
+  body('rememberSupplierPrice').optional().isBoolean(),
   procurementListController.updateCurrentListItem
 );
 

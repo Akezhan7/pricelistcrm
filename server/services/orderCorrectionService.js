@@ -225,7 +225,28 @@ function buildReceivedOrderCorrectionPlan({
   };
 }
 
+const snapshotOrder = (order, items) => ({
+  supplierId: order.supplierId == null ? null : Number(order.supplierId),
+  expectedDeliveryDate: order.expectedDeliveryDate || null,
+  deliveryLocation: order.deliveryLocation || null,
+  notes: order.notes || null,
+  settlementType: order.settlementType,
+  totalAmount: Number(order.totalAmount || 0).toFixed(2),
+  paymentStatus: order.paymentStatus,
+  items: items.map((item) => ({
+    id: Number(item.id),
+    productId: Number(item.productId),
+    productVariationId: item.productVariationId ? Number(item.productVariationId) : null,
+    quantity: Number(item.quantity),
+    orderedQuantity: item.orderedQuantity == null ? null : Number(item.orderedQuantity),
+    priceAtPurchase: Number(item.priceAtPurchase),
+    totalPrice: Number(item.totalPrice).toFixed(2),
+    notes: item.notes || null,
+  })),
+});
+
 module.exports = {
   buildOrderEditPolicy,
   buildReceivedOrderCorrectionPlan,
+  snapshotOrder,
 };

@@ -24,6 +24,7 @@ import procurementListsApi, {
   type ProcurementListItem,
   type ProcurementListItemInput,
   type ProcurementListData,
+  type ProcurementAppendableOrder,
   type ProcurementCreatedOrder,
   type ProcurementSupplier,
 } from '../services/procurementListsApi';
@@ -70,9 +71,11 @@ const ProcurementItemRow: React.FC<ItemRowProps> = ({
   const [purchasePrice, setPurchasePrice] = useState(
     item.purchasePrice === null ? '' : String(item.purchasePrice)
   );
+  const [rememberPrice, setRememberPrice] = useState(item.rememberSupplierPrice);
   const [showAllSuppliers, setShowAllSuppliers] = useState(false);
 
   useEffect(() => {
+    setRememberPrice(item.rememberSupplierPrice);
     setQuantity(String(item.requestedQuantity));
     setObservedStock(item.observedStock === null ? '' : String(item.observedStock));
     setNotes(item.notes || '');
@@ -95,7 +98,15 @@ const ProcurementItemRow: React.FC<ItemRowProps> = ({
     || parsedObservedStock !== item.observedStock
     || notes.trim() !== (item.notes || '')
     || (selectedSupplierId === '' ? null : Number(selectedSupplierId)) !== item.selectedSupplierId
-    || parsedPurchasePrice !== (item.purchasePrice === null ? null : Number(item.purchasePrice));
+    || parsedPurchasePrice !== (item.purchasePrice === null ? null : Number(item.purchasePrice))
+    || rememberPrice !== item.rememberSupplierPrice;
+  const linkedSupplierPrice = item.product.suppliers?.find(
+    (supplier) => String(supplier.id) === selectedSupplierId
+  )?.ProductSupplier?.supplierPrice;
+  const offerRememberPrice = selectedSupplierId !== ''
+    && parsedPurchasePrice !== null
+    && parsedPurchasePrice > 0
+    && (linkedSupplierPrice === undefined || Number(linkedSupplierPrice) !== parsedPurchasePrice);
   const currentSelectedSupplier = suppliers.find(
     (supplier) => String(supplier.id) === selectedSupplierId
   ) || item.selectedSupplier;
@@ -227,16 +238,33 @@ const ProcurementItemRow: React.FC<ItemRowProps> = ({
             </Button>
           </div>
         </div>
-        <Input
-          label="Цена закупа"
-          type="number"
-          min="0"
-          step="0.01"
-          placeholder="Не указана"
-          value={purchasePrice}
-          onChange={(event) => setPurchasePrice(event.target.value)}
-          disabled={busy || selectedSupplierId === ''}
-        />
+        <div>
+          <Input
+            label="Цена закупа"
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="Не указана"
+            value={purchasePrice}
+            onChange={(event) => setPurchasePrice(event.target.value)}
+            disabled={busy || selectedSupplierId === ''}
+          />
+          {offerRememberPrice && (
+            <label
+              className="mt-1 flex cursor-pointer items-center gap-1.5 text-caption text-text-muted"
+              title="Снимите галочку, если цена разовая — у поставщика она не изменится"
+            >
+              <input
+                type="checkbox"
+                checked={rememberPrice}
+                disabled={busy}
+                onChange={(event) => setRememberPrice(event.target.checked)}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              Запомнить у поставщика
+            </label>
+          )}
+        </div>
         <Input
           label="Комментарий"
           value={notes}
@@ -259,6 +287,7 @@ const ProcurementItemRow: React.FC<ItemRowProps> = ({
                 ? null
                 : Number(selectedSupplierId),
               purchasePrice: parsedPurchasePrice,
+              rememberSupplierPrice: rememberPrice,
             })}
           />
           <IconButton
@@ -280,6 +309,9 @@ export const ProcurementListPage: React.FC = () => {
   const { confirm } = useConfirmDialog();
   const [list, setList] = useState<ProcurementList | null>(null);
   const [suppliers, setSuppliers] = useState<ProcurementSupplier[]>([]);
+  const [appendableOrders, setAppendableOrders] = useState<ProcurementAppendableOrder[]>([]);
+  // Выбор по поставщику: id заявки, куда добавить позиции, или 'new' — создать новую
+  const [orderChoices, setOrderChoices] = useState<Record<number, number | 'new'>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
@@ -302,6 +334,7 @@ export const ProcurementListPage: React.FC = () => {
   const applyListData = useCallback((data: ProcurementListData) => {
     setList(data.list);
     setSuppliers(data.suppliers);
+    setAppendableOrders(data.appendableOrders || []);
   }, []);
 
   const loadList = useCallback(async () => {
@@ -493,6 +526,17 @@ export const ProcurementListPage: React.FC = () => {
   }).format(value);
   const readyGroups = supplierGroups.groups.filter((group) => group.withoutPrice === 0);
   const readyItemCount = readyGroups.reduce((total, group) => total + group.positions, 0);
+  const getAppendableOrders = (supplierId: number) => (
+    appendableOrders.filter((order) => order.supplierId === supplierId)
+  );
+  // Если у поставщика одна подходящая заявка — по умолчанию добавляем в неё, иначе создаём новую
+  const getOrderChoice = (supplierId: number): number | 'new' => {
+    const options = getAppendableOrders(supplierId);
+    const choice = orderChoices[supplierId];
+    if (choice === 'new') return 'new';
+    if (typeof choice === 'number' && options.some((order) => order.id === choice)) return choice;
+    return options.length === 1 ? options[0].id : 'new';
+  };
   const visibleItems = useMemo(() => {
     const items = list?.items || [];
     if (supplierFilter === null) return items;
@@ -508,24 +552,30 @@ export const ProcurementListPage: React.FC = () => {
       return;
     }
 
+    const targets = readyGroups.flatMap((group) => {
+      const choice = getOrderChoice(group.id);
+      return typeof choice === 'number' ? [{ supplierId: group.id, orderId: choice }] : [];
+    });
+    const newOrdersCount = readyGroups.length - targets.length;
     const accepted = await confirm({
-      title: 'Создать заявки поставщикам?',
-      message: 'Будет создано заявок: ' + readyGroups.length
+      title: 'Оформить закупку поставщикам?',
+      message: 'Новых заявок: ' + newOrdersCount
+        + ', добавится в существующие: ' + targets.length
         + ', позиций: ' + readyItemCount
         + '. Неготовые позиции останутся в закупочном листе.',
-      confirmLabel: 'Создать заявки',
+      confirmLabel: 'Оформить',
     });
     if (!accepted) return;
 
     setCreatingOrders(true);
     try {
-      const result = await procurementListsApi.createOrders();
+      const result = await procurementListsApi.createOrders(targets);
       applyListData(result);
       setCreatedOrders(result.orders);
       toast.success(
         result.blocked.length > 0
           ? 'Заявки созданы. Неготовые позиции остались в листе.'
-          : 'Все заявки поставщикам созданы.'
+          : 'Заявки поставщикам оформлены.'
       );
     } catch (createError) {
       toast.error(getErrorMessage(createError, 'Не удалось создать заявки'));
@@ -572,8 +622,8 @@ export const ProcurementListPage: React.FC = () => {
           <span className="text-caption text-text-muted">{itemCount}</span>
         </button>
         {supplierGroups.groups.map((group) => (
+          <div key={group.id}>
           <button
-            key={group.id}
             type="button"
             className={`mt-1 w-full border-l-2 px-3 py-2 text-left ${supplierFilter === group.id ? 'border-success bg-success/5' : 'border-transparent hover:bg-surface-muted'}`}
             onClick={() => {
@@ -589,6 +639,26 @@ export const ProcurementListPage: React.FC = () => {
               {formatMoney(group.total)} ₸{group.withoutPrice > 0 ? ` · без цены: ${group.withoutPrice}` : ''}
             </span>
           </button>
+          {canCreateOrders && group.withoutPrice === 0 && getAppendableOrders(group.id).length > 0 && (
+            <select
+              aria-label={'Заявка для поставщика ' + group.name}
+              className="mt-1 w-full border border-border-input bg-brand-white px-2 py-1 text-caption text-brand-black"
+              value={getOrderChoice(group.id)}
+              disabled={creatingOrders}
+              onChange={(event) => setOrderChoices((prev) => ({
+                ...prev,
+                [group.id]: event.target.value === 'new' ? 'new' : Number(event.target.value),
+              }))}
+            >
+              <option value="new">Новая заявка</option>
+              {getAppendableOrders(group.id).map((order) => (
+                <option key={order.id} value={order.id}>
+                  Добавить в {order.orderNumber} ({order.itemCount} поз., {formatMoney(Number(order.totalAmount))} ₸)
+                </option>
+              ))}
+            </select>
+          )}
+          </div>
         ))}
         {supplierGroups.unassigned > 0 && (
           <button
@@ -642,7 +712,9 @@ export const ProcurementListPage: React.FC = () => {
                   onClick={() => navigate('/orders/' + order.id)}
                 >
                   <FileText className="h-4 w-4" aria-hidden />
-                  <span>{order.orderNumber} · {order.supplier.name}</span>
+                  <span>
+                    {order.orderNumber} · {order.supplier.name}{order.merged ? ' · дополнена' : ''}
+                  </span>
                   <ArrowRight className="h-4 w-4" aria-hidden />
                 </button>
               ))}

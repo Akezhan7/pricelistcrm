@@ -102,7 +102,8 @@ function buildStartLifecyclePlan({
   }
 
   if (firstStage === LIFECYCLE_ROUTE_STAGES.MARKETPLACE
-    || firstStage === LIFECYCLE_ROUTE_STAGES.SALE_LAUNCH) {
+    || firstStage === LIFECYCLE_ROUTE_STAGES.SALE_LAUNCH
+    || firstStage === LIFECYCLE_ROUTE_STAGES.DUMPING) {
     productUpdate.assignedToUserId = product.marketplaceManagerId || null;
   }
 
@@ -127,6 +128,7 @@ function buildStartLifecyclePlan({
       createdAt: now,
     },
     resetSaleLaunch: route.includes(LIFECYCLE_ROUTE_STAGES.SALE_LAUNCH),
+    resetDumping: route.includes(LIFECYCLE_ROUTE_STAGES.DUMPING),
     resetLifecyclePurchase: repeated && route.includes(LIFECYCLE_ROUTE_STAGES.PURCHASE),
   };
 }
@@ -174,6 +176,9 @@ function buildBulkStartLifecyclePlan({
     historyEntries: plans.map((plan) => plan.historyEntry),
     resetSaleLaunchProductIds: plans
       .map((plan, index) => plan.resetSaleLaunch ? normalizedProductIds[index] : null)
+      .filter(Boolean),
+    resetDumpingProductIds: plans
+      .map((plan, index) => plan.resetDumping ? normalizedProductIds[index] : null)
       .filter(Boolean),
     resetLifecyclePurchaseProductIds: plans
       .map((plan, index) => plan.resetLifecyclePurchase ? normalizedProductIds[index] : null)

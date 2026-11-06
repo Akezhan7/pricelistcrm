@@ -143,8 +143,11 @@ function buildMarketplaceOwnershipUpdate({ actor, product }) {
   }
 
   const update = { marketplaceManagerId: Number(actor.id) };
-  if ([PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE, PRODUCT_LIFECYCLE_STATUSES.IN_SALE]
-    .includes(product?.lifecycleStatus)) {
+  if ([
+    PRODUCT_LIFECYCLE_STATUSES.MARKETPLACE,
+    PRODUCT_LIFECYCLE_STATUSES.DUMPING,
+    PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
+  ].includes(product?.lifecycleStatus)) {
     update.assignedToUserId = Number(actor.id);
   }
 

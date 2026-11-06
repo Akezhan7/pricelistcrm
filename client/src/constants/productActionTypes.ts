@@ -25,6 +25,8 @@ export const PRODUCT_ACTION_TYPE_LABELS: Record<string, string> = {
   stock_updated: 'Изменил остаток',
   sale_launch_completed: 'Запустил продажи',
   sale_flags_updated: 'Изменил параметры продаж',
+  dumping_updated: 'Изменил параметры демпинга',
+  dumping_connected: 'Подключил демпинг',
 };
 
 export function getProductActionTypeLabel(actionType: string): string {

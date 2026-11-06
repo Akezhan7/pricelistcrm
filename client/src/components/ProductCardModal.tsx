@@ -7,6 +7,7 @@ import {
   Package,
   Save,
   Store,
+  TrendingDown,
   Truck,
 } from 'lucide-react';
 import type { Category, Product, SupplierWithPrice } from '../types';
@@ -19,11 +20,13 @@ import { formatPriceKZT } from '../utils/format';
 import { getProductLifecycleLabel } from '../constants/productLifecycle';
 import { toast } from '../context/ToastContext';
 import { ProductFormFields } from './forms/ProductFormFields';
+import { isCostPriceAutomatic } from '../utils/productCostPrice';
 import type { ProductFormData } from './forms/ProductFormFields';
 import { ProductMarketplacePanel } from './ProductMarketplacePanel';
 import { ProductAssetsPanel } from './ProductAssetsPanel';
 import { ProductWarehousePanel } from './ProductWarehousePanel';
 import { ProductActionTimeline } from './ProductActionTimeline';
+import { ProductDumpingPanel } from './ProductDumpingPanel';
 import { ProductSuppliersModal } from './ProductSuppliersModal';
 import { Alert, Badge, Button, FileUploadZone, Input, Modal, Spinner } from './ui';
 
@@ -40,6 +43,7 @@ type ProductCardTab =
   | 'assets'
   | 'suppliers'
   | 'warehouse'
+  | 'dumping'
   | 'history';
 
 const tabs: Array<{ id: ProductCardTab; label: string; icon: React.ComponentType<{ className?: string }> }> = [
@@ -48,6 +52,7 @@ const tabs: Array<{ id: ProductCardTab; label: string; icon: React.ComponentType
   { id: 'assets', label: 'Материалы', icon: ImageIcon },
   { id: 'suppliers', label: 'Поставщики', icon: Truck },
   { id: 'warehouse', label: 'Склад', icon: Boxes },
+  { id: 'dumping', label: 'Демпинг', icon: TrendingDown },
   { id: 'history', label: 'История', icon: History },
 ];
 
@@ -107,6 +112,7 @@ function ProductSummary({ product }: { product: Product }) {
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-section-title text-brand-black">{product.name}</h3>
           {lifecycleLabel && <Badge variant="outline">{lifecycleLabel}</Badge>}
+          {product.dumping?.connectedAt && <Badge variant="success">✓ Демпинг подключён</Badge>}
         </div>
         <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-text-muted">
           <span>{product.article}</span>
@@ -313,6 +319,7 @@ function MainProductTab({
           onImageChange={setImage}
           currentImageUrl={product.image || null}
           mode="edit"
+          costPriceLocked={isCostPriceAutomatic(product)}
         />
         <div className="flex justify-end border-t border-border-subtle pt-4">
           <Button type="submit" leftIcon={Save} loading={saving} disabled={saving}>
@@ -527,6 +534,8 @@ export const ProductCardModal: React.FC<ProductCardModalProps> = ({
         return <SuppliersTab product={displayProduct} onChanged={handleChanged} />;
       case 'warehouse':
         return <ProductWarehousePanel product={displayProduct} onChanged={handleChanged} />;
+      case 'dumping':
+        return <ProductDumpingPanel product={displayProduct} onChanged={handleChanged} />;
       case 'history':
         return <ProductActionTimeline productId={displayProduct.id} />;
       default:

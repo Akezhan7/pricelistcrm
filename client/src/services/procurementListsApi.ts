@@ -29,6 +29,7 @@ export type ProcurementListItem = {
   notes: string | null;
   selectedSupplierId: number | null;
   purchasePrice: number | string | null;
+  rememberSupplierPrice: boolean;
   selectedSupplier: (ProcurementSupplier & { isActive: boolean }) | null;
   supplierRecommendation: ProcurementSupplierRecommendation;
   product: Pick<Product, 'id' | 'name' | 'internalName' | 'article' | 'image'> & {
@@ -57,11 +58,27 @@ export type ProcurementListItemInput = {
   notes?: string | null;
   selectedSupplierId?: number | null;
   purchasePrice?: number | null;
+  rememberSupplierPrice?: boolean;
+};
+
+export type ProcurementAppendableOrder = {
+  id: number;
+  orderNumber: string;
+  supplierId: number;
+  totalAmount: number | string;
+  createdAt: string;
+  itemCount: number;
+};
+
+export type ProcurementOrderTarget = {
+  supplierId: number;
+  orderId: number;
 };
 
 export type ProcurementListData = {
   list: ProcurementList | null;
   suppliers: ProcurementSupplier[];
+  appendableOrders: ProcurementAppendableOrder[];
 };
 
 export type ProcurementCreatedOrder = {
@@ -70,6 +87,7 @@ export type ProcurementCreatedOrder = {
   totalAmount: number | string;
   supplier: ProcurementSupplier;
   itemCount: number;
+  merged: boolean;
 };
 
 export type ProcurementOrderCreationData = ProcurementListData & {
@@ -125,9 +143,10 @@ class ProcurementListsApi {
     return unwrapData(response);
   }
 
-  async createOrders(): Promise<ProcurementOrderCreationData> {
+  async createOrders(targets: ProcurementOrderTarget[] = []): Promise<ProcurementOrderCreationData> {
     const response = await api.post<ApiResponse<ProcurementOrderCreationData>>(
-      this.baseUrl + '/create-orders'
+      this.baseUrl + '/create-orders',
+      { targets }
     );
     if (!response.data.success || !response.data.data) {
       throw new Error(response.data.message || 'Не удалось создать заявки');

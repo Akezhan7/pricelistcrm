@@ -18,6 +18,7 @@ const EMPLOYEE_TASK_ACTIONS = Object.freeze({
   APPROVE: 'approve',
   RETURN: 'return',
   CANCEL: 'cancel',
+  COMPLETE: 'complete',
 });
 
 const EMPLOYEE_TASK_PRIORITIES = Object.freeze({
@@ -56,6 +57,16 @@ const ACTION_TRANSITIONS = Object.freeze({
       EMPLOYEE_TASK_STATUSES.RETURNED,
     ],
     to: EMPLOYEE_TASK_STATUSES.CANCELLED,
+    actor: 'admin',
+  },
+  // Прямое закрытие без проверки; из «На проверке» задачу закрывает «Принять».
+  [EMPLOYEE_TASK_ACTIONS.COMPLETE]: {
+    from: [
+      EMPLOYEE_TASK_STATUSES.NEW,
+      EMPLOYEE_TASK_STATUSES.IN_PROGRESS,
+      EMPLOYEE_TASK_STATUSES.RETURNED,
+    ],
+    to: EMPLOYEE_TASK_STATUSES.DONE,
     actor: 'admin',
   },
 });
@@ -146,7 +157,13 @@ function buildTaskWhere(user, query = {}) {
     }
   }
 
-  if (query.status) conditions.push({ status: query.status });
+  if (query.status === 'active') {
+    conditions.push({
+      status: { [Op.notIn]: [EMPLOYEE_TASK_STATUSES.DONE, EMPLOYEE_TASK_STATUSES.CANCELLED] },
+    });
+  } else if (query.status) {
+    conditions.push({ status: query.status });
+  }
   if (query.priority) conditions.push({ priority: query.priority });
   if (query.search?.trim()) {
     const pattern = `%${query.search.trim()}%`;

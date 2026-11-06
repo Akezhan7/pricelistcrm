@@ -9,6 +9,7 @@ export const PRODUCT_LIFECYCLE_LABELS: Record<ProductLifecycleStatus, string> = 
   marketplace: 'Маркетплейс',
   purchase: 'Закуп',
   warehouse: 'Склад',
+  dumping: 'Демпинг',
   in_sale: 'В продаже',
   archived: 'Архив',
 };

@@ -112,7 +112,7 @@ function buildSaleLaunchCompletionPlan({
       actorId: actor.id,
       actionType: 'sale_launch_completed',
       fromStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
-      toStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
+      toStatus: routeUpdate?.lifecycleStatus || PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
       message: 'Sale launch completed',
       metadata: routeUpdate ? withLifecycleRunMetadata(product, {
         marketplaceListingId: kaspiListing.id,
@@ -142,7 +142,8 @@ function buildSaleLaunchUpdatePlan({
   payload = {},
   now = new Date(),
 }) {
-  if (!product || product.lifecycleStatus !== PRODUCT_LIFECYCLE_STATUSES.IN_SALE) {
+  if (![PRODUCT_LIFECYCLE_STATUSES.IN_SALE, PRODUCT_LIFECYCLE_STATUSES.DUMPING]
+    .includes(product?.lifecycleStatus)) {
     throw new Error('Sale flags can only be updated for a product in sale');
   }
   assertProductActionAllowed({
@@ -186,7 +187,9 @@ function buildSaleLaunchUpdatePlan({
     productUpdate: {
       marketplaceManagerId: actor.id,
       assignedToUserId: actor.id,
-      ...(!product.lifecycleCompletedAt ? { lifecycleCompletedAt: completedAt } : {}),
+      ...(!product.lifecycleCompletedAt && product.lifecycleStatus === PRODUCT_LIFECYCLE_STATUSES.IN_SALE
+        ? { lifecycleCompletedAt: completedAt }
+        : {}),
     },
     marketplaceListingUpdate: nextCampaignName !== previousCampaignName
       ? { campaignName: nextCampaignName }
@@ -196,8 +199,8 @@ function buildSaleLaunchUpdatePlan({
       productId: product.id,
       actorId: actor.id,
       actionType: 'sale_flags_updated',
-      fromStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
-      toStatus: PRODUCT_LIFECYCLE_STATUSES.IN_SALE,
+      fromStatus: product.lifecycleStatus,
+      toStatus: product.lifecycleStatus,
       message: 'Sale launch settings updated',
       metadata: {
         changedFields,

@@ -22,6 +22,8 @@ export interface ProductListItemProps {
 
     suppliers?: Product['suppliers'];
 
+    dumping?: Product['dumping'];
+
   };
 
   /** Override selling/supplier price display */
@@ -334,6 +336,11 @@ export const ProductListItem: React.FC<ProductListItemProps> = ({
             {lifecycleLabel && (
               <Badge variant="outline" className="shrink-0">
                 {lifecycleLabel}
+              </Badge>
+            )}
+            {product.dumping?.connectedAt && (
+              <Badge variant="success" className="shrink-0">
+                ✓ Демпинг
               </Badge>
             )}
             {isCompact && product.suppliers && product.suppliers.length > 0 && (

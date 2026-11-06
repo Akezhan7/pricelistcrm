@@ -57,6 +57,11 @@ const routeStageOptions: RouteStageOption[] = [
     label: 'Запуск продаж и реклама',
     description: 'Настройка рекламных активностей и параметров продаж.',
   },
+  {
+    value: 'dumping',
+    label: 'Демпинг',
+    description: 'Фиксация мин. и макс. цены и подключение демпинга. Последний этап цикла.',
+  },
 ];
 
 const routePresets: Array<{
@@ -67,7 +72,7 @@ const routePresets: Array<{
   { label: 'Материалы + площадка', stages: ['design', 'marketplace'] },
   {
     label: 'Полный цикл',
-    stages: ['design', 'marketplace', 'purchase', 'warehouse', 'sale_launch'],
+    stages: ['design', 'marketplace', 'purchase', 'warehouse', 'sale_launch', 'dumping'],
   },
 ];
 

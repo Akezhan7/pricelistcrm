@@ -14,7 +14,7 @@ import { Textarea } from './ui/Textarea';
 import { OrderLineItemsEditor, type OrderLineItemEdit } from './forms/OrderLineItemsEditor';
 import { formatPriceKZT } from '../utils/format';
 import { useProductCatalogSearch } from '../hooks/useProductCatalogSearch';
-import { getSupplierListPrice } from '../utils/orderItems';
+import { getRememberPriceFlag, getSupplierListPrice } from '../utils/orderItems';
 
 interface EditOrderModalProps {
   isOpen: boolean;
@@ -116,6 +116,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
             } : null,
             quantity: item.quantity,
             priceAtPurchase: Number(item.priceAtPurchase),
+            initialPrice: Number(item.priceAtPurchase),
             notes: item.notes || '',
             uniqueKey: `existing-${item.id}`,
             isDeleted: false
@@ -192,6 +193,12 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
   const handleUpdatePrice = (index: number, price: number) => {
     const newItems = [...items];
     newItems[index].priceAtPurchase = price;
+    setItems(newItems);
+  };
+
+  const handleToggleRememberPrice = (index: number, remember: boolean) => {
+    const newItems = [...items];
+    newItems[index].rememberSupplierPrice = remember;
     setItems(newItems);
   };
 
@@ -281,6 +288,7 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
           productVariationId: item.productVariationId || undefined,
           quantity: item.quantity,
           priceAtPurchase: item.priceAtPurchase,
+          rememberSupplierPrice: order.type === 'return' ? undefined : getRememberPriceFlag(item, supplierId),
           notes: item.notes || undefined
         }))
       };
@@ -467,6 +475,8 @@ const EditOrderModal: React.FC<EditOrderModalProps> = ({ isOpen, onClose, onSucc
                     emptyMessage="Нет товаров в заявке"
                     onUpdateQuantity={handleUpdateQuantity}
                     onUpdatePrice={handleUpdatePrice}
+                    supplierId={order.type === 'return' ? null : supplierId}
+                    onToggleRememberPrice={handleToggleRememberPrice}
                     onUpdateNotes={handleUpdateNotes}
                     onRemoveItem={handleRemoveItem}
                     onAddVariation={handleAddVariationAsNewItem}

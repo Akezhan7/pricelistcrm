@@ -14,6 +14,7 @@ const {
   ProductMarketplaceListing,
 } = require('../models');
 const { DEBT_STATUSES } = require('../services/orderStatusPolicyService');
+const { syncProductCostPrices } = require('../services/supplierPriceService');
 const path = require('path');
 const fs = require('fs').promises;
 
@@ -241,6 +242,7 @@ const createSupplier = async (req, res) => {
       }));
 
       await ProductSupplier.bulkCreate(productData);
+      await syncProductCostPrices({ productIds: productData.map((p) => p.productId), actorId: req.user.id });
     }
 
     // Получение созданного поставщика с товарами
@@ -344,6 +346,7 @@ const updateSupplier = async (req, res) => {
 
     // Обновление товаров
     if (products && Array.isArray(products)) {
+      const previousLinks = await ProductSupplier.findAll({ where: { supplierId: id }, attributes: ['productId'] });
       // Удаление существующих связей
       await ProductSupplier.destroy({ where: { supplierId: id } });
 
@@ -358,6 +361,10 @@ const updateSupplier = async (req, res) => {
       }));
 
       await ProductSupplier.bulkCreate(productData);
+      await syncProductCostPrices({
+        productIds: [...previousLinks.map((link) => link.productId), ...productData.map((p) => p.productId)],
+        actorId: req.user.id,
+      });
     }
 
     // Получение обновленного поставщика
@@ -404,6 +411,9 @@ const deleteSupplier = async (req, res) => {
     // Мягкое удаление
     await supplier.update({ isActive: false });
 
+    const links = await ProductSupplier.findAll({ where: { supplierId: id }, attributes: ['productId'] });
+    await syncProductCostPrices({ productIds: links.map((link) => link.productId), actorId: req.user.id });
+
     res.json({
       success: true,
       message: 'Поставщик успешно удален',
@@ -431,7 +441,9 @@ const deleteSupplierPermanently = async (req, res) => {
     }
 
     // Удаление связей с товарами
+    const links = await ProductSupplier.findAll({ where: { supplierId: id }, attributes: ['productId'] });
     await ProductSupplier.destroy({ where: { supplierId: id } });
+    await syncProductCostPrices({ productIds: links.map((link) => link.productId), actorId: req.user.id });
 
     // Удаление файла изображения, если он есть
     if (supplier.containerImage) {

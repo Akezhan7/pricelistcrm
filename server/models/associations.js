@@ -28,6 +28,7 @@ const ProductMarketplaceListing = require('./ProductMarketplaceListing');
 const ProductLifecyclePurchase = require('./ProductLifecyclePurchase');
 const ProductWarehouseDetails = require('./ProductWarehouseDetails');
 const ProductLaunchFlags = require('./ProductLaunchFlags');
+const ProductDumping = require('./ProductDumping');
 const ProductDesignerKpiEntry = require('./ProductDesignerKpiEntry');
 const EmployeeTask = require('./EmployeeTask');
 const EmployeeTaskHistory = require('./EmployeeTaskHistory');
@@ -834,6 +835,15 @@ ProductLaunchFlags.belongsTo(Product, { foreignKey: 'productId', as: 'product' }
 ProductLaunchFlags.belongsTo(User, { foreignKey: 'updatedBy', as: 'updater' });
 ProductLaunchFlags.belongsTo(User, { foreignKey: 'completedBy', as: 'completer' });
 
+Product.hasOne(ProductDumping, {
+  foreignKey: 'productId',
+  as: 'dumping',
+  onDelete: 'CASCADE',
+});
+ProductDumping.belongsTo(Product, { foreignKey: 'productId', as: 'product' });
+ProductDumping.belongsTo(User, { foreignKey: 'updatedBy', as: 'updater' });
+ProductDumping.belongsTo(User, { foreignKey: 'connectedBy', as: 'connector' });
+
 Product.hasOne(ProductDesignerKpiEntry, {
   foreignKey: 'productId',
   as: 'designerKpiEntry',
@@ -962,6 +972,7 @@ module.exports = {
   ProductLifecyclePurchase,
   ProductWarehouseDetails,
   ProductLaunchFlags,
+  ProductDumping,
   ProductDesignerKpiEntry,
   EmployeeTask,
   EmployeeTaskHistory,

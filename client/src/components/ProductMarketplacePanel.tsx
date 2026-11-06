@@ -111,11 +111,13 @@ export const ProductMarketplacePanel: React.FC<ProductMarketplacePanelProps> = (
     ? 'Передать на склад'
     : nextRouteStage === 'sale_launch'
       ? 'Передать на запуск продаж'
-      : nextRouteStage
-        ? 'Завершить этап маркетплейса'
-        : product.lifecycleRoute
+      : nextRouteStage === 'dumping'
+        ? 'Передать на демпинг'
+        : nextRouteStage
           ? 'Завершить этап маркетплейса'
-          : 'Передать в закуп';
+          : product.lifecycleRoute
+            ? 'Завершить этап маркетплейса'
+            : 'Передать в закуп';
   const priceNumber = Number(form.price);
   const hasRequiredKaspiData = useMemo(
     () =>

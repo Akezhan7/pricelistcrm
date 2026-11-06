@@ -30,6 +30,7 @@ const ProductMarketplaceListing = require('./ProductMarketplaceListing');
 const ProductLifecyclePurchase = require('./ProductLifecyclePurchase');
 const ProductWarehouseDetails = require('./ProductWarehouseDetails');
 const ProductLaunchFlags = require('./ProductLaunchFlags');
+const ProductDumping = require('./ProductDumping');
 const ProductDesignerKpiEntry = require('./ProductDesignerKpiEntry');
 const EmployeeTask = require('./EmployeeTask');
 const EmployeeTaskHistory = require('./EmployeeTaskHistory');
@@ -74,6 +75,7 @@ module.exports = {
   ProductLifecyclePurchase,
   ProductWarehouseDetails,
   ProductLaunchFlags,
+  ProductDumping,
   ProductDesignerKpiEntry,
   EmployeeTask,
   EmployeeTaskHistory,

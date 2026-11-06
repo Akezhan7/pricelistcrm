@@ -94,6 +94,10 @@ export interface ProductFormFieldsProps {
 
   onCostPriceChange?: (value: string) => void;
 
+  /** Себестоимость берётся из цен поставщиков и вручную не меняется */
+
+  costPriceLocked?: boolean;
+
 }
 
 
@@ -115,6 +119,8 @@ export const ProductFormFields: React.FC<ProductFormFieldsProps> = ({
   mode,
 
   onCostPriceChange,
+
+  costPriceLocked,
 
 }) => {
 
@@ -269,6 +275,10 @@ export const ProductFormFields: React.FC<ProductFormFieldsProps> = ({
           }}
 
           placeholder="1000"
+
+          disabled={costPriceLocked}
+
+          helperText={costPriceLocked ? 'Минимальная цена среди поставщиков в наличии' : undefined}
 
         />
 

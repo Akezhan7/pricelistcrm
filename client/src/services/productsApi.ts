@@ -4,6 +4,7 @@ import type {
   Product,
   ProductLifecyclePurchase,
   ProductLaunchFlags,
+  ProductDumping,
   ProductHistoryPage,
   ProductWarehouseDetails,
 } from '../types';
@@ -60,6 +61,12 @@ export interface ProductSaleLaunchDto {
   sellerBonusEnabled: boolean;
   notes?: string;
   campaignName?: string | null;
+}
+
+export interface ProductDumpingDto {
+  minPrice: number;
+  maxPrice: number;
+  notes?: string | null;
 }
 
 export interface LinkProductSupplierDto {
@@ -217,6 +224,38 @@ class ProductsApi {
       throw new Error(response.data.message || 'Ошибка завершения запуска продаж');
     }
     return response.data.data.launchFlags;
+  }
+
+  async getProductDumping(productId: number): Promise<ProductDumping | null> {
+    const response = await api.get<ApiResponse<{ dumping: ProductDumping | null }>>(
+      `${this.baseUrl}/${productId}/dumping`
+    );
+    if (!response.data.success) {
+      throw new Error(response.data.message || 'Ошибка получения параметров демпинга');
+    }
+    return response.data.data?.dumping ?? null;
+  }
+
+  async saveProductDumping(productId: number, data: ProductDumpingDto): Promise<ProductDumping> {
+    const response = await api.put<ApiResponse<{ dumping: ProductDumping }>>(
+      `${this.baseUrl}/${productId}/dumping`,
+      data
+    );
+    if (!response.data.success || !response.data.data?.dumping) {
+      throw new Error(response.data.message || 'Ошибка сохранения параметров демпинга');
+    }
+    return response.data.data.dumping;
+  }
+
+  async connectProductDumping(productId: number, data: ProductDumpingDto): Promise<ProductDumping> {
+    const response = await api.post<ApiResponse<{ dumping: ProductDumping }>>(
+      `${this.baseUrl}/${productId}/dumping/connect`,
+      data
+    );
+    if (!response.data.success || !response.data.data?.dumping) {
+      throw new Error(response.data.message || 'Ошибка подключения демпинга');
+    }
+    return response.data.data.dumping;
   }
 
   async updateProductLaunchFlags(

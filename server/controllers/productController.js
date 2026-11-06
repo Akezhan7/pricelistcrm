@@ -16,10 +16,12 @@ const {
   ProductLifecyclePurchase,
   ProductWarehouseDetails,
   ProductLaunchFlags,
+  ProductDumping,
   ProductDesignerKpiEntry,
   StockHistory,
   sequelize,
 } = require('../models');
+const { pickMinimumSupplierPrice, syncProductCostPrices } = require('../services/supplierPriceService');
 const path = require('path');
 const fs = require('fs').promises;
 const {
@@ -166,6 +168,11 @@ function buildProductListInclude() {
     {
       model: ProductLaunchFlags,
       as: 'launchFlags',
+      required: false,
+    },
+    {
+      model: ProductDumping,
+      as: 'dumping',
       required: false,
     },
     ...productUserInclude,
@@ -553,6 +560,12 @@ const getProductWorkflowQueue = async (req, res) => {
           required: false,
         },
         {
+          model: ProductDumping,
+          as: 'dumping',
+          attributes: ['id', 'minPrice', 'maxPrice', 'connectedAt'],
+          required: false,
+        },
+        {
           model: ProductMarketplaceListing,
           as: 'marketplaceListings',
           attributes: ['id', 'marketplace', 'status'],
@@ -627,6 +640,11 @@ const getProductById = async (req, res) => {
         {
           model: ProductLaunchFlags,
           as: 'launchFlags',
+          required: false,
+        },
+        {
+          model: ProductDumping,
+          as: 'dumping',
           required: false,
         },
         ...productUserInclude,
@@ -1486,6 +1504,12 @@ const startProductLifecycle = async (req, res) => {
         { where: { productId: product.id }, transaction }
       );
     }
+    if (plan.resetDumping) {
+      await ProductDumping.update(
+        { connectedAt: null, connectedBy: null },
+        { where: { productId: product.id }, transaction }
+      );
+    }
     if (plan.resetLifecyclePurchase) {
       await ProductLifecyclePurchase.destroy({
         where: { productId: product.id },
@@ -1633,6 +1657,12 @@ const bulkStartProductLifecycle = async (req, res) => {
       await ProductLaunchFlags.update(
         { completedAt: null, completedBy: null },
         { where: { productId: { [Op.in]: plan.resetSaleLaunchProductIds } }, transaction }
+      );
+    }
+    if (plan.resetDumpingProductIds.length > 0) {
+      await ProductDumping.update(
+        { connectedAt: null, connectedBy: null },
+        { where: { productId: { [Op.in]: plan.resetDumpingProductIds } }, transaction }
       );
     }
     if (plan.resetLifecyclePurchaseProductIds.length > 0) {
@@ -2745,6 +2775,7 @@ const createProductDraft = async (req, res) => {
         isPreferred: true,
         notes: comment || '',
       }, { transaction });
+      await syncProductCostPrices({ productIds: [product.id], actorId: req.user.id, transaction });
     }
 
     await ProductActionHistory.create(buildProductActionEntry({
@@ -2890,6 +2921,7 @@ const createProduct = async (req, res) => {
       }));
 
       await ProductSupplier.bulkCreate(supplierData, { transaction });
+      await syncProductCostPrices({ productIds: [product.id], actorId: req.user.id, transaction });
     }
 
     await ProductActionHistory.create(buildProductActionEntry({
@@ -3027,11 +3059,22 @@ const updateProduct = async (req, res) => {
       }
     }
 
+    // Себестоимость задаётся минимальной ценой поставщиков «в наличии» и вручную не меняется
+    const supplierLinksAfterUpdate = Array.isArray(suppliers)
+      ? suppliers.map((s) => ({ supplierPrice: s.price, isAvailable: s.isAvailable !== false }))
+      : await ProductSupplier.findAll({
+        where: { productId: id },
+        attributes: ['supplierPrice', 'isAvailable'],
+        include: [{ model: Supplier, as: 'supplier', attributes: ['isActive'] }],
+        transaction,
+      });
+    const costPriceLocked = pickMinimumSupplierPrice(supplierLinksAfterUpdate) !== null;
+
     const updateData = {};
     if (name) updateData.name = name;
     if (article) updateData.article = article;
     if (internalName !== undefined) updateData.internalName = internalName;
-    if (costPrice !== undefined) updateData.costPrice = costPrice;
+    if (costPrice !== undefined && !costPriceLocked) updateData.costPrice = costPrice;
     if (sellingPrice !== undefined) updateData.sellingPrice = sellingPrice;
     if (currentStock !== undefined) updateData.currentStock = parseInt(currentStock) || 0;
     if (minStock !== undefined) updateData.minStock = parseInt(minStock) || 0;
@@ -3051,7 +3094,7 @@ const updateProduct = async (req, res) => {
     const oldSellingPrice = parseFloat(product.sellingPrice);
     
     // Проверка изменений цен
-    const costPriceChanged = costPrice !== undefined && parseFloat(costPrice) !== oldCostPrice;
+    const costPriceChanged = updateData.costPrice !== undefined && parseFloat(costPrice) !== oldCostPrice;
     const sellingPriceChanged = sellingPrice !== undefined && parseFloat(sellingPrice) !== oldSellingPrice;
 
     // Обновление товара
@@ -3100,6 +3143,9 @@ const updateProduct = async (req, res) => {
       }));
 
       await ProductSupplier.bulkCreate(supplierData, { transaction });
+    }
+    if (costPriceLocked) {
+      await syncProductCostPrices({ productIds: [product.id], actorId: req.user.id, transaction });
     }
 
     const productDiff = buildProductUpdateDiff({
@@ -3307,6 +3353,7 @@ const addSupplierToProduct = async (req, res) => {
         supplierPrice: Number(supplierPrice),
       },
     }), { transaction });
+    await syncProductCostPrices({ productIds: [product.id], actorId: req.user.id, transaction });
 
     await transaction.commit();
     transactionFinished = true;
@@ -3388,6 +3435,7 @@ const removeSupplierFromProduct = async (req, res) => {
       toStatus: product.lifecycleStatus,
       metadata: { supplierId: Number(supplierId) },
     }), { transaction });
+    await syncProductCostPrices({ productIds: [product.id], actorId: req.user.id, transaction });
 
     await transaction.commit();
     transactionFinished = true;
@@ -3487,6 +3535,7 @@ const updateProductSupplier = async (req, res) => {
         },
       }), { transaction });
     }
+    await syncProductCostPrices({ productIds: [product.id], actorId: req.user.id, transaction });
 
     await transaction.commit();
     transactionFinished = true;

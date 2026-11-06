@@ -2,6 +2,7 @@ const { validationResult } = require('express-validator');
 const { Op } = require('sequelize');
 const {
   Order,
+  OrderCorrection,
   OrderItem,
   OrderStatusHistory,
   ProcurementList,
@@ -9,21 +10,24 @@ const {
   Product,
   ProductActionHistory,
   ProductLifecyclePurchase,
-  ProductSupplier,
   Supplier,
   User,
   sequelize,
 } = require('../models');
 const {
   PROCUREMENT_LIST_STATUSES,
+  buildOrderMergeItems,
   buildProcurementListItemData,
   buildProcurementListItemUpdate,
   buildProcurementOrderGroups,
   buildSupplierRecommendation,
+  normalizeOrderTargets,
 } = require('../services/procurementListService');
 const { generateOrderNumber } = require('../services/orderNumberService');
+const { buildOrderItemSyncPlan } = require('../services/orderItemSyncService');
+const { snapshotOrder } = require('../services/orderCorrectionService');
 const { PRODUCT_LIFECYCLE_STATUSES } = require('../constants/productLifecycle');
-const { PRODUCT_ACTION_TYPES } = require('../constants/productHistory');
+const { saveSupplierPrice, syncProductCostPrices } = require('../services/supplierPriceService');
 
 const USER_ATTRIBUTES = ['id', 'name', 'email', 'role'];
 const PRODUCT_ATTRIBUTES = [
@@ -98,18 +102,44 @@ async function findCurrentList(transaction = null) {
   });
 }
 
+// Заявки, в которые можно добавить позиции листа: неоплаченные, в статусе «Создана»
+async function loadAppendableOrders() {
+  const orders = await Order.findAll({
+    where: {
+      type: 'purchase',
+      status: 'Создана',
+      isActive: true,
+      paidAmount: 0,
+      supplierId: { [Op.ne]: null },
+    },
+    attributes: ['id', 'orderNumber', 'supplierId', 'totalAmount', 'createdAt'],
+    include: [{ model: OrderItem, as: 'items', attributes: ['id'] }],
+    order: [['createdAt', 'DESC']],
+  });
+
+  return orders.map((order) => ({
+    id: order.id,
+    orderNumber: order.orderNumber,
+    supplierId: order.supplierId,
+    totalAmount: order.totalAmount,
+    createdAt: order.createdAt,
+    itemCount: order.items.length,
+  }));
+}
+
 async function loadCurrentListData() {
-  const [list, suppliers] = await Promise.all([
+  const [list, suppliers, appendableOrders] = await Promise.all([
     findCurrentList(),
     Supplier.findAll({
       where: { isActive: true },
       attributes: ['id', 'name'],
       order: [['name', 'ASC']],
     }),
+    loadAppendableOrders(),
   ]);
 
   if (!list || list.items.length === 0) {
-    return { list, suppliers };
+    return { list, suppliers, appendableOrders };
   }
 
   const productIds = list.items.map((item) => item.productId);
@@ -160,7 +190,7 @@ async function loadCurrentListData() {
     }),
   }));
 
-  return { list: serializedList, suppliers };
+  return { list: serializedList, suppliers, appendableOrders };
 }
 
 async function getOrCreateCurrentList(actorId, transaction) {
@@ -413,11 +443,151 @@ async function deleteCurrentListItem(req, res) {
   }
 }
 
+async function createOrderForGroup({ group, list, actor, now, transaction }) {
+  const orderNumber = await generateOrderNumber({ transaction, date: now });
+  const order = await Order.create({
+    orderNumber,
+    supplierId: group.supplierId,
+    type: 'purchase',
+    settlementType: 'standard',
+    expectedDeliveryDate: null,
+    deliveryLocation: 'Точка Байсад',
+    totalAmount: group.totalAmount.toFixed(2),
+    paidAmount: 0,
+    status: 'Создана',
+    paymentStatus: 'Не оплачено',
+    notes: 'Создано из закупочного листа №' + list.id,
+    createdBy: actor.id,
+    isActive: true,
+  }, { transaction });
+
+  await OrderStatusHistory.create({
+    orderId: order.id,
+    oldStatus: null,
+    newStatus: 'Создана',
+    changedBy: actor.id,
+    comment: 'Заявка создана из закупочного листа',
+    changedAt: now,
+  }, { transaction });
+
+  const entries = [];
+  for (const plannedItem of group.items) {
+    const orderItem = await OrderItem.create({
+      orderId: order.id,
+      productId: plannedItem.productId,
+      productVariationId: null,
+      quantity: plannedItem.quantity,
+      priceAtPurchase: plannedItem.purchasePrice,
+      totalPrice: (
+        plannedItem.quantity * plannedItem.purchasePrice
+      ).toFixed(2),
+      notes: plannedItem.notes,
+    }, { transaction });
+    entries.push({ plannedItem, orderItem, consumed: false });
+  }
+
+  return { order, entries, merged: false };
+}
+
+async function addGroupToExistingOrder({ group, targetOrderId, list, actor, now, transaction }) {
+  // Добавлять можно только в неоплаченную заявку этого поставщика, пока она ещё «Создана»
+  const order = await Order.findOne({
+    where: {
+      id: targetOrderId,
+      supplierId: group.supplierId,
+      type: 'purchase',
+      status: 'Создана',
+      isActive: true,
+      paidAmount: 0,
+    },
+    transaction,
+    lock: true,
+  });
+  if (!order) {
+    const error = new Error(
+      'Выбранная заявка недоступна для добавления: она должна быть неоплаченной, в статусе «Создана» и у того же поставщика'
+    );
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const [existingItems, lifecyclePurchases] = await Promise.all([
+    OrderItem.findAll({
+      where: { orderId: order.id },
+      order: [['id', 'ASC']],
+      transaction,
+      lock: true,
+    }),
+    ProductLifecyclePurchase.findAll({
+      where: { orderId: order.id },
+      transaction,
+      lock: true,
+    }),
+  ]);
+  const beforeData = snapshotOrder(order, existingItems);
+
+  const mergePlan = buildOrderMergeItems({ existingItems, plannedItems: group.items });
+  const syncPlan = buildOrderItemSyncPlan({
+    orderId: order.id,
+    existingItems,
+    lifecyclePurchases,
+    incomingItems: mergePlan.incomingItems,
+  });
+
+  const existingById = new Map(existingItems.map((item) => [Number(item.id), item]));
+  for (const update of syncPlan.updates) {
+    await existingById.get(update.id).update(update.data, { transaction });
+  }
+  for (const update of syncPlan.lifecyclePurchaseUpdates) {
+    await ProductLifecyclePurchase.update(update.data, {
+      where: { id: update.id, orderId: order.id },
+      transaction,
+    });
+  }
+
+  const entries = mergePlan.mergedPlannedItems.map((plannedItem) => ({
+    plannedItem,
+    orderItem: existingItems.find(
+      (item) => !item.productVariationId && Number(item.productId) === plannedItem.productId
+    ),
+    consumed: true,
+  }));
+  for (let index = 0; index < syncPlan.creates.length; index += 1) {
+    const orderItem = await OrderItem.create(syncPlan.creates[index], { transaction });
+    entries.push({
+      plannedItem: mergePlan.appendedPlannedItems[index],
+      orderItem,
+      consumed: false,
+    });
+  }
+
+  order.totalAmount = syncPlan.totalAmount;
+  await order.save({ transaction });
+
+  const finalItems = await OrderItem.findAll({
+    where: { orderId: order.id },
+    order: [['id', 'ASC']],
+    transaction,
+  });
+  await OrderCorrection.create({
+    orderId: order.id,
+    correctionType: 'pre_receipt_edit',
+    reason: `Добавлено из закупочного листа №${list.id}`,
+    beforeData,
+    afterData: snapshotOrder(order, finalItems),
+    changedBy: actor.id,
+    createdAt: now,
+  }, { transaction });
+
+  return { order, entries, merged: true };
+}
+
 async function createOrdersFromCurrentList(req, res) {
   const transaction = await sequelize.transaction();
   let transactionFinished = false;
 
   try {
+    const orderTargets = normalizeOrderTargets(req.body?.targets);
     const list = await ProcurementList.findOne({
       where: { status: PROCUREMENT_LIST_STATUSES.OPEN },
       transaction,
@@ -492,104 +662,57 @@ async function createOrdersFromCurrentList(req, res) {
       lifecyclePurchases.map((purchase) => [Number(purchase.productId), purchase])
     );
     const createdOrders = [];
+    const pricedProductIds = new Set();
     const now = new Date();
 
     for (const group of plan.groups) {
-      const orderNumber = await generateOrderNumber({ transaction, date: now });
-      const order = await Order.create({
-        orderNumber,
-        supplierId: group.supplierId,
-        type: 'purchase',
-        settlementType: 'standard',
-        expectedDeliveryDate: null,
-        deliveryLocation: 'Точка Байсад',
-        totalAmount: group.totalAmount.toFixed(2),
-        paidAmount: 0,
-        status: 'Создана',
-        paymentStatus: 'Не оплачено',
-        notes: 'Создано из закупочного листа №' + list.id,
-        createdBy: req.user.id,
-        isActive: true,
-      }, { transaction });
+      const targetOrderId = orderTargets.get(group.supplierId);
+      const { order, entries, merged } = targetOrderId
+        ? await addGroupToExistingOrder({
+          group, targetOrderId, list, actor: req.user, now, transaction,
+        })
+        : await createOrderForGroup({ group, list, actor: req.user, now, transaction });
 
-      await OrderStatusHistory.create({
-        orderId: order.id,
-        oldStatus: null,
-        newStatus: 'Создана',
-        changedBy: req.user.id,
-        comment: 'Заявка создана из закупочного листа',
-        changedAt: now,
-      }, { transaction });
-
-      for (const plannedItem of group.items) {
-        const orderItem = await OrderItem.create({
-          orderId: order.id,
-          productId: plannedItem.productId,
-          productVariationId: null,
-          quantity: plannedItem.quantity,
-          priceAtPurchase: plannedItem.purchasePrice,
-          totalPrice: (
-            plannedItem.quantity * plannedItem.purchasePrice
-          ).toFixed(2),
-          notes: plannedItem.notes,
-        }, { transaction });
-
-        const [updatedCount] = await ProcurementListItem.update(
-          { orderItemId: orderItem.id },
-          {
-            where: {
-              id: plannedItem.procurementListItemId,
-              procurementListId: list.id,
-              orderItemId: null,
-            },
+      for (const { plannedItem, orderItem, consumed } of entries) {
+        if (consumed) {
+          // Количество влилось в существующую строку заявки, у которой уже есть своя позиция листа
+          await ProcurementListItem.destroy({
+            where: { id: plannedItem.procurementListItemId, procurementListId: list.id, orderItemId: null },
             transaction,
+          });
+        } else {
+          const [updatedCount] = await ProcurementListItem.update(
+            { orderItemId: orderItem.id },
+            {
+              where: {
+                id: plannedItem.procurementListItemId,
+                procurementListId: list.id,
+                orderItemId: null,
+              },
+              transaction,
+            }
+          );
+          if (updatedCount !== 1) {
+            const error = new Error('Закупочный лист был изменён во время оформления');
+            error.statusCode = 409;
+            throw error;
           }
-        );
-        if (updatedCount !== 1) {
-          const error = new Error('Закупочный лист был изменён во время оформления');
-          error.statusCode = 409;
-          throw error;
         }
 
         const product = productsById.get(plannedItem.productId);
 
-        // Подтверждённая закупка фиксируется в каталоге поставщика: товар появляется у него с ценой закупа.
-        const [supplierLink, linkCreated] = await ProductSupplier.findOrCreate({
-          where: { productId: plannedItem.productId, supplierId: group.supplierId },
-          defaults: {
-            supplierPrice: plannedItem.purchasePrice,
-            quantity: 0,
-            isAvailable: true,
-            isPreferred: false,
-          },
-          transaction,
-        });
-        const previousSupplierPrice = Number(supplierLink.supplierPrice);
-        const supplierPriceChanged = !linkCreated && previousSupplierPrice !== plannedItem.purchasePrice;
-        if (supplierPriceChanged) {
-          await supplierLink.update({ supplierPrice: plannedItem.purchasePrice }, { transaction });
-        }
-        if (linkCreated || supplierPriceChanged) {
-          await ProductActionHistory.create({
-            productId: plannedItem.productId,
+        if (plannedItem.rememberSupplierPrice) {
+          await saveSupplierPrice({
+            product,
+            supplierId: group.supplierId,
+            price: plannedItem.purchasePrice,
             actorId: req.user.id,
-            actionType: linkCreated
-              ? PRODUCT_ACTION_TYPES.SUPPLIER_LINKED
-              : PRODUCT_ACTION_TYPES.SUPPLIER_UPDATED,
-            fromStatus: product.lifecycleStatus,
-            toStatus: product.lifecycleStatus,
-            message: linkCreated
-              ? 'Supplier linked from procurement list'
-              : 'Supplier price updated from procurement list',
-            metadata: {
-              supplierId: group.supplierId,
-              supplierPrice: plannedItem.purchasePrice,
-              ...(supplierPriceChanged ? { previousSupplierPrice } : {}),
-              orderNumber,
-              procurementListId: list.id,
-            },
-            createdAt: now,
-          }, { transaction });
+            source: 'procurement list',
+            metadata: { orderNumber: order.orderNumber, procurementListId: list.id },
+            transaction,
+            now,
+          });
+          pricedProductIds.add(plannedItem.productId);
         }
 
         if (
@@ -620,7 +743,7 @@ async function createOrdersFromCurrentList(req, res) {
               supplierId: group.supplierId,
               quantity: plannedItem.quantity,
               purchasePrice: plannedItem.purchasePrice,
-              orderNumber,
+              orderNumber: order.orderNumber,
               procurementListId: list.id,
             },
             createdAt: now,
@@ -635,8 +758,16 @@ async function createOrdersFromCurrentList(req, res) {
         totalAmount: order.totalAmount,
         supplier: { id: supplier.id, name: supplier.name },
         itemCount: group.items.length,
+        merged,
       });
     }
+
+    await syncProductCostPrices({
+      productIds: [...pricedProductIds],
+      actorId: req.user.id,
+      transaction,
+      now,
+    });
 
     const remainingItems = await ProcurementListItem.count({
       where: { procurementListId: list.id, orderItemId: null },

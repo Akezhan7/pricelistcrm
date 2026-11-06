@@ -134,6 +134,14 @@ class TasksApi {
     return unwrap(response, 'Не удалось вернуть задачу').task;
   }
 
+  async completeTask(id: number, comment?: string): Promise<EmployeeTask> {
+    const response = await api.patch<ApiResponse<{ task: EmployeeTask }>>(
+      `${this.baseUrl}/${id}/complete`,
+      { comment }
+    );
+    return unwrap(response, 'Не удалось выполнить задачу').task;
+  }
+
   async cancelTask(id: number, comment?: string): Promise<EmployeeTask> {
     const response = await api.patch<ApiResponse<{ task: EmployeeTask }>>(
       `${this.baseUrl}/${id}/cancel`,

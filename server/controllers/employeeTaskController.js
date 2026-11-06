@@ -532,7 +532,10 @@ async function applyTaskAction(req, res, action) {
 
       if (action === EMPLOYEE_TASK_ACTIONS.SUBMIT_REVIEW) updateData.submittedAt = new Date();
       if (action === EMPLOYEE_TASK_ACTIONS.RETURN) updateData.submittedAt = null;
-      if (action === EMPLOYEE_TASK_ACTIONS.APPROVE) updateData.completedAt = new Date();
+      if (
+        action === EMPLOYEE_TASK_ACTIONS.APPROVE
+        || action === EMPLOYEE_TASK_ACTIONS.COMPLETE
+      ) updateData.completedAt = new Date();
       if (action === EMPLOYEE_TASK_ACTIONS.CANCEL) updateData.cancelledAt = new Date();
 
       await task.update(updateData, { transaction });
@@ -583,4 +586,5 @@ module.exports = {
   approveTask: (req, res) => applyTaskAction(req, res, EMPLOYEE_TASK_ACTIONS.APPROVE),
   returnTask: (req, res) => applyTaskAction(req, res, EMPLOYEE_TASK_ACTIONS.RETURN),
   cancelTask: (req, res) => applyTaskAction(req, res, EMPLOYEE_TASK_ACTIONS.CANCEL),
+  completeTask: (req, res) => applyTaskAction(req, res, EMPLOYEE_TASK_ACTIONS.COMPLETE),
 };

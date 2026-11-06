@@ -21,6 +21,7 @@ const {
   StockHistory,
 } = require('../models');
 const { recalculateSupplierDebt } = require('./paymentController');
+const { isProductCostPriceLocked, rememberOrderItemPrices } = require('../services/supplierPriceService');
 const { createPriceHistoryRecord } = require('./priceHistoryController');
 const { formatOrderMessage, generateWhatsAppLink } = require('../utils/whatsappFormatter');
 const { generateOrderNumber } = require('../services/orderNumberService');
@@ -28,6 +29,7 @@ const { buildOrderItemSyncPlan } = require('../services/orderItemSyncService');
 const {
   buildOrderEditPolicy,
   buildReceivedOrderCorrectionPlan,
+  snapshotOrder,
 } = require('../services/orderCorrectionService');
 const {
   buildSettlementChange,
@@ -478,6 +480,16 @@ exports.createOrder = async (req, res) => {
       changedAt: new Date()
     }, { transaction });
 
+    if (orderType === 'purchase' && normalizedSupplierId) {
+      await rememberOrderItemPrices({
+        items,
+        supplierId: normalizedSupplierId,
+        actorId: req.user.id,
+        metadata: { orderNumber, orderId: order.id },
+        transaction,
+      });
+    }
+
     await transaction.commit();
 
     // Пересчитать задолженность поставщика
@@ -816,6 +828,16 @@ exports.updateOrder = async (req, res) => {
       transaction,
     });
 
+    if (items !== undefined && order.type === 'purchase' && order.supplierId) {
+      await rememberOrderItemPrices({
+        items,
+        supplierId: order.supplierId,
+        actorId: req.user.id,
+        metadata: { orderNumber: order.orderNumber, orderId: order.id },
+        transaction,
+      });
+    }
+
     if (supplierChanged) {
       const orderItemIds = finalItems.map((item) => Number(item.id));
       if (order.supplierId && orderItemIds.length > 0) {
@@ -919,26 +941,6 @@ exports.updateOrder = async (req, res) => {
     });
   }
 };
-
-const snapshotOrder = (order, items) => ({
-  supplierId: order.supplierId == null ? null : Number(order.supplierId),
-  expectedDeliveryDate: order.expectedDeliveryDate || null,
-  deliveryLocation: order.deliveryLocation || null,
-  notes: order.notes || null,
-  settlementType: order.settlementType,
-  totalAmount: Number(order.totalAmount || 0).toFixed(2),
-  paymentStatus: order.paymentStatus,
-  items: items.map((item) => ({
-    id: Number(item.id),
-    productId: Number(item.productId),
-    productVariationId: item.productVariationId ? Number(item.productVariationId) : null,
-    quantity: Number(item.quantity),
-    orderedQuantity: item.orderedQuantity == null ? null : Number(item.orderedQuantity),
-    priceAtPurchase: Number(item.priceAtPurchase),
-    totalPrice: Number(item.totalPrice).toFixed(2),
-    notes: item.notes || null,
-  })),
-});
 
 const getOrderDocumentCounts = async (order, transaction) => {
   const [receiptCount, paymentCount] = await Promise.all([
@@ -1608,7 +1610,8 @@ exports.updateProductPricesFromOrder = async (req, res) => {
       let priceChanged = false;
 
       // Обновление себестоимости
-      if (newCostPrice !== undefined && parseFloat(newCostPrice) !== oldCostPrice) {
+      const costPriceLocked = await isProductCostPriceLocked(product.id, transaction);
+      if (newCostPrice !== undefined && !costPriceLocked && parseFloat(newCostPrice) !== oldCostPrice) {
         await createPriceHistoryRecord({
           productId: product.id,
           oldPrice: oldCostPrice,
